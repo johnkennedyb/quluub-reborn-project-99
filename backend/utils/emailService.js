@@ -2,7 +2,7 @@
 const nodemailer = require('nodemailer');
 
 // Configure nodemailer with Whogohost settings
-const transporter = nodemailer.createTransporter({
+const transporter = nodemailer.createTransport({
   host: 'mail.quluub.com',
   port: 465, // Use 465 for SSL or 587 for TLS
   secure: true, // true for 465, false for other ports
