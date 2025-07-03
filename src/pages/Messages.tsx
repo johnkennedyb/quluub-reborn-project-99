@@ -308,7 +308,7 @@ const Messages = () => {
         </div>
 
         {/* Chat Window */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+        <div className="flex-1 p-4 space-y-4 bg-gray-50">
           {loading ? (
             <div className="flex items-center justify-center h-full">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
