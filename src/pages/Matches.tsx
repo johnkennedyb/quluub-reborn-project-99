@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import Navbar from "@/components/Navbar";
@@ -107,7 +106,7 @@ const Matches = () => {
               <div key={match._id}>
                 <MatchCard 
                   name={`${match.fname} ${match.lname}`}
-                  age={calculateAge(match.dob as string) || 0}
+                  age={calculateAge(match.dob?.toString()) || 0}
                   location={match.country || "Location not specified"}
                   photoUrl=""
                   matchDate={match.relationship?.createdAt ? formatMatchDate(match.relationship.createdAt) : "Recently"}

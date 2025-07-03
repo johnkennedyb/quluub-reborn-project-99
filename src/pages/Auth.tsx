@@ -19,13 +19,13 @@ const Auth = () => {
     window.location.href = getGoogleAuthUrl();
   };
 
-  const handleLoginSuccess = (userData: any) => {
-    login(userData);
+  const handleLoginSuccess = async (userData: any) => {
+    await login(userData);
     navigate('/dashboard');
   };
 
-  const handleSignupSuccess = (userData: any) => {
-    login(userData);
+  const handleSignupSuccess = async (userData: any) => {
+    await login(userData);
     navigate('/dashboard');
   };
 
@@ -44,11 +44,11 @@ const Auth = () => {
             </TabsList>
             
             <TabsContent value="login">
-              <LoginForm onSuccess={handleLoginSuccess} />
+              <LoginForm />
             </TabsContent>
             
             <TabsContent value="signup">
-              <SignupForm onSuccess={handleSignupSuccess} />
+              <SignupForm />
             </TabsContent>
           </Tabs>
 

@@ -197,7 +197,7 @@ const Search = () => {
   // Sort users based on selection
   const sortedUsers = users ? [...users].sort((a, b) => {
     if (sortBy === "newest") {
-      return new Date(b.created || 0).getTime() - new Date(a.created || 0).getTime();
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
     } else if (sortBy === "lastSeen") {
       return new Date(b.lastSeen || 0).getTime() - new Date(a.lastSeen || 0).getTime();
     }

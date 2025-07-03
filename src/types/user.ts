@@ -1,4 +1,3 @@
-
 export interface User {
   _id: string;
   id?: string;
@@ -43,6 +42,17 @@ export interface User {
   profile_pic?: string;
   createdAt?: Date;
   updatedAt?: Date;
+  traits?: string;
+  height?: string;
+  weight?: string;
+  revert?: string;
+  sect?: string;
+  scholarsSpeakers?: string;
+  dressingCovering?: string;
+  islamicPractice?: string;
+  openToMatches?: string;
+  dealbreakers?: string;
+  icebreakers?: string;
 }
 
 export interface LoginCredentials {
