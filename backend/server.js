@@ -14,9 +14,9 @@ connectDB();
 
 const app = express();
 
-const allowedOrigins = process.env.NODE_ENV === 'production'
-  ? ['https://quluub-reborn-project-33.vercel.app']  // add your actual production frontend URL(s)
-  : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:8080'];
+const allowedOrigins = [
+  'https://quluub-reborn-project-33.vercel.app'
+];
 
 const corsOptions = {
   origin: function (origin, callback) {
