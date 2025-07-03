@@ -16,7 +16,7 @@ const app = express();
 
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://your-domain.com', 'https://www.your-domain.com']
+    ? ['https://your-domain.com', 'https://quluub-reborn-project-33.vercel.app']
     : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:8080'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
