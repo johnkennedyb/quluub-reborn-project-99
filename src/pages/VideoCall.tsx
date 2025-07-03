@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useState, useContext } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -6,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Clock, Users, PhoneOff } from "lucide-react";
 import { loadJitsiScript, createJitsiMeeting } from "@/lib/jitsi";
 import { AuthContext } from "@/contexts/AuthContext";
+import apiClient from "@/lib/api-client";
 
 const VideoCall = () => {
   const { toast } = useToast();
@@ -81,12 +81,23 @@ const VideoCall = () => {
       .padStart(2, "0")}`;
   };
 
-  const handleCallTimeout = () => {
+  const handleCallTimeout = async () => {
     toast({
       title: "Call Time Limit Reached",
       description: "Your 5-minute call has ended",
       variant: "destructive",
     });
+    
+    // Update call status to completed
+    try {
+      await apiClient.put('/video-call/status', {
+        roomId,
+        status: 'completed'
+      });
+    } catch (error) {
+      console.error('Error updating call status:', error);
+    }
+    
     handleEndCall();
   };
 
@@ -115,6 +126,18 @@ const VideoCall = () => {
       initializingRef.current = true;
       setCallState("connecting");
       
+      // Check if call exists and get call info
+      try {
+        const callResponse = await apiClient.get(`/video-call/room/${roomId}`);
+        console.log('Call info:', callResponse.data);
+      } catch (error: any) {
+        if (error.response?.status === 404) {
+          console.log('Call not found, this might be a direct room join');
+        } else {
+          console.error('Error fetching call info:', error);
+        }
+      }
+      
       // Load Jitsi script
       await loadJitsiScript();
       
@@ -141,10 +164,21 @@ const VideoCall = () => {
       jitsiApiRef.current = jitsiApi;
 
       // Set up event listeners
-      jitsiApi.addEventListener('videoConferenceJoined', () => {
+      jitsiApi.addEventListener('videoConferenceJoined', async () => {
         console.log('Joined Jitsi call as:', displayName);
         setCallState("connected");
         setParticipantCount(1);
+        
+        // Update call status to ongoing
+        try {
+          await apiClient.put('/video-call/status', {
+            roomId,
+            status: 'ongoing'
+          });
+        } catch (error) {
+          console.error('Error updating call status to ongoing:', error);
+        }
+        
         toast({
           title: "Call Connected",
           description: "You have 5 minutes for this call",
@@ -152,8 +186,19 @@ const VideoCall = () => {
         initializingRef.current = false;
       });
 
-      jitsiApi.addEventListener('videoConferenceLeft', () => {
+      jitsiApi.addEventListener('videoConferenceLeft', async () => {
         console.log('Left Jitsi call');
+        
+        // Update call status
+        try {
+          await apiClient.put('/video-call/status', {
+            roomId,
+            status: 'completed'
+          });
+        } catch (error) {
+          console.error('Error updating call status:', error);
+        }
+        
         handleEndCall();
       });
 
@@ -286,7 +331,7 @@ const VideoCall = () => {
                 {getStatusMessage()}
               </p>
               <p className="text-sm text-gray-300 mt-2">
-                Authenticated users only • 5 minute limit
+                Authenticated users only • 5 minute limit • Rejoin anytime
               </p>
             </div>
           </div>
