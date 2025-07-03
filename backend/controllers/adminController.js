@@ -11,7 +11,7 @@ const { sendMatchChatReportEmail } = require('../utils/emailService');
 // @desc    Get comprehensive admin dashboard statistics
 // @route   GET /api/admin/stats
 // @access  Private (Admin only)
-exports.getAdminStats = async (req, res) => {
+exports.getStats = async (req, res) => {
   try {
     console.log('Fetching comprehensive admin statistics...');
     
@@ -878,7 +878,7 @@ const sendChatReport = async (req, res) => {
 };
 
 module.exports = {
-  getAdminStats,
+  getStats,
   getAllUsers,
   getUserDetails,
   updateUserStatus,
