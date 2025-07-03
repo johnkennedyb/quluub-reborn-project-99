@@ -13,21 +13,32 @@ const Auth = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("login");
 
   const handleGoogleAuth = () => {
     setIsLoading(true);
     window.location.href = getGoogleAuthUrl();
   };
 
-  const handleLoginSuccess = async (userData: any) => {
-    await login(userData);
+  const handleLogin = async (username: string, password: string) => {
+    await login({ username, password });
     navigate('/dashboard');
   };
 
-  const handleSignupSuccess = async (userData: any) => {
-    await login(userData);
+  const handleSignup = async (name: string, email: string, password: string, gender: string) => {
+    const [fname, ...lnameParts] = name.split(' ');
+    const lname = lnameParts.join(' ') || '';
+    
+    await login({
+      username: email, // Use email as username for signup
+      password,
+      // Additional signup data would be handled by the signup endpoint
+    });
     navigate('/dashboard');
   };
+
+  const switchToSignup = () => setActiveTab("signup");
+  const switchToLogin = () => setActiveTab("login");
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
@@ -37,18 +48,24 @@ const Auth = () => {
           <CardDescription>Your Islamic marriage platform</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="login" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Login</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
             </TabsList>
             
             <TabsContent value="login">
-              <LoginForm />
+              <LoginForm 
+                onLogin={handleLogin}
+                onSwitchToSignup={switchToSignup}
+              />
             </TabsContent>
             
             <TabsContent value="signup">
-              <SignupForm />
+              <SignupForm 
+                onSignup={handleSignup}
+                onSwitchToLogin={switchToLogin}
+              />
             </TabsContent>
           </Tabs>
 
