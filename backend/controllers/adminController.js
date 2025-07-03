@@ -942,19 +942,7 @@ const getReferralAnalysis = async (req, res) => {
 };
 
 module.exports = {
-  getStats,
-  getAllUsers,
-  getUserDetails,
-  updateUserStatus,
-  updateUserPlan,
-  updateUserProfile,
-  deleteUser,
-  resetUserPassword,
-  toggleUserHidden,
-  getSystemMetrics,
-  getAllCalls,
-  saveCallRecord,
-  uploadCallRecording,
+  
   sendBulkEmail,
   getEmailMetrics,
   getMatchingInsights,
