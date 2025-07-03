@@ -757,7 +757,7 @@ const getChatReports = async (req, res) => {
       query = {
         $or: [
           { senderId: userId1, receiverId: userId2 },
-          { senderId: userId1, receiverId: userId2 }
+          { senderId: userId2, receiverId: userId1 }
         ]
       };
     }
@@ -877,14 +877,80 @@ const sendChatReport = async (req, res) => {
   }
 };
 
+// Placeholder functions for missing exports
+const sendBulkEmail = async (req, res) => {
+  try {
+    res.status(501).json({ message: 'Bulk email functionality not implemented yet' });
+  } catch (error) {
+    console.error('Error in sendBulkEmail:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+const getEmailMetrics = async (req, res) => {
+  try {
+    res.status(501).json({ message: 'Email metrics functionality not implemented yet' });
+  } catch (error) {
+    console.error('Error in getEmailMetrics:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+const getMatchingInsights = async (req, res) => {
+  try {
+    res.status(501).json({ message: 'Matching insights functionality not implemented yet' });
+  } catch (error) {
+    console.error('Error in getMatchingInsights:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+const getEngagementMetrics = async (req, res) => {
+  try {
+    res.status(501).json({ message: 'Engagement metrics functionality not implemented yet' });
+  } catch (error) {
+    console.error('Error in getEngagementMetrics:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+const getConversionMetrics = async (req, res) => {
+  try {
+    res.status(501).json({ message: 'Conversion metrics functionality not implemented yet' });
+  } catch (error) {
+    console.error('Error in getConversionMetrics:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+const getChurnAnalysis = async (req, res) => {
+  try {
+    res.status(501).json({ message: 'Churn analysis functionality not implemented yet' });
+  } catch (error) {
+    console.error('Error in getChurnAnalysis:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+const getReferralAnalysis = async (req, res) => {
+  try {
+    res.status(501).json({ message: 'Referral analysis functionality not implemented yet' });
+  } catch (error) {
+    console.error('Error in getReferralAnalysis:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 module.exports = {
   getStats,
   getAllUsers,
   getUserDetails,
   updateUserStatus,
   updateUserPlan,
+  updateUserProfile,
   deleteUser,
   resetUserPassword,
+  toggleUserHidden,
   getSystemMetrics,
   getAllCalls,
   saveCallRecord,
