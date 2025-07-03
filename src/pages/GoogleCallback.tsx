@@ -9,7 +9,7 @@ import apiClient from '@/lib/api-client';
 const GoogleCallback = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { updateUser } = useAuth();
   const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(true);
 
@@ -42,14 +42,19 @@ const GoogleCallback = () => {
       }
 
       try {
+        console.log('Processing Google OAuth callback with code');
+        
         // Send the authorization code to your backend
         const response = await apiClient.post('/auth/google', {
           code,
           redirectUri: `${window.location.origin}/auth/google/callback`
         });
 
-        if (response.data.token) {
+        if (response.data.token && response.data.user) {
           localStorage.setItem('token', response.data.token);
+          
+          // Update the user context
+          updateUser(response.data.user);
           
           toast({
             title: 'Login Successful',
@@ -69,23 +74,31 @@ const GoogleCallback = () => {
 
           navigate(redirectTo);
         } else {
-          throw new Error('No token received from server');
+          throw new Error('No token or user data received from server');
         }
       } catch (error: any) {
         console.error('Google authentication error:', error);
+        const errorMessage = error.response?.data?.message || 'Failed to authenticate with Google';
+        
         toast({
           title: 'Authentication Failed',
-          description: error.response?.data?.message || 'Failed to authenticate with Google',
+          description: errorMessage,
           variant: 'destructive',
         });
-        navigate('/auth');
+        
+        // If the error is about missing required fields, redirect to complete signup
+        if (errorMessage.includes('gender') || errorMessage.includes('required')) {
+          navigate('/auth?completeProfile=true');
+        } else {
+          navigate('/auth');
+        }
       } finally {
         setIsProcessing(false);
       }
     };
 
     handleGoogleCallback();
-  }, [searchParams, navigate, toast]);
+  }, [searchParams, navigate, toast, updateUser]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">

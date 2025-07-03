@@ -1,3 +1,4 @@
+
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -40,6 +41,12 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    console.error('API Error:', {
+      url: error.config?.url,
+      status: error.response?.status,
+      message: error.response?.data?.message || error.message
+    });
+
     if (error.response?.status === 401) {
       // Check if this was an admin request
       if (error.config?.url?.includes('/admin/')) {
@@ -51,8 +58,9 @@ apiClient.interceptors.response.use(
         }
       } else {
         // Regular user token expired
+        console.error('❌ User authentication failed, clearing user token');
         localStorage.removeItem('token');
-        if (!window.location.pathname.includes('/admin')) {
+        if (!window.location.pathname.includes('/admin') && !window.location.pathname.includes('/auth')) {
           window.location.href = '/auth';
         }
       }
@@ -64,11 +72,16 @@ apiClient.interceptors.response.use(
 // Auth service
 export const authService = {
   login: async (credentials: { username: string; password: string }) => {
-    const response = await apiClient.post('/auth/login', credentials);
-    if (response.data.token) {
-      localStorage.setItem('token', response.data.token);
+    try {
+      const response = await apiClient.post('/auth/login', credentials);
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
+      }
+      return response.data;
+    } catch (error) {
+      console.error('Auth service login error:', error);
+      throw error;
     }
-    return response.data;
   },
   
   signup: async (userData: {
@@ -78,22 +91,38 @@ export const authService = {
     fname: string;
     lname: string;
     gender: string;
+    parentEmail?: string;
   }) => {
-    const response = await apiClient.post('/auth/signup', userData);
-    if (response.data.token) {
-      localStorage.setItem('token', response.data.token);
+    try {
+      const response = await apiClient.post('/auth/signup', userData);
+      if (response.data.token) {
+        localStorage.setItem('token', response.data.token);
+      }
+      return response.data;
+    } catch (error) {
+      console.error('Auth service signup error:', error);
+      throw error;
     }
-    return response.data;
   },
   
   getCurrentUser: async () => {
-    const response = await apiClient.get('/auth/profile');
-    return response.data;
+    try {
+      const response = await apiClient.get('/auth/profile');
+      return response.data;
+    } catch (error) {
+      console.error('Auth service getCurrentUser error:', error);
+      throw error;
+    }
   },
   
   getProfile: async () => {
-    const response = await apiClient.get('/auth/profile');
-    return response.data;
+    try {
+      const response = await apiClient.get('/auth/profile');
+      return response.data;
+    } catch (error) {
+      console.error('Auth service getProfile error:', error);
+      throw error;
+    }
   },
   
   logout: () => {
@@ -101,8 +130,13 @@ export const authService = {
   },
   
   changePassword: async (passwordData: { currentPassword: string; newPassword: string }) => {
-    const response = await apiClient.put('/auth/change-password', passwordData);
-    return response.data;
+    try {
+      const response = await apiClient.put('/auth/change-password', passwordData);
+      return response.data;
+    } catch (error) {
+      console.error('Auth service changePassword error:', error);
+      throw error;
+    }
   }
 };
 

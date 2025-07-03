@@ -1,6 +1,6 @@
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useToast } from '@/hooks/use-toast';
+import { createContext, useContext, useEffect, useState } from 'react';
+import { adminService } from '@/lib/api-client';
 
 interface AdminUser {
   _id: string;
@@ -15,78 +15,70 @@ interface AdminAuthContextType {
   adminUser: AdminUser | null;
   isAdminAuthenticated: boolean;
   isLoading: boolean;
-  adminLogin: (credentials: { username: string; password: string }) => Promise<void>;
+  adminLogin: (credentials: { username: string; password: string }) => Promise<AdminUser>;
   adminLogout: () => void;
 }
 
-const AdminAuthContext = createContext<AdminAuthContextType | undefined>(undefined);
+const AdminAuthContext = createContext<AdminAuthContextType>({
+  adminUser: null,
+  isAdminAuthenticated: false,
+  isLoading: true,
+  adminLogin: async () => {
+    throw new Error('AdminAuth context not initialized');
+  },
+  adminLogout: () => {},
+});
 
-export const useAdminAuth = () => {
-  const context = useContext(AdminAuthContext);
-  if (context === undefined) {
-    throw new Error('useAdminAuth must be used within an AdminAuthProvider');
-  }
-  return context;
-};
+export const useAdminAuth = () => useContext(AdminAuthContext);
 
-interface AdminAuthProviderProps {
-  children: ReactNode;
-}
-
-export const AdminAuthProvider = ({ children }: AdminAuthProviderProps) => {
+export const AdminAuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const { toast } = useToast();
-
-  const isAdminAuthenticated = !!adminUser;
 
   useEffect(() => {
-    const initializeAuth = async () => {
-      const token = localStorage.getItem('adminToken');
-      const storedAdminUser = localStorage.getItem('adminUser');
-      
-      console.log('🔍 Admin auth init:', { hasToken: !!token, hasUser: !!storedAdminUser });
-      
-      if (token && storedAdminUser) {
-        try {
-          console.log('🔍 Verifying stored admin token...');
-          
-          // Test the token with a simple API call
-          const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/admin/stats`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          });
-          
-          if (response.ok) {
+    const initializeAdminAuth = async () => {
+      try {
+        const adminToken = localStorage.getItem('adminToken');
+        const storedAdminUser = localStorage.getItem('adminUser');
+        
+        console.log('🔍 Admin auth init:', {
+          hasToken: !!adminToken,
+          hasUser: !!storedAdminUser
+        });
+
+        if (adminToken && storedAdminUser) {
+          try {
             const parsedUser = JSON.parse(storedAdminUser);
-            console.log('✅ Admin token verified, user restored:', parsedUser.username);
+            console.log('Admin user found in storage:', parsedUser.username);
+            
+            // Verify the token is still valid by making a test request
+            await adminService.getStats();
             setAdminUser(parsedUser);
-          } else {
-            console.log('❌ Admin token validation failed, clearing storage');
+            console.log('Admin authentication verified');
+          } catch (error) {
+            console.error('Admin token verification failed:', error);
             localStorage.removeItem('adminToken');
             localStorage.removeItem('adminUser');
           }
-        } catch (error) {
-          console.error('❌ Admin token validation error:', error);
-          localStorage.removeItem('adminToken');
-          localStorage.removeItem('adminUser');
+        } else {
+          console.log('No admin authentication found');
         }
+      } catch (error) {
+        console.error('Failed to initialize admin auth:', error);
+        localStorage.removeItem('adminToken');
+        localStorage.removeItem('adminUser');
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
 
-    initializeAuth();
+    initializeAdminAuth();
   }, []);
 
-  const adminLogin = async (credentials: { username: string; password: string }) => {
+  const adminLogin = async (credentials: { username: string; password: string }): Promise<AdminUser> => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      
-      console.log('🔐 Attempting admin login for:', credentials.username);
-      
-      // Use the regular auth login but validate admin privileges
+      // Use the regular login endpoint but check for admin type
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/auth/login`, {
         method: 'POST',
         headers: {
@@ -96,54 +88,26 @@ export const AdminAuthProvider = ({ children }: AdminAuthProviderProps) => {
       });
 
       const data = await response.json();
-      console.log('🔐 Login response:', { 
-        status: response.status, 
-        userType: data.user?.type,
-        hasUser: !!data.user,
-        hasToken: !!data.token
-      });
 
       if (!response.ok) {
         throw new Error(data.message || 'Login failed');
       }
 
-      // Check if user is admin - accept both 'ADMIN' and 'admin' for flexibility
-      const userType = data.user?.type?.toUpperCase();
-      if (!data.user || userType !== 'ADMIN') {
-        console.log('❌ Admin access denied:', {
-          userExists: !!data.user,
-          userType: data.user?.type,
-          expectedType: 'ADMIN'
-        });
+      // Check if user is admin
+      if (data.user.type !== 'ADMIN') {
         throw new Error('Access denied. Admin privileges required.');
       }
 
-      // Store admin-specific token and user data
-      const adminToken = data.token;
-      const adminUserData = {
-        ...data.user,
-        type: 'ADMIN' as const // Normalize to uppercase
-      };
-
-      console.log('✅ Storing admin credentials:', {
-        token: adminToken.substring(0, 10) + '...',
-        userData: adminUserData.username
-      });
-
-      localStorage.setItem('adminToken', adminToken);
-      localStorage.setItem('adminUser', JSON.stringify(adminUserData));
+      console.log('✅ Admin login successful:', data.user.username);
       
-      setAdminUser(adminUserData);
-
-      toast({
-        title: "Admin login successful",
-        description: "Welcome to the admin dashboard!",
-      });
-    } catch (error: any) {
-      console.error('❌ Admin login error:', error);
-      // Clean up any partial state
-      localStorage.removeItem('adminToken');
-      localStorage.removeItem('adminUser');
+      // Store admin token and user data
+      localStorage.setItem('adminToken', data.token);
+      localStorage.setItem('adminUser', JSON.stringify(data.user));
+      
+      setAdminUser(data.user);
+      return data.user;
+    } catch (error) {
+      console.error('Admin login error:', error);
       throw error;
     } finally {
       setIsLoading(false);
@@ -151,27 +115,22 @@ export const AdminAuthProvider = ({ children }: AdminAuthProviderProps) => {
   };
 
   const adminLogout = () => {
-    console.log('🔐 Admin logout');
     localStorage.removeItem('adminToken');
     localStorage.removeItem('adminUser');
     setAdminUser(null);
-    
-    toast({
-      title: "Logged out",
-      description: "You have been logged out of the admin panel.",
-    });
-  };
-
-  const value: AdminAuthContextType = {
-    adminUser,
-    isAdminAuthenticated,
-    isLoading,
-    adminLogin,
-    adminLogout,
+    console.log('Admin logged out');
   };
 
   return (
-    <AdminAuthContext.Provider value={value}>
+    <AdminAuthContext.Provider
+      value={{
+        adminUser,
+        isAdminAuthenticated: !!adminUser,
+        isLoading,
+        adminLogin,
+        adminLogout,
+      }}
+    >
       {children}
     </AdminAuthContext.Provider>
   );

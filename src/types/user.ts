@@ -1,3 +1,4 @@
+
 export interface User {
   _id: string;
   id?: string;
@@ -5,61 +6,43 @@ export interface User {
   email: string;
   fname: string;
   lname: string;
-  plan?: string | null;
-  gender: "male" | "female";
-  dob?: string | Date | null;
-  startedPracticing?: string | Date | null;
-  hidden?: boolean | null;
-  status?: string;
-  type?: string;
-  validationToken?: string;
-  resetPasswordToken?: string;
-  resetPasswordTokenExpiration?: Date | null;
+  parentEmail?: string;
+  plan?: string;
+  gender: 'male' | 'female' | 'other';
+  dob?: Date;
+  startedPracticing?: Date;
+  hidden?: boolean;
+  emailVerified?: boolean;
+  status?: 'active' | 'inactive' | 'pending' | 'suspended' | 'banned';
+  type?: 'USER' | 'ADMIN';
   referralCode?: string;
   referredBy?: string;
-  referralStatus?: string;
+  referralStatus?: 'Pending' | 'Verified' | 'Rejected';
   referralStats?: {
     totalReferrals: number;
     activeReferrals: number;
     completedReferrals: number;
   };
   videoCallCredits?: number;
-  waliDetails?: string; // JSON string
+  waliDetails?: string;
   kunya?: string;
   nationality?: string;
   country?: string;
   region?: string;
-  build?: string | null;
-  appearance?: string | null;
+  build?: string;
+  appearance?: string;
   maritalStatus?: string;
   noOfChildren?: string;
-  ethnicity?: string; // JSON string array
+  ethnicity?: string;
   patternOfSalaah?: string;
-  genotype?: string | null;
+  genotype?: string;
   summary?: string;
   workEducation?: string;
   lastSeen?: Date;
   favorites?: string[];
-  traits?: string; // JSON string array
-  revert?: string;
-  scholarsSpeakers?: string;
-  height?: string | null;
-  weight?: string | null;
-  emailVerified?: boolean;
-  profile_pic?: string | null;
-  sect?: string | null;
-  dressingCovering?: string | null;
-  islamicPractice?: string | null;
-  otherDetails?: string | null;
-  openToMatches?: string | null;
-  dealbreakers?: string | null;
-  icebreakers?: string | null;
-  interests?: string; // JSON string array
-  sessionId?: string | null;
-  created?: string;
-  updated?: string;
-  deleted?: string | null;
-  parentEmail?: string | null;
+  profile_pic?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 export interface LoginCredentials {
@@ -73,58 +56,27 @@ export interface SignupData {
   password: string;
   fname: string;
   lname: string;
-  gender: "male" | "female";
+  gender: 'male' | 'female' | 'other';
+  parentEmail?: string;
 }
 
 export interface AuthResponse {
+  _id: string;
+  username: string;
+  email: string;
+  fname: string;
+  lname: string;
+  gender: string;
+  type: string;
   token: string;
   user: User;
 }
 
-export interface ConnectionRequest {
+export interface AdminUser {
   _id: string;
-  relationship: {
-    id: string;
-    status: string;
-  };
+  username: string;
+  email: string;
   fname: string;
   lname: string;
-  country?: string;
-  profile_pic?: string;
-}
-
-export interface Chat {
-  _id: string;
-  senderId: string;
-  receiverId: string;
-  message: string;
-  createdAt: string;
-  read: boolean;
-}
-
-export interface Conversation {
-  user: User;
-  lastMessage?: Chat;
-  unreadCount: number;
-}
-
-export interface MatchCardProps {
-  name: string;
-  age: number;
-  location: string;
-  photoUrl: string;
-  tags: string[];
-  userId: string;
-  onLike: () => Promise<void>;
-  onPass: () => void;
-  onMessage: () => void;
-  matchDate?: string;
-  bio?: string;
-  onChat?: () => void;
-}
-
-export interface VideoCallSettings {
-  duration: number; // in minutes
-  participants: User[];
-  callId: string;
+  type: 'ADMIN';
 }

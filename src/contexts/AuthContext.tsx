@@ -39,12 +39,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const token = localStorage.getItem('token');
         if (token) {
           console.log('Found token in storage, fetching user data...');
-          const currentUser = await authService.getCurrentUser();
-          if (currentUser) {
-            console.log('User authenticated:', currentUser.username);
-            setUser(currentUser);
-          } else {
-            console.log('No user data returned despite having token');
+          try {
+            const currentUser = await authService.getCurrentUser();
+            if (currentUser) {
+              console.log('User authenticated:', currentUser.username);
+              setUser(currentUser);
+            } else {
+              console.log('No user data returned despite having token');
+              localStorage.removeItem('token'); // Clean up invalid token
+            }
+          } catch (error) {
+            console.error('Failed to fetch current user:', error);
             localStorage.removeItem('token'); // Clean up invalid token
           }
         } else {
@@ -68,6 +73,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('Login successful:', response.user.username);
       setUser(response.user);
       return response.user;
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -80,6 +88,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.log('Signup successful:', response.user.username);
       setUser(response.user);
       return response.user;
+    } catch (error) {
+      console.error('Signup error:', error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -93,7 +104,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const updateUser = (userData: Partial<User>) => {
     if (user) {
-      setUser({ ...user, ...userData });
+      const updatedUser = { ...user, ...userData };
+      setUser(updatedUser);
+      console.log('User updated:', updatedUser);
     }
   };
 

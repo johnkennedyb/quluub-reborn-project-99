@@ -1,3 +1,4 @@
+
 const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -9,6 +10,15 @@ const crypto = require('crypto');
 const signup = async (req, res) => {
   try {
     const { username, email, password, fname, lname, gender, parentEmail } = req.body;
+
+    console.log('Signup attempt:', { username, email, fname, lname, gender });
+
+    // Validate required fields
+    if (!username || !email || !password || !fname || !lname || !gender) {
+      return res.status(400).json({ 
+        message: 'All fields are required: username, email, password, fname, lname, gender' 
+      });
+    }
 
     // Check if user already exists
     const existingUser = await User.findOne({ 
@@ -74,6 +84,8 @@ const adminSignup = async (req, res) => {
   try {
     const { username, email, password, fname, lname, adminKey } = req.body;
 
+    console.log('Admin signup attempt:', { username, email, fname, lname });
+
     // Verify admin key (you should set this in your environment variables)
     const ADMIN_SIGNUP_KEY = process.env.ADMIN_SIGNUP_KEY || 'admin123';
     if (adminKey !== ADMIN_SIGNUP_KEY) {
@@ -99,7 +111,7 @@ const adminSignup = async (req, res) => {
     const user = await User.create({
       username,
       email,
-      password: hashedPassword, // Now properly hashed
+      password: hashedPassword,
       fname,
       lname,
       gender: 'other', // Default for admin
@@ -140,6 +152,12 @@ const adminSignup = async (req, res) => {
 const login = async (req, res) => {
   try {
     const { username, password } = req.body;
+
+    console.log('Login attempt:', { username });
+
+    if (!username || !password) {
+      return res.status(400).json({ message: 'Username and password are required' });
+    }
 
     // Find user by username or email
     const user = await User.findOne({
@@ -193,7 +211,7 @@ const login = async (req, res) => {
 };
 
 // Google OAuth handler
-exports.googleAuth = async (req, res) => {
+const googleAuth = async (req, res) => {
   try {
     const { code } = req.body;
     console.log('Google OAuth: Received authorization code');
@@ -251,7 +269,7 @@ exports.googleAuth = async (req, res) => {
       await user.save();
       console.log('Google OAuth: Existing user signed in:', user.email);
     } else {
-      // Create new user
+      // Create new user with default gender
       const username = googleUser.email.split('@')[0] + Math.random().toString(36).substr(2, 4);
       
       user = new User({
@@ -261,10 +279,13 @@ exports.googleAuth = async (req, res) => {
         username,
         googleId: googleUser.id,
         password: crypto.randomBytes(32).toString('hex'), // Random password for Google users
-        isEmailVerified: googleUser.verified_email || true,
+        emailVerified: googleUser.verified_email || true,
         status: 'active',
         plan: 'freemium',
-        lastSeen: new Date()
+        gender: 'other', // Default gender for Google OAuth users
+        parentEmail: googleUser.email, // Use Google email as parent email
+        lastSeen: new Date(),
+        type: 'USER'
       });
 
       await user.save();
@@ -276,13 +297,16 @@ exports.googleAuth = async (req, res) => {
     res.json({
       token,
       user: {
+        _id: user._id,
         id: user._id,
         fname: user.fname,
         lname: user.lname,
         email: user.email,
         username: user.username,
         plan: user.plan,
-        status: user.status
+        status: user.status,
+        type: user.type,
+        gender: user.gender
       }
     });
 
