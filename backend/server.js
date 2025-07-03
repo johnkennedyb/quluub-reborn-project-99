@@ -14,30 +14,16 @@ connectDB();
 
 const app = express();
 
-const allowedOrigins = [
-  'https://quluub-reborn-project-33.vercel.app'
-];
-
 const corsOptions = {
-  origin: function (origin, callback) {
-    // allow requests with no origin like Postman or curl
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error(`CORS policy: Origin ${origin} not allowed`));
-    }
-  },
+  origin: 'https://quluub-reborn-project-33.vercel.app',
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
 };
 
-// Use CORS middleware
 app.use(cors(corsOptions));
 
+
 // Enable preflight across all routes
-app.options('*', cors(corsOptions));
+
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -80,6 +66,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: corsOptions
 });
+
 
 global.io = io;
 
