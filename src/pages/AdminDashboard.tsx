@@ -1,0 +1,242 @@
+
+import React, { useState } from 'react';
+import { useAdminData } from '@/hooks/useAdminData';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { useAdminAuth } from '@/contexts/AdminAuthContext';
+import { Loader2, Users, BarChart3, Mail, Settings, Phone } from 'lucide-react';
+import MemberManagement from '@/components/admin/MemberManagement';
+import DashboardInsights from '@/components/admin/DashboardInsights';
+
+const AdminDashboard = () => {
+  const { adminUser, adminLogout } = useAdminAuth();
+  const { stats, users, calls, loading, error } = useAdminData();
+  const [activeTab, setActiveTab] = useState('overview');
+
+  if (loading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-red-600" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-red-600 mb-2">Error Loading Dashboard</h2>
+          <p className="text-gray-600 mb-4">{error.message}</p>
+          <Button onClick={() => window.location.reload()}>Retry</Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+              <p className="text-sm text-gray-600">Welcome back, {adminUser?.fname} {adminUser?.lname}</p>
+            </div>
+            <Button variant="outline" onClick={adminLogout}>
+              Logout
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="overview" className="flex items-center space-x-2">
+              <BarChart3 className="h-4 w-4" />
+              <span>Overview</span>
+            </TabsTrigger>
+            <TabsTrigger value="members" className="flex items-center space-x-2">
+              <Users className="h-4 w-4" />
+              <span>Members</span>
+            </TabsTrigger>
+            <TabsTrigger value="insights" className="flex items-center space-x-2">
+              <BarChart3 className="h-4 w-4" />
+              <span>Insights</span>
+            </TabsTrigger>
+            <TabsTrigger value="communication" className="flex items-center space-x-2">
+              <Mail className="h-4 w-4" />
+              <span>Communication</span>
+            </TabsTrigger>
+            <TabsTrigger value="calls" className="flex items-center space-x-2">
+              <Phone className="h-4 w-4" />
+              <span>Calls</span>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Overview Tab */}
+          <TabsContent value="overview">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Members</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats?.totalMembers || 0}</div>
+                  <p className="text-xs text-muted-foreground">
+                    +{stats?.recentRegistrations || 0} this week
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Matches</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats?.totalMatches || 0}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {stats?.successRate || 0}% success rate
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Premium Members</CardTitle>
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats?.premiumMembers || 0}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {stats?.conversionRate || 0}% conversion rate
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Messages Exchanged</CardTitle>
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{stats?.messagesExchanged || 0}</div>
+                  <p className="text-xs text-muted-foreground">
+                    +{stats?.messagesThisWeek || 0} this week
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Quick Actions */}
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle>Quick Actions</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Button 
+                    onClick={() => setActiveTab('members')}
+                    className="h-20 flex flex-col items-center justify-center"
+                  >
+                    <Users className="h-6 w-6 mb-2" />
+                    Manage Members
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={() => setActiveTab('insights')}
+                    className="h-20 flex flex-col items-center justify-center"
+                  >
+                    <BarChart3 className="h-6 w-6 mb-2" />
+                    View Insights
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={() => setActiveTab('communication')}
+                    className="h-20 flex flex-col items-center justify-center"
+                  >
+                    <Mail className="h-6 w-6 mb-2" />
+                    Send Messages
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Members Tab */}
+          <TabsContent value="members">
+            <MemberManagement stats={stats} />
+          </TabsContent>
+
+          {/* Insights Tab */}
+          <TabsContent value="insights">
+            <DashboardInsights stats={stats} />
+          </TabsContent>
+
+          {/* Communication Tab */}
+          <TabsContent value="communication">
+            <Card>
+              <CardHeader>
+                <CardTitle>Communication & Notifications</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <Mail className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Email Communication</h3>
+                  <p className="text-gray-500 mb-4">
+                    Send bulk emails, manage templates, and track email campaigns.
+                  </p>
+                  <Button>Configure Email Settings</Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Calls Tab */}
+          <TabsContent value="calls">
+            <Card>
+              <CardHeader>
+                <CardTitle>Video Call Management</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold">{calls?.length || 0}</div>
+                      <div className="text-sm text-gray-600">Total Calls</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold">5</div>
+                      <div className="text-sm text-gray-600">Min Limit</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold">100%</div>
+                      <div className="text-sm text-gray-600">Recorded</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold">24h</div>
+                      <div className="text-sm text-gray-600">Avg Response</div>
+                    </div>
+                  </div>
+                  
+                  <div className="text-center py-4">
+                    <p className="text-gray-500">
+                      All video calls are automatically recorded and sent to parent/wali emails.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </main>
+    </div>
+  );
+};
+
+export default AdminDashboard;
