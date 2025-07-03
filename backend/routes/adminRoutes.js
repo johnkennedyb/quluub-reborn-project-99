@@ -1,9 +1,11 @@
+
 const express = require('express');
 const {
   getStats,
   getAllUsers,
   getUserDetails,
   updateUserStatus,
+  updateUserPlan,
   updateUser,
   deleteUser,
   resetUserPassword,
@@ -62,7 +64,9 @@ router.get('/users/:id', getUserDetails);
 
 // User management routes
 router.put('/users/:id/status', updateUserStatus);
+router.put('/users/:id/plan', updateUserPlan);
 router.put('/users/:id', updateUser);
+router.put('/users/:id/reset-password', resetUserPassword);
 router.delete('/users/:id', deleteUser);
 
 // System routes
@@ -76,5 +80,14 @@ router.post('/call-recordings', upload.single('recording'), uploadCallRecording)
 // Chat management routes
 router.get('/chat-reports', getChatReports);
 router.post('/send-chat-report', sendChatReport);
+
+// Email and analytics routes (placeholders)
+router.post('/bulk-email', sendBulkEmail);
+router.get('/email-metrics', getEmailMetrics);
+router.get('/matching-insights', getMatchingInsights);
+router.get('/engagement-metrics', getEngagementMetrics);
+router.get('/conversion-metrics', getConversionMetrics);
+router.get('/churn-analysis', getChurnAnalysis);
+router.get('/referral-analysis', getReferralAnalysis);
 
 module.exports = router;

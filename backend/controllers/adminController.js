@@ -392,9 +392,9 @@ exports.updateUserPlan = async (req, res) => {
 };
 
 // @desc    Update user profile (admin edit)
-// @route   PUT /api/admin/users/:id/profile
+// @route   PUT /api/admin/users/:id
 // @access  Private (Admin only)
-exports.updateUserProfile = async (req, res) => {
+exports.updateUser = async (req, res) => {
   try {
     const userId = req.params.id;
     const updates = req.body;
@@ -747,8 +747,10 @@ exports.uploadCallRecording = async (req, res) => {
   }
 };
 
-// Get chat reports between matched users
-const getChatReports = async (req, res) => {
+// @desc    Get chat reports between matched users
+// @route   GET /api/admin/chat-reports
+// @access  Private (Admin only)
+exports.getChatReports = async (req, res) => {
   try {
     const { page = 1, limit = 10, userId1, userId2 } = req.query;
     
@@ -785,8 +787,10 @@ const getChatReports = async (req, res) => {
   }
 };
 
-// Send chat report to parents manually
-const sendChatReport = async (req, res) => {
+// @desc    Send chat report to parents manually
+// @route   POST /api/admin/send-chat-report
+// @access  Private (Admin only)
+exports.sendChatReport = async (req, res) => {
   try {
     const { userId1, userId2 } = req.body;
 
@@ -877,8 +881,8 @@ const sendChatReport = async (req, res) => {
   }
 };
 
-// Placeholder functions for missing exports
-const sendBulkEmail = async (req, res) => {
+// Placeholder functions for missing exports that are referenced in routes
+exports.sendBulkEmail = async (req, res) => {
   try {
     res.status(501).json({ message: 'Bulk email functionality not implemented yet' });
   } catch (error) {
@@ -887,7 +891,7 @@ const sendBulkEmail = async (req, res) => {
   }
 };
 
-const getEmailMetrics = async (req, res) => {
+exports.getEmailMetrics = async (req, res) => {
   try {
     res.status(501).json({ message: 'Email metrics functionality not implemented yet' });
   } catch (error) {
@@ -896,7 +900,7 @@ const getEmailMetrics = async (req, res) => {
   }
 };
 
-const getMatchingInsights = async (req, res) => {
+exports.getMatchingInsights = async (req, res) => {
   try {
     res.status(501).json({ message: 'Matching insights functionality not implemented yet' });
   } catch (error) {
@@ -905,7 +909,7 @@ const getMatchingInsights = async (req, res) => {
   }
 };
 
-const getEngagementMetrics = async (req, res) => {
+exports.getEngagementMetrics = async (req, res) => {
   try {
     res.status(501).json({ message: 'Engagement metrics functionality not implemented yet' });
   } catch (error) {
@@ -914,7 +918,7 @@ const getEngagementMetrics = async (req, res) => {
   }
 };
 
-const getConversionMetrics = async (req, res) => {
+exports.getConversionMetrics = async (req, res) => {
   try {
     res.status(501).json({ message: 'Conversion metrics functionality not implemented yet' });
   } catch (error) {
@@ -923,7 +927,7 @@ const getConversionMetrics = async (req, res) => {
   }
 };
 
-const getChurnAnalysis = async (req, res) => {
+exports.getChurnAnalysis = async (req, res) => {
   try {
     res.status(501).json({ message: 'Churn analysis functionality not implemented yet' });
   } catch (error) {
@@ -932,24 +936,11 @@ const getChurnAnalysis = async (req, res) => {
   }
 };
 
-const getReferralAnalysis = async (req, res) => {
+exports.getReferralAnalysis = async (req, res) => {
   try {
     res.status(501).json({ message: 'Referral analysis functionality not implemented yet' });
   } catch (error) {
     console.error('Error in getReferralAnalysis:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
-};
-
-module.exports = {
-  
-  sendBulkEmail,
-  getEmailMetrics,
-  getMatchingInsights,
-  getEngagementMetrics,
-  getConversionMetrics,
-  getChurnAnalysis,
-  getReferralAnalysis,
-  getChatReports,
-  sendChatReport
 };
