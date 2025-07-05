@@ -21,7 +21,12 @@ const {
   getChurnAnalysis,
   getReferralAnalysis,
   getChatReports,
-  sendChatReport
+  sendChatReport,
+  getReportedProfiles,
+  dismissReport,
+  getVipUsers,
+  getPotentialMatches,
+  sendMatchSuggestions
 } = require('../controllers/adminController');
 const {
   getAllSubscriptions
@@ -68,12 +73,14 @@ router.use(adminAuth);
 router.get('/stats', getStats);
 router.get('/users', getAllUsers);
 router.get('/users/:id', getUserDetails);
+router.get('/users/:id/potential-matches', getPotentialMatches);
 
 // User management routes
 router.put('/users/:id/status', updateUserStatus);
 router.put('/users/:id/plan', updateUserPlan);
 router.put('/users/:id', updateUser);
 router.put('/users/:id/reset-password', resetUserPassword);
+router.post('/users/:id/suggest-matches', sendMatchSuggestions);
 router.delete('/users/:id', deleteUser);
 
 // System routes
@@ -87,6 +94,10 @@ router.post('/call-recordings', upload.single('recording'), uploadCallRecording)
 // Chat management routes
 router.get('/chat-reports', getChatReports);
 router.post('/send-chat-report', sendChatReport);
+
+// Reported profiles routes
+router.get('/reported-profiles', getReportedProfiles);
+router.patch('/reported-profiles/:id/dismiss', dismissReport);
 
 // Email and analytics routes
 router.post('/bulk-email', sendBulkEmail);

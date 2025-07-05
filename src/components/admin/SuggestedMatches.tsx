@@ -66,9 +66,9 @@ const SuggestedMatches = () => {
               </SelectTrigger>
               <SelectContent>
                 {loadingVips ? (
-                  <SelectItem value="" disabled>Loading VIP users...</SelectItem>
+                  <SelectItem value="loading" disabled>Loading VIP users...</SelectItem>
                 ) : vipUsers.length === 0 ? (
-                  <SelectItem value="" disabled>No VIP users found</SelectItem>
+                  <SelectItem value="no-users" disabled>No VIP users found</SelectItem>
                 ) : (
                   vipUsers.map((user) => (
                     <SelectItem key={user._id} value={user._id}>
