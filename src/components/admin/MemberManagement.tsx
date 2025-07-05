@@ -9,7 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Search, Edit, Trash2, User, Users } from 'lucide-react';
+import ViewProfileDialog from './ViewProfileDialog';
+import EditUserDialog from './EditUserDialog';
+import { Search, Edit, Trash2, User, Users, Eye } from 'lucide-react';
 
 interface MemberManagementProps {
   stats: any;
@@ -21,7 +23,8 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
     gender: 'all',
     plan: 'all',
     status: 'all',
-    country: 'all',
+    country: '',
+    city: '',
     inactiveMonths: 'all',
     page: 1,
     limit: 20
@@ -29,6 +32,7 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
 
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [viewProfileDialogOpen, setViewProfileDialogOpen] = useState(false);
   const { users, loading, pagination, updateUserStatus, refetchData } = useAdminData(filters);
   const { toast } = useToast();
 
@@ -125,6 +129,13 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
               
               <Button size="sm" variant="outline" onClick={() => {
                 setSelectedUser(user);
+                setViewProfileDialogOpen(true);
+              }}>
+                <Eye className="h-4 w-4" />
+              </Button>
+
+              <Button size="sm" variant="outline" onClick={() => {
+                setSelectedUser(user);
                 setEditDialogOpen(true);
               }}>
                 <Edit className="h-4 w-4" />
@@ -200,7 +211,7 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
           <CardTitle>Member Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <Input
@@ -234,6 +245,19 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
               </SelectContent>
             </Select>
             
+            <Select value={filters.status} onValueChange={(value) => handleFilterChange('status', value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="suspended">Suspended</SelectItem>
+                <SelectItem value="banned">Banned</SelectItem>
+              </SelectContent>
+            </Select>
+
             <Select value={filters.inactiveMonths} onValueChange={(value) => handleFilterChange('inactiveMonths', value)}>
               <SelectTrigger>
                 <SelectValue placeholder="Inactive Period" />
@@ -246,6 +270,20 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
                 <SelectItem value="12">12+ months inactive</SelectItem>
               </SelectContent>
             </Select>
+
+            <Input
+              type="text"
+              placeholder="Filter by country"
+              value={filters.country}
+              onChange={(e) => handleFilterChange('country', e.target.value)}
+            />
+
+            <Input
+              type="text"
+              placeholder="Filter by city"
+              value={filters.city}
+              onChange={(e) => handleFilterChange('city', e.target.value)}
+            />
           </div>
         </CardContent>
       </Card>
@@ -289,25 +327,24 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
         </CardContent>
       </Card>
 
+      {/* View Profile Dialog */}
+      {selectedUser && (
+        <ViewProfileDialog
+          user={selectedUser}
+          isOpen={viewProfileDialogOpen}
+          onOpenChange={setViewProfileDialogOpen}
+        />
+      )}
+
       {/* Edit User Dialog */}
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit User: {selectedUser?.fullName}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p>Advanced user editing functionality would be implemented here.</p>
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={() => setEditDialogOpen(false)}>
-                Save Changes
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {selectedUser && (
+        <EditUserDialog
+          user={selectedUser}
+          isOpen={editDialogOpen}
+          onOpenChange={setEditDialogOpen}
+          onUserUpdate={refetchData}
+        />
+      )}
     </div>
   );
 };

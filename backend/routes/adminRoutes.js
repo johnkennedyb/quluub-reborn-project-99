@@ -23,6 +23,13 @@ const {
   getChatReports,
   sendChatReport
 } = require('../controllers/adminController');
+const {
+  getAllSubscriptions
+} = require('../controllers/subscriptionController');
+const {
+  getAllPayments,
+  processRefund
+} = require('../controllers/paymentController');
 const { adminAuth } = require('../middlewares/adminAuth');
 const multer = require('multer');
 const path = require('path');
@@ -89,5 +96,10 @@ router.get('/engagement-metrics', getEngagementMetrics);
 router.get('/conversion-metrics', getConversionMetrics);
 router.get('/churn-analysis', getChurnAnalysis);
 router.get('/referral-analysis', getReferralAnalysis);
+
+// Subscription and Payment routes
+router.get('/subscriptions', getAllSubscriptions);
+router.get('/payments', getAllPayments);
+router.post('/payments/:id/refund', processRefund);
 
 module.exports = router;

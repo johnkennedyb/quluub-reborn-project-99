@@ -5,9 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
-import { Loader2, Users, BarChart3, Mail, Settings, Phone } from 'lucide-react';
+import { Loader2, Users, BarChart3, Mail, Settings, Phone, CreditCard, Wallet, Heart } from 'lucide-react';
 import MemberManagement from '@/components/admin/MemberManagement';
+import ReportedProfiles from '@/components/admin/ReportedProfiles';
 import DashboardInsights from '@/components/admin/DashboardInsights';
+import SubscriptionOverview from '@/components/admin/SubscriptionOverview';
+import PaymentHistory from '@/components/admin/PaymentHistory';
+import SuggestedMatches from '@/components/admin/SuggestedMatches';
 
 const AdminDashboard = () => {
   const { adminUser, adminLogout } = useAdminAuth();
@@ -54,7 +58,7 @@ const AdminDashboard = () => {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 md:grid-cols-9">
             <TabsTrigger value="overview" className="flex items-center space-x-2">
               <BarChart3 className="h-4 w-4" />
               <span>Overview</span>
@@ -74,6 +78,22 @@ const AdminDashboard = () => {
             <TabsTrigger value="calls" className="flex items-center space-x-2">
               <Phone className="h-4 w-4" />
               <span>Calls</span>
+            </TabsTrigger>
+            <TabsTrigger value="reported" className="flex items-center space-x-2">
+              <Settings className="h-4 w-4" />
+              <span>Reported</span>
+            </TabsTrigger>
+            <TabsTrigger value="subscriptions" className="flex items-center space-x-2">
+              <CreditCard className="h-4 w-4" />
+              <span>Subscriptions</span>
+            </TabsTrigger>
+            <TabsTrigger value="payments" className="flex items-center space-x-2">
+              <Wallet className="h-4 w-4" />
+              <span>Payments</span>
+            </TabsTrigger>
+            <TabsTrigger value="suggestions" className="flex items-center space-x-2">
+              <Heart className="h-4 w-4" />
+              <span>Suggestions</span>
             </TabsTrigger>
           </TabsList>
 
@@ -232,6 +252,26 @@ const AdminDashboard = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Reported Tab */}
+          <TabsContent value="reported">
+            <ReportedProfiles />
+          </TabsContent>
+
+          {/* Subscriptions Tab */}
+          <TabsContent value="subscriptions">
+            <SubscriptionOverview />
+          </TabsContent>
+
+          {/* Payments Tab */}
+          <TabsContent value="payments">
+            <PaymentHistory />
+          </TabsContent>
+
+          {/* Suggestions Tab */}
+          <TabsContent value="suggestions">
+            <SuggestedMatches />
           </TabsContent>
         </Tabs>
       </main>

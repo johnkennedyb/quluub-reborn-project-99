@@ -1,4 +1,4 @@
-
+const Payment = require('../models/Payment');
 const User = require('../models/User');
 
 // @desc    Create Paystack payment
@@ -72,3 +72,42 @@ exports.paystackWebhook = async (req, res) => {
     res.status(400).json({ error: error.message });
   }
 };
+
+// @desc    Get all payments
+// @route   GET /api/admin/payments
+// @access  Private (Admin only)
+exports.getAllPayments = async (req, res) => {
+  try {
+    const payments = await Payment.find({}).populate('user', 'username fname lname');
+    res.json({ payments });
+  } catch (error) {
+    console.error('Error fetching payments:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Process a refund for a payment
+// @route   POST /api/admin/payments/:id/refund
+// @access  Private (Admin only)
+exports.processRefund = async (req, res) => {
+  try {
+    const payment = await Payment.findById(req.params.id);
+
+    if (!payment) {
+      return res.status(404).json({ message: 'Payment not found' });
+    }
+
+    // In a real application, you would integrate with a payment gateway (e.g., Stripe)
+    // to process the actual refund. For this example, we'll just update the status.
+    // stripe.refunds.create({ payment_intent: payment.transactionId });
+
+    payment.status = 'refunded';
+    await payment.save();
+
+    res.json({ message: 'Refund processed successfully', payment });
+  } catch (error) {
+    console.error('Error processing refund:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import axios from 'axios';
 
@@ -68,6 +68,36 @@ interface AdminUser {
   hidden?: boolean;
 }
 
+interface ReportedProfile {
+  _id: string;
+  reporter: { _id: string; fullName: string; username: string };
+  reported: { _id: string; fullName: string; username: string };
+  reason: string;
+  description: string;
+  createdAt: string;
+  status: 'pending' | 'dismissed' | 'action_taken';
+}
+
+interface Subscription {
+  _id: string;
+  user: { _id: string; fullName: string; username: string };
+  plan: string;
+  status: string;
+  startDate: string;
+  endDate: string;
+  amount: number;
+}
+
+interface Payment {
+  _id: string;
+  user: { _id: string; fullName: string; username: string };
+  amount: number;
+  plan: string;
+  status: string;
+  transactionId: string;
+  createdAt: string;
+}
+
 interface AdminCall {
   _id: string;
   conversationId: string;
@@ -113,6 +143,9 @@ interface UserFilters {
 }
 
 // Configure axios to use the correct base URL and ADMIN auth token
+const defaultUserFilters: UserFilters = {};
+const defaultCallFilters: CallFilters = {};
+
 const createApiClient = () => {
   const apiClient = axios.create({
     baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
@@ -160,7 +193,7 @@ const createApiClient = () => {
   return apiClient;
 };
 
-export const useAdminData = (filters: UserFilters = {}, callFilters: CallFilters = {}) => {
+export const useAdminData = (filters: UserFilters = defaultUserFilters, callFilters: CallFilters = defaultCallFilters) => {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [calls, setCalls] = useState<AdminCall[]>([]);
@@ -173,13 +206,15 @@ export const useAdminData = (filters: UserFilters = {}, callFilters: CallFilters
     hasNextPage: false,
     hasPrevPage: false
   });
-  const [callPagination, setCallPagination] = useState({
-    currentPage: 1,
-    totalPages: 1,
-    total: 0,
-    hasNextPage: false,
-    hasPrevPage: false
-  });
+  const [callPagination, setCallPagination] = useState<any>({});
+  const [reportedProfiles, setReportedProfiles] = useState<ReportedProfile[]>([]);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [vipUsers, setVipUsers] = useState<AdminUser[]>([]);
+  const [potentialMatches, setPotentialMatches] = useState<AdminUser[]>([]);
+  const [loadingVips, setLoadingVips] = useState<boolean>(true);
+  const [loadingMatches, setLoadingMatches] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [callStats, setCallStats] = useState({
     totalCalls: 0,
     completedCalls: 0,
@@ -188,9 +223,9 @@ export const useAdminData = (filters: UserFilters = {}, callFilters: CallFilters
   });
   const { toast } = useToast();
 
-  const apiClient = createApiClient();
+  const apiClient = useMemo(() => createApiClient(), []);
 
-  const fetchAdminStats = async () => {
+  const fetchAdminStats = useCallback(async () => {
     try {
       console.log("📊 Fetching admin statistics...");
       const response = await apiClient.get('/admin/stats');
@@ -200,9 +235,9 @@ export const useAdminData = (filters: UserFilters = {}, callFilters: CallFilters
       console.error("❌ Failed to fetch admin stats:", error);
       throw error;
     }
-  };
+  }, [apiClient]);
 
-  const fetchUsers = async (userFilters = filters) => {
+  const fetchUsers = useCallback(async (userFilters: UserFilters) => {
     try {
       console.log("👥 Fetching users with filters:", userFilters);
       
@@ -237,18 +272,18 @@ export const useAdminData = (filters: UserFilters = {}, callFilters: CallFilters
       setUsers([]);
       throw error;
     }
-  };
+  }, [apiClient]);
 
-  const fetchCalls = async (filters = callFilters) => {
+  const fetchCalls = useCallback(async (cFilters: CallFilters) => {
     try {
-      console.log("📞 Fetching calls with filters:", filters);
+      console.log("📞 Fetching calls with filters:", cFilters);
       
       const params = new URLSearchParams();
-      if (filters.status && filters.status !== 'all') params.append('status', filters.status);
-      if (filters.page) params.append('page', filters.page.toString());
-      if (filters.limit) params.append('limit', filters.limit.toString());
-      if (filters.sortBy) params.append('sortBy', filters.sortBy);
-      if (filters.sortOrder) params.append('sortOrder', filters.sortOrder);
+      if (cFilters.status && cFilters.status !== 'all') params.append('status', cFilters.status);
+      if (cFilters.page) params.append('page', cFilters.page.toString());
+      if (cFilters.limit) params.append('limit', cFilters.limit.toString());
+      if (cFilters.sortBy) params.append('sortBy', cFilters.sortBy);
+      if (cFilters.sortOrder) params.append('sortOrder', cFilters.sortOrder);
 
       const response = await apiClient.get(`/admin/calls?${params.toString()}`);
       console.log("✅ Admin calls received:", response.data);
@@ -261,13 +296,82 @@ export const useAdminData = (filters: UserFilters = {}, callFilters: CallFilters
         hasNextPage: response.data.hasNextPage || false,
         hasPrevPage: response.data.hasPrevPage || false
       });
-      setCallStats(response.data.statistics || callStats);
+      setCallStats(prevStats => response.data.statistics || prevStats);
     } catch (error) {
       console.error("❌ Failed to fetch calls:", error);
       setCalls([]);
       throw error;
     }
-  };
+  }, [apiClient]);
+
+  const fetchReportedProfiles = useCallback(async () => {
+    try {
+      const response = await apiClient.get('/admin/reported-profiles');
+      setReportedProfiles(response.data.reports || []);
+    } catch (error) {
+      console.error('❌ Failed to fetch reported profiles:', error);
+      setReportedProfiles([]);
+    }
+  }, [apiClient]);
+
+  const fetchSubscriptions = useCallback(async () => {
+    try {
+      const response = await apiClient.get('/admin/subscriptions');
+      setSubscriptions(response.data.subscriptions || []);
+    } catch (error) {
+      console.error('❌ Failed to fetch subscriptions:', error);
+      setSubscriptions([]);
+    }
+  }, [apiClient]);
+
+  const fetchPayments = useCallback(async () => {
+    try {
+      const response = await apiClient.get('/admin/payments');
+      setPayments(response.data.payments || []);
+    } catch (error) {
+      console.error('❌ Failed to fetch payments:', error);
+      setPayments([]);
+    }
+  }, [apiClient]);
+
+  const fetchVipUsers = useCallback(async () => {
+    setLoadingVips(true);
+    try {
+      const response = await apiClient.get('/admin/users', { params: { plan: 'Pro' } });
+      setVipUsers(response.data.users || []);
+    } catch (error) {
+      console.error('❌ Failed to fetch VIP users:', error);
+      setVipUsers([]);
+    } finally {
+      setLoadingVips(false);
+    }
+  }, [apiClient]);
+
+  const fetchPotentialMatches = useCallback(async (userId: string) => {
+    setLoadingMatches(true);
+    try {
+      const response = await apiClient.get(`/admin/users/${userId}/potential-matches`);
+      setPotentialMatches(response.data.matches || []);
+    } catch (error) {
+      console.error('❌ Failed to fetch potential matches:', error);
+      setPotentialMatches([]);
+    } finally {
+      setLoadingMatches(false);
+    }
+  }, [apiClient]);
+
+  const sendSuggestions = useCallback(async (userId: string, suggestedUserIds: string[]) => {
+    setIsSubmitting(true);
+    try {
+      await apiClient.post(`/admin/users/${userId}/suggest-matches`, { suggestedUserIds });
+      toast({ title: 'Success', description: 'Match suggestions sent successfully!' });
+    } catch (error) {
+      console.error('Failed to send suggestions:', error);
+      toast({ title: 'Error', description: 'Could not send suggestions.', variant: 'destructive' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [apiClient, toast]);
 
   useEffect(() => {
     const fetchAdminData = async () => {
@@ -280,7 +384,11 @@ export const useAdminData = (filters: UserFilters = {}, callFilters: CallFilters
         await Promise.all([
           fetchAdminStats(),
           fetchUsers(filters),
-          fetchCalls(callFilters)
+          fetchCalls(callFilters),
+          fetchReportedProfiles(),
+          fetchSubscriptions(),
+          fetchPayments(),
+          fetchVipUsers()
         ]);
 
         console.log("✅ All admin data fetched successfully");
@@ -304,7 +412,6 @@ export const useAdminData = (filters: UserFilters = {}, callFilters: CallFilters
       }
     };
 
-    // Only fetch if we have an admin token
     const adminToken = localStorage.getItem('adminToken');
     if (adminToken) {
       fetchAdminData();
@@ -328,10 +435,18 @@ export const useAdminData = (filters: UserFilters = {}, callFilters: CallFilters
     callFilters.page,
     callFilters.limit,
     callFilters.sortBy,
-    callFilters.sortOrder
+    callFilters.sortOrder,
+    fetchAdminStats,
+    fetchUsers,
+    fetchCalls,
+    fetchReportedProfiles,
+    fetchSubscriptions,
+    fetchPayments,
+    fetchVipUsers,
+    toast
   ]);
 
-  const updateUserStatus = async (userId: string, status: string) => {
+  const updateUserStatus = useCallback(async (userId: string, status: string) => {
     try {
       console.log(`🔄 Updating user ${userId} status to ${status}`);
       await apiClient.put(`/admin/users/${userId}/status`, { status });
@@ -357,9 +472,29 @@ export const useAdminData = (filters: UserFilters = {}, callFilters: CallFilters
       });
       throw error;
     }
-  };
+  }, [apiClient, toast]);
 
-  const updateUserPlan = async (userId: string, plan: string) => {
+  const dismissReport = useCallback(async (reportId: string) => {
+    try {
+      await apiClient.patch(`/admin/reported-profiles/${reportId}/dismiss`);
+      setReportedProfiles(prev => prev.filter(report => report._id !== reportId));
+      toast({ title: 'Success', description: 'Report dismissed.' });
+    } catch (error) {
+      toast({ title: 'Error', description: 'Could not dismiss report.', variant: 'destructive' });
+    }
+  }, [apiClient, toast]);
+
+  const processRefund = useCallback(async (paymentId: string) => {
+    try {
+      await apiClient.post(`/admin/payments/${paymentId}/refund`);
+      setPayments(prev => prev.map(p => p._id === paymentId ? { ...p, status: 'refunded' } : p));
+      toast({ title: 'Success', description: 'Payment refunded successfully.' });
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to process refund.', variant: 'destructive' });
+    }
+  }, [apiClient, toast]);
+
+  const updateUserPlan = useCallback(async (userId: string, plan: string) => {
     try {
       await apiClient.put(`/admin/users/${userId}/plan`, { plan });
       setUsers(prev => prev.map(user => 
@@ -380,9 +515,9 @@ export const useAdminData = (filters: UserFilters = {}, callFilters: CallFilters
       });
       throw error;
     }
-  };
+  }, [apiClient, toast]);
 
-  const getUserDetails = async (userId: string) => {
+  const getUserDetails = useCallback(async (userId: string) => {
     try {
       console.log(`🔍 Fetching details for user ${userId}`);
       const response = await apiClient.get(`/admin/users/${userId}`);
@@ -391,15 +526,19 @@ export const useAdminData = (filters: UserFilters = {}, callFilters: CallFilters
       console.error("❌ Failed to fetch user details:", error);
       throw error;
     }
-  };
+  }, [apiClient]);
 
-  const refetchData = async (newFilters = filters, newCallFilters = callFilters) => {
+  const refetchData = useCallback(async (newFilters = filters, newCallFilters = callFilters) => {
     try {
       setLoading(true);
       await Promise.all([
         fetchAdminStats(),
         fetchUsers(newFilters),
-        fetchCalls(newCallFilters)
+        fetchCalls(newCallFilters),
+        fetchReportedProfiles(),
+        fetchSubscriptions(),
+        fetchPayments(),
+        fetchVipUsers()
       ]);
     } catch (err) {
       console.error("❌ Failed to refetch admin data:", err);
@@ -409,7 +548,7 @@ export const useAdminData = (filters: UserFilters = {}, callFilters: CallFilters
     } finally {
       setLoading(false);
     }
-  };
+  }, [fetchAdminStats, fetchUsers, fetchCalls, fetchReportedProfiles, fetchSubscriptions, fetchPayments, fetchVipUsers, filters, callFilters]);
 
   return { 
     stats, 
@@ -420,9 +559,22 @@ export const useAdminData = (filters: UserFilters = {}, callFilters: CallFilters
     error, 
     pagination,
     callPagination,
+    reportedProfiles,
+    subscriptions,
+    payments,
     updateUserStatus,
     updateUserPlan,
     getUserDetails,
-    refetchData
+    dismissReport,
+    processRefund,
+    refetchData,
+    vipUsers,
+    potentialMatches,
+    loadingVips,
+    loadingMatches,
+    isSubmitting,
+    fetchPotentialMatches,
+    sendSuggestions
   };
 };
+

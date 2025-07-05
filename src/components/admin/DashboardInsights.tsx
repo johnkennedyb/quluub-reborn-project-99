@@ -151,6 +151,27 @@ const DashboardInsights = ({ stats }: DashboardInsightsProps) => {
         </Card>
       </div>
 
+      {/* User Inactivity */}
+      <Card>
+        <CardHeader>
+          <CardTitle>User Inactivity</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex justify-between items-center">
+            <span className="text-sm">Inactive {'>'} 1 Month</span>
+            <Badge variant="secondary">{formatNumber(stats.inactiveLastMonth || 0)}</Badge>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm">Inactive {'>'} 3 Months</span>
+            <Badge variant="secondary">{formatNumber(stats.inactiveLastQuarter || 0)}</Badge>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm">Inactive {'>'} 1 Year</span>
+            <Badge variant="secondary">{formatNumber(stats.inactiveLastYear || 0)}</Badge>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Messaging Activity */}
       <Card>
         <CardHeader>
@@ -217,7 +238,9 @@ const DashboardInsights = ({ stats }: DashboardInsightsProps) => {
                   </div>
                   <div className="text-right">
                     <div className="text-sm font-bold">{referrer.totalReferrals} referrals</div>
-                    <div className="text-xs text-gray-500">{referrer.activeReferrals} active</div>
+                    <div className="text-xs text-green-600 font-semibold">
+                      Bonus: {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(referrer.bonusReceived || 0)}
+                    </div>
                   </div>
                 </div>
               ))}
