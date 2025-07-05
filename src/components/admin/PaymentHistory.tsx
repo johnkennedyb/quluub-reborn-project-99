@@ -1,3 +1,4 @@
+
 import { useAdminData } from '@/hooks/useAdminData';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
@@ -8,20 +9,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+import { DollarSign, CreditCard, RefreshCw } from 'lucide-react';
 
 const PaymentHistory = () => {
   const { payments, loading, processRefund } = useAdminData();
@@ -34,19 +25,30 @@ const PaymentHistory = () => {
         return 'destructive';
       case 'refunded':
         return 'secondary';
-      default:
+      case 'pending':
         return 'outline';
+      default:
+        return 'secondary';
     }
   };
 
-  if (loading) return <div>Loading payment history...</div>;
+  const handleRefund = async (paymentId: string) => {
+    if (confirm('Are you sure you want to process this refund?')) {
+      await processRefund(paymentId);
+    }
+  };
+
+  if (loading) return <div>Loading payment data...</div>;
 
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Payment History</CardTitle>
-          <CardDescription>Review all transactions and manage refunds.</CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5" />
+            Payment History
+          </CardTitle>
+          <CardDescription>View and manage all payment transactions.</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -54,9 +56,10 @@ const PaymentHistory = () => {
               <TableRow>
                 <TableHead>User</TableHead>
                 <TableHead>Amount</TableHead>
+                <TableHead>Plan</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Date</TableHead>
                 <TableHead>Transaction ID</TableHead>
+                <TableHead>Date</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -68,41 +71,43 @@ const PaymentHistory = () => {
                       <div className="font-medium">{payment.user.fname} {payment.user.lname}</div>
                       <div className="text-sm text-muted-foreground">@{payment.user.username}</div>
                     </TableCell>
-                    <TableCell>{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(payment.amount)}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <DollarSign className="h-4 w-4" />
+                        {payment.amount.toFixed(2)} {payment.currency || 'USD'}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{payment.plan}</Badge>
+                    </TableCell>
                     <TableCell>
                       <Badge variant={getStatusVariant(payment.status)}>{payment.status}</Badge>
                     </TableCell>
-                    <TableCell>{format(new Date(payment.createdAt), 'PPP p')}</TableCell>
-                    <TableCell className="font-mono">{payment.transactionId}</TableCell>
+                    <TableCell>
+                      <code className="text-xs bg-gray-100 px-1 py-0.5 rounded">
+                        {payment.transactionId}
+                      </code>
+                    </TableCell>
+                    <TableCell>{format(new Date(payment.createdAt), 'PPP')}</TableCell>
                     <TableCell>
                       {payment.status === 'succeeded' && (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="sm">Refund</Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will refund the payment of {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(payment.amount)} for {payment.user.fname} {payment.user.lname}. This action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => processRefund(payment._id)}>
-                                Confirm Refund
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleRefund(payment._id)}
+                          className="flex items-center gap-1"
+                        >
+                          <RefreshCw className="h-3 w-3" />
+                          Refund
+                        </Button>
                       )}
                     </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">
-                    No payment history found.
+                  <TableCell colSpan={7} className="text-center">
+                    No payments found.
                   </TableCell>
                 </TableRow>
               )}

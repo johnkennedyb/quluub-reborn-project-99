@@ -1,45 +1,47 @@
-import { useState } from 'react';
+
 import { useAdminData } from '@/hooks/useAdminData';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Heart, Users, Send } from 'lucide-react';
+import { useState } from 'react';
 
 const SuggestedMatches = () => {
-  const {
-    vipUsers,
-    potentialMatches,
-    loadingVips,
-    loadingMatches,
+  const { 
+    vipUsers, 
+    potentialMatches, 
+    loadingVips, 
+    loadingMatches, 
     isSubmitting,
-    fetchPotentialMatches,
-    sendSuggestions,
+    fetchPotentialMatches, 
+    sendSuggestions 
   } = useAdminData();
-
-  const [selectedVip, setSelectedVip] = useState<string>('');
+  
+  const [selectedVipUser, setSelectedVipUser] = useState<string>('');
   const [selectedMatches, setSelectedMatches] = useState<string[]>([]);
 
-
-
-  const handleVipSelect = (userId: string) => {
-    setSelectedVip(userId);
+  const handleVipUserSelect = async (userId: string) => {
+    setSelectedVipUser(userId);
     setSelectedMatches([]);
     if (userId) {
-      fetchPotentialMatches(userId);
+      await fetchPotentialMatches(userId);
     }
   };
 
-  const handleMatchToggle = (matchId: string) => {
-    setSelectedMatches((prev) =>
-      prev.includes(matchId) ? prev.filter((id) => id !== matchId) : [...prev, matchId]
+  const toggleMatchSelection = (userId: string) => {
+    setSelectedMatches(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
     );
   };
 
-  const handleSubmit = () => {
-    if (selectedVip && selectedMatches.length > 0) {
-      sendSuggestions(selectedVip, selectedMatches);
+  const handleSendSuggestions = async () => {
+    if (selectedVipUser && selectedMatches.length > 0) {
+      await sendSuggestions(selectedVipUser, selectedMatches);
+      setSelectedMatches([]);
     }
   };
 
@@ -47,62 +49,101 @@ const SuggestedMatches = () => {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Admin-Suggested Matches</CardTitle>
-          <CardDescription>Select a VIP user to suggest potential matches.</CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <Heart className="h-5 w-5" />
+            Manual Match Suggestions
+          </CardTitle>
+          <CardDescription>
+            Send curated match suggestions to VIP users to improve their experience.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           <div>
-            <label className="text-sm font-medium">Select VIP User</label>
-            <Select onValueChange={handleVipSelect} disabled={loadingVips}>
+            <label className="text-sm font-medium mb-2 block">Select VIP User</label>
+            <Select onValueChange={handleVipUserSelect} value={selectedVipUser}>
               <SelectTrigger>
-                <SelectValue placeholder={loadingVips ? 'Loading VIPs...' : 'Select a VIP user'} />
+                <SelectValue placeholder="Choose a VIP user..." />
               </SelectTrigger>
               <SelectContent>
-                {vipUsers.map((user) => (
-                  <SelectItem key={user._id} value={user._id}>
-                    {user.fullName} (@{user.username})
-                  </SelectItem>
-                ))}
+                {loadingVips ? (
+                  <SelectItem value="" disabled>Loading VIP users...</SelectItem>
+                ) : vipUsers.length === 0 ? (
+                  <SelectItem value="" disabled>No VIP users found</SelectItem>
+                ) : (
+                  vipUsers.map((user) => (
+                    <SelectItem key={user._id} value={user._id}>
+                      {user.fullName} (@{user.username}) - {user.plan}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>
 
-          {loadingMatches && (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              <span className="ml-2">Loading matches...</span>
-            </div>
-          )}
-
-          {selectedVip && !loadingMatches && (
+          {selectedVipUser && (
             <div>
-              <h3 className="text-lg font-semibold mb-2">Potential Matches</h3>
-              <ScrollArea className="h-72 w-full rounded-md border p-4">
-                {potentialMatches.length > 0 ? (
-                  potentialMatches.map((match) => (
-                    <div key={match._id} className="flex items-center space-x-3 mb-2">
-                      <Checkbox
-                        id={match._id}
-                        checked={selectedMatches.includes(match._id)}
-                        onCheckedChange={() => handleMatchToggle(match._id)}
-                      />
-                      <label htmlFor={match._id} className="text-sm font-medium leading-none">
-                        {match.fullName} (@{match.username})
-                      </label>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground">No potential matches found.</p>
-                )}
-              </ScrollArea>
+              <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Potential Matches
+              </h3>
+              
+              {loadingMatches ? (
+                <div>Loading potential matches...</div>
+              ) : potentialMatches.length === 0 ? (
+                <p className="text-muted-foreground">No potential matches found for this user.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {potentialMatches.map((match) => (
+                    <Card 
+                      key={match._id} 
+                      className={`cursor-pointer transition-colors ${
+                        selectedMatches.includes(match._id) 
+                          ? 'ring-2 ring-primary bg-primary/5' 
+                          : 'hover:bg-gray-50'
+                      }`}
+                      onClick={() => toggleMatchSelection(match._id)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center space-x-3">
+                          <Avatar>
+                            <AvatarFallback>
+                              {match.fname?.[0]}{match.lname?.[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <h4 className="font-medium">{match.fullName}</h4>
+                            <p className="text-sm text-muted-foreground">@{match.username}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <Badge variant={match.gender === 'male' ? 'default' : 'secondary'}>
+                                {match.gender}
+                              </Badge>
+                              {match.age && <Badge variant="outline">{match.age} years</Badge>}
+                              {match.country && <Badge variant="outline">{match.country}</Badge>}
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+              
+              {selectedMatches.length > 0 && (
+                <div className="flex items-center justify-between pt-4 border-t">
+                  <span className="text-sm text-muted-foreground">
+                    {selectedMatches.length} match{selectedMatches.length !== 1 ? 'es' : ''} selected
+                  </span>
+                  <Button 
+                    onClick={handleSendSuggestions} 
+                    disabled={isSubmitting}
+                    className="flex items-center gap-2"
+                  >
+                    <Send className="h-4 w-4" />
+                    {isSubmitting ? 'Sending...' : 'Send Suggestions'}
+                  </Button>
+                </div>
+              )}
             </div>
-          )}
-
-          {selectedVip && (
-            <Button onClick={handleSubmit} disabled={isSubmitting || selectedMatches.length === 0}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Send Suggestions ({selectedMatches.length})
-            </Button>
           )}
         </CardContent>
       </Card>
