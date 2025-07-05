@@ -355,7 +355,7 @@ export const useAdminData = (filters: UserFilters = defaultUserFilters, callFilt
   const fetchVipUsers = useCallback(async () => {
     setLoadingVips(true);
     try {
-      const response = await apiClient.get('/admin/vip-users');
+      const response = await apiClient.get('/admin/users', { params: { plan: 'Pro' } });
       setVipUsers(response.data.users || []);
     } catch (error) {
       console.error('❌ Failed to fetch VIP users:', error);
