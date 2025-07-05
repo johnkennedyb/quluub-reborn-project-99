@@ -5,13 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
-import { Loader2, Users, BarChart3, Mail, Settings, Phone, CreditCard, Wallet, Heart } from 'lucide-react';
+import { Loader2, Users, BarChart3, Mail, Settings, Phone, CreditCard, Wallet, Heart, UserCheck } from 'lucide-react';
 import MemberManagement from '@/components/admin/MemberManagement';
 import ReportedProfiles from '@/components/admin/ReportedProfiles';
 import DashboardInsights from '@/components/admin/DashboardInsights';
 import SubscriptionOverview from '@/components/admin/SubscriptionOverview';
 import PaymentHistory from '@/components/admin/PaymentHistory';
 import SuggestedMatches from '@/components/admin/SuggestedMatches';
+import ReferralAnalysis from '@/components/admin/ReferralAnalysis';
 
 const AdminDashboard = () => {
   const { adminUser, adminLogout } = useAdminAuth();
@@ -58,7 +59,7 @@ const AdminDashboard = () => {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 md:grid-cols-9">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 md:grid-cols-10">
             <TabsTrigger value="overview" className="flex items-center space-x-2">
               <BarChart3 className="h-4 w-4" />
               <span>Overview</span>
@@ -95,6 +96,10 @@ const AdminDashboard = () => {
               <Heart className="h-4 w-4" />
               <span>Suggestions</span>
             </TabsTrigger>
+            <TabsTrigger value="referrals" className="flex items-center space-x-2">
+              <UserCheck className="h-4 w-4" />
+              <span>Referrals</span>
+            </TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -115,13 +120,13 @@ const AdminDashboard = () => {
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Matches</CardTitle>
+                  <CardTitle className="text-sm font-medium">Inactive Users</CardTitle>
                   <Users className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{stats?.totalMatches || 0}</div>
+                  <div className="text-2xl font-bold">{stats?.inactiveUsers || 0}</div>
                   <p className="text-xs text-muted-foreground">
-                    {stats?.successRate || 0}% success rate
+                    {stats?.inactiveSixMonths || 0} inactive 6+ months
                   </p>
                 </CardContent>
               </Card>
@@ -153,6 +158,73 @@ const AdminDashboard = () => {
               </Card>
             </div>
 
+            {/* Additional Metrics */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Inactive User Analysis</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex justify-between">
+                    <span>1 Month Inactive:</span>
+                    <span className="font-semibold">{stats?.inactiveUsers || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>3 Months Inactive:</span>
+                    <span className="font-semibold">{stats?.inactiveQuarter || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>6 Months Inactive:</span>
+                    <span className="font-semibold">{stats?.inactiveSixMonths || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>1 Year Inactive:</span>
+                    <span className="font-semibold">{stats?.inactiveYear || 0}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Match Statistics</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex justify-between">
+                    <span>Total Matches:</span>
+                    <span className="font-semibold">{stats?.totalMatches || 0}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Success Rate:</span>
+                    <span className="font-semibold">{stats?.successRate || 0}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Avg per User:</span>
+                    <span className="font-semibold">{stats?.avgMatchesPerUser || 0}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Growth Metrics</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex justify-between">
+                    <span>Growth Rate:</span>
+                    <span className="font-semibold">{stats?.growthRate || 0}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Churn Rate:</span>
+                    <span className="font-semibold">{stats?.churnRate || 0}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Engagement Rate:</span>
+                    <span className="font-semibold">{stats?.engagementRate || 0}%</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
             {/* Quick Actions */}
             <Card className="mt-6">
               <CardHeader>
@@ -177,11 +249,11 @@ const AdminDashboard = () => {
                   </Button>
                   <Button 
                     variant="outline"
-                    onClick={() => setActiveTab('communication')}
+                    onClick={() => setActiveTab('suggestions')}
                     className="h-20 flex flex-col items-center justify-center"
                   >
-                    <Mail className="h-6 w-6 mb-2" />
-                    Send Messages
+                    <Heart className="h-6 w-6 mb-2" />
+                    Match Suggestions
                   </Button>
                 </div>
               </CardContent>
@@ -272,6 +344,11 @@ const AdminDashboard = () => {
           {/* Suggestions Tab */}
           <TabsContent value="suggestions">
             <SuggestedMatches />
+          </TabsContent>
+
+          {/* Referrals Tab */}
+          <TabsContent value="referrals">
+            <ReferralAnalysis />
           </TabsContent>
         </Tabs>
       </main>
