@@ -1,4 +1,3 @@
-
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -356,6 +355,78 @@ export const adminService = {
       throw error;
     }
   },
+
+  // Subscriptions and Payments
+  getAllSubscriptions: async () => {
+    try {
+      const response = await apiClient.get('/admin/subscriptions');
+      return response.data;
+    } catch (error) {
+      console.error('Admin subscriptions error:', error);
+      throw error;
+    }
+  },
+
+  getAllPayments: async () => {
+    try {
+      const response = await apiClient.get('/admin/payments');
+      return response.data;
+    } catch (error) {
+      console.error('Admin payments error:', error);
+      throw error;
+    }
+  },
+
+  processRefund: async (paymentId: string) => {
+    try {
+      const response = await apiClient.post(`/admin/payments/${paymentId}/refund`);
+      return response.data;
+    } catch (error) {
+      console.error('Admin process refund error:', error);
+      throw error;
+    }
+  },
+
+  // User Management
+  updateUser: async (userId: string, userData: any) => {
+    try {
+      const response = await apiClient.put(`/admin/users/${userId}`, userData);
+      return response.data;
+    } catch (error) {
+      console.error('Admin update user error:', error);
+      throw error;
+    }
+  },
+
+  deleteUser: async (userId: string) => {
+    try {
+      const response = await apiClient.delete(`/admin/users/${userId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Admin delete user error:', error);
+      throw error;
+    }
+  },
+
+  resetUserPassword: async (userId: string) => {
+    try {
+      const response = await apiClient.put(`/admin/users/${userId}/reset-password`);
+      return response.data;
+    } catch (error) {
+      console.error('Admin reset password error:', error);
+      throw error;
+    }
+  },
+
+  updateUserPlan: async (userId: string, plan: string) => {
+    try {
+      const response = await apiClient.put(`/admin/users/${userId}/plan`, { plan });
+      return response.data;
+    } catch (error) {
+      console.error('Admin update user plan error:', error);
+      throw error;
+    }
+  }
 };
 
 // Video call service

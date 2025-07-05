@@ -88,7 +88,7 @@ router.post('/call-recordings', upload.single('recording'), uploadCallRecording)
 router.get('/chat-reports', getChatReports);
 router.post('/send-chat-report', sendChatReport);
 
-// Email and analytics routes (placeholders)
+// Email and analytics routes
 router.post('/bulk-email', sendBulkEmail);
 router.get('/email-metrics', getEmailMetrics);
 router.get('/matching-insights', getMatchingInsights);
