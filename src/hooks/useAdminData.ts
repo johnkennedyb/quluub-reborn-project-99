@@ -80,22 +80,41 @@ interface ReportedProfile {
 
 interface Subscription {
   _id: string;
-  user: { _id: string; fullName: string; username: string };
+  user: { 
+    _id: string; 
+    username: string; 
+    fname: string; 
+    lname: string; 
+    email: string;
+    fullName: string; 
+  };
   plan: string;
   status: string;
   startDate: string;
   endDate: string;
-  amount: number;
+  paymentId: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 interface Payment {
   _id: string;
-  user: { _id: string; fullName: string; username: string };
+  user: { 
+    _id: string; 
+    username: string; 
+    fname: string; 
+    lname: string; 
+    email: string;
+    fullName: string; 
+  };
   amount: number;
+  currency: string;
   plan: string;
   status: string;
   transactionId: string;
+  paymentGateway: string;
   createdAt: string;
+  updatedAt: string;
 }
 
 interface AdminCall {
@@ -142,7 +161,6 @@ interface UserFilters {
   sortOrder?: 'asc' | 'desc';
 }
 
-// Configure axios to use the correct base URL and ADMIN auth token
 const defaultUserFilters: UserFilters = {};
 const defaultCallFilters: CallFilters = {};
 
@@ -577,4 +595,3 @@ export const useAdminData = (filters: UserFilters = defaultUserFilters, callFilt
     sendSuggestions
   };
 };
-
