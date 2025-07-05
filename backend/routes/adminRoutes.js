@@ -99,6 +99,9 @@ router.post('/send-chat-report', sendChatReport);
 router.get('/reported-profiles', getReportedProfiles);
 router.patch('/reported-profiles/:id/dismiss', dismissReport);
 
+// VIP users routes
+router.get('/vip-users', getVipUsers);
+
 // Email and analytics routes
 router.post('/bulk-email', sendBulkEmail);
 router.get('/email-metrics', getEmailMetrics);
