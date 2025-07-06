@@ -14,7 +14,10 @@ const {
   saveCallRecord,
   uploadCallRecording,
   sendBulkEmail,
+  sendTestEmail,
   getEmailMetrics,
+  saveEmailConfig,
+  getEmailConfig,
   getMatchingInsights,
   getEngagementMetrics,
   getConversionMetrics,
@@ -99,14 +102,22 @@ router.post('/send-chat-report', sendChatReport);
 router.get('/reported-profiles', getReportedProfiles);
 router.patch('/reported-profiles/:id/dismiss', dismissReport);
 
-// Email and analytics routes
+// Email configuration and management routes
+router.get('/email-config', getEmailConfig);
+router.post('/email-config', saveEmailConfig);
 router.post('/bulk-email', sendBulkEmail);
+router.post('/test-email', sendTestEmail);
 router.get('/email-metrics', getEmailMetrics);
+
+// Analytics routes
 router.get('/matching-insights', getMatchingInsights);
 router.get('/engagement-metrics', getEngagementMetrics);
 router.get('/conversion-metrics', getConversionMetrics);
 router.get('/churn-analysis', getChurnAnalysis);
 router.get('/referral-analysis', getReferralAnalysis);
+
+// VIP users route
+router.get('/vip-users', getVipUsers);
 
 // Subscription and Payment routes
 router.get('/subscriptions', getAllSubscriptions);

@@ -1,34 +1,91 @@
-
 const nodemailer = require('nodemailer');
 
-// Configure nodemailer with Whogohost settings
-const transporter = nodemailer.createTransport({
-  host: 'mail.quluub.com',
-  port: 465, // Use 465 for SSL or 587 for TLS
-  secure: true, // true for 465, false for other ports
+// Default configuration - can be updated dynamically
+let emailConfig = {
+  host: process.env.SMTP_HOST || 'mail.quluub.com',
+  port: parseInt(process.env.SMTP_PORT) || 465,
+  secure: true,
   auth: {
-    user: process.env.MAIL_USER,
-    pass: process.env.MAIL_PASSWORD || process.env.EMAIL_PASSWORD
+    user: process.env.MAIL_USER || 'mail@quluub.com',
+    pass: process.env.MAIL_PASSWORD || 'Z}!QLm__(e8p?I8J'
   },
   tls: {
     rejectUnauthorized: false
   }
-});
+};
+
+// Email settings
+let emailSettings = {
+  fromName: process.env.FROM_NAME || 'Quluub Team',
+  fromEmail: process.env.FROM_EMAIL || 'mail@quluub.com',
+  replyTo: process.env.REPLY_TO || 'support@quluub.com'
+};
+
+// Create transporter with current configuration
+let transporter = nodemailer.createTransporter(emailConfig);
 
 // Verify transporter configuration
-transporter.verify((error, success) => {
-  if (error) {
-    console.error('Email transporter verification failed:', error);
-  } else {
-    console.log('Email transporter verified successfully');
+const verifyTransporter = () => {
+  transporter.verify((error, success) => {
+    if (error) {
+      console.error('Email transporter verification failed:', error);
+    } else {
+      console.log('Email transporter verified successfully');
+    }
+  });
+};
+
+// Initial verification
+verifyTransporter();
+
+// Function to update email configuration
+const updateEmailConfig = async (newConfig) => {
+  try {
+    emailConfig = {
+      host: newConfig.smtpHost,
+      port: parseInt(newConfig.smtpPort),
+      secure: parseInt(newConfig.smtpPort) === 465,
+      auth: {
+        user: newConfig.smtpUser,
+        pass: newConfig.smtpPassword
+      },
+      tls: {
+        rejectUnauthorized: false
+      }
+    };
+
+    emailSettings = {
+      fromName: newConfig.fromName,
+      fromEmail: newConfig.fromEmail,
+      replyTo: newConfig.replyTo
+    };
+
+    // Create new transporter with updated config
+    transporter = nodemailer.createTransporter(emailConfig);
+    
+    // Verify new configuration
+    return new Promise((resolve) => {
+      transporter.verify((error, success) => {
+        if (error) {
+          console.error('Updated email transporter verification failed:', error);
+          resolve(false);
+        } else {
+          console.log('Updated email transporter verified successfully');
+          resolve(true);
+        }
+      });
+    });
+  } catch (error) {
+    console.error('Error updating email configuration:', error);
+    return false;
   }
-});
+};
 
 const sendValidationEmail = async (email, validationToken) => {
   const validationUrl = `${process.env.FRONTEND_URL}/validate-email?token=${validationToken}`;
   
   const mailOptions = {
-    from: '"Quluub" <admin@quluub.com>',
+    from: `"${emailSettings.fromName}" <${emailSettings.fromEmail}>`,
     to: email,
     subject: 'Validate Your Email - Quluub',
     html: `
@@ -84,7 +141,7 @@ const sendPasswordResetEmail = async (email, resetToken) => {
   const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
   
   const mailOptions = {
-    from: '"Quluub" <admin@quluub.com>',
+    from: `"${emailSettings.fromName}" <${emailSettings.fromEmail}>`,
     to: email,
     subject: 'Reset Your Password - Quluub',
     html: `
@@ -263,9 +320,115 @@ const sendMatchChatReportEmail = async (parentEmail, userDetails, partnerDetails
   }
 };
 
+// New function to send bulk emails
+const sendBulkEmail = async (users, subject, message) => {
+  let successCount = 0;
+  let failedCount = 0;
+
+  for (const user of users) {
+    const mailOptions = {
+      from: `"${emailSettings.fromName}" <${emailSettings.fromEmail}>`,
+      to: user.email,
+      subject: subject,
+      html: `
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px; font-family: Arial, sans-serif; background-color: #f9f9f9;">
+          <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #075e54; margin: 0;">Quluub</h1>
+              <p style="color: #666; font-size: 16px; margin-top: 10px;">Islamic Marriage Platform</p>
+            </div>
+            
+            <p style="color: #333; line-height: 1.6; font-size: 16px;">
+              Assalamu Alaikum ${user.fname || 'Dear Member'},
+            </p>
+            
+            <div style="color: #666; line-height: 1.6; margin: 20px 0;">
+              ${message.replace(/\n/g, '<br>')}
+            </div>
+            
+            <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee;">
+              <p style="color: #999; font-size: 12px; text-align: center;">
+                Best regards,<br>
+                The Quluub Team<br>
+                <a href="${process.env.FRONTEND_URL}" style="color: #075e54;">quluub.com</a>
+              </p>
+            </div>
+          </div>
+        </div>
+      `
+    };
+
+    try {
+      await transporter.sendMail(mailOptions);
+      successCount++;
+      console.log(`Bulk email sent to: ${user.email}`);
+    } catch (error) {
+      failedCount++;
+      console.error(`Failed to send bulk email to ${user.email}:`, error);
+    }
+  }
+
+  return { successCount, failedCount };
+};
+
+// New function to send test emails
+const sendTestEmail = async (testEmail) => {
+  const mailOptions = {
+    from: `"${emailSettings.fromName}" <${emailSettings.fromEmail}>`,
+    to: testEmail,
+    subject: 'Test Email - Quluub Configuration',
+    html: `
+      <div style="max-width: 600px; margin: 0 auto; padding: 20px; font-family: Arial, sans-serif; background-color: #f9f9f9;">
+        <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #075e54; margin: 0;">Email Configuration Test</h1>
+            <p style="color: #666; font-size: 16px; margin-top: 10px;">Quluub</p>
+          </div>
+          
+          <p style="color: #333; line-height: 1.6; font-size: 16px;">
+            This is a test email to verify your email configuration is working correctly.
+          </p>
+          
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="color: #075e54; margin-top: 0;">Configuration Details:</h3>
+            <p style="margin: 5px 0;"><strong>SMTP Host:</strong> ${emailConfig.host}</p>
+            <p style="margin: 5px 0;"><strong>SMTP Port:</strong> ${emailConfig.port}</p>
+            <p style="margin: 5px 0;"><strong>From Email:</strong> ${emailSettings.fromEmail}</p>
+            <p style="margin: 5px 0;"><strong>From Name:</strong> ${emailSettings.fromName}</p>
+            <p style="margin: 5px 0;"><strong>Reply To:</strong> ${emailSettings.replyTo}</p>
+          </div>
+          
+          <p style="color: #25d366; font-weight: bold; text-align: center;">
+            ✅ Email configuration is working correctly!
+          </p>
+          
+          <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee;">
+            <p style="color: #999; font-size: 12px; text-align: center;">
+              Test email sent at: ${new Date().toLocaleString()}<br>
+              Quluub Admin Panel
+            </p>
+          </div>
+        </div>
+      </div>
+    `
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Test email sent successfully:', info.messageId);
+    return true;
+  } catch (error) {
+    console.error('Error sending test email:', error);
+    return false;
+  }
+};
+
 module.exports = {
   sendValidationEmail,
   sendPasswordResetEmail,
   sendVideoCallNotificationEmail,
-  sendMatchChatReportEmail
+  sendMatchChatReportEmail,
+  sendBulkEmail,
+  sendTestEmail,
+  updateEmailConfig
 };

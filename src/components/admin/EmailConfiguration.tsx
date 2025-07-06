@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,14 +7,16 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Mail, Settings, Send, TestTube, Shield } from 'lucide-react';
+import { Mail, Settings, Send, TestTube, Shield, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { adminService } from '@/lib/api-client';
 
 const EmailConfiguration = () => {
   const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
   const [emailSettings, setEmailSettings] = useState({
-    smtpHost: 'smtp.gmail.com',
-    smtpPort: '587',
+    smtpHost: 'mail.quluub.com',
+    smtpPort: '465',
     smtpUser: 'mail@quluub.com',
     smtpPassword: 'Z}!QLm__(e8p?I8J',
     fromName: 'Quluub Team',
@@ -29,6 +31,39 @@ const EmailConfiguration = () => {
   });
 
   const [testEmail, setTestEmail] = useState('');
+  const [emailMetrics, setEmailMetrics] = useState({
+    deliveryRate: 0,
+    openRate: 0,
+    sentToday: 0,
+    bounced: 0
+  });
+
+  useEffect(() => {
+    fetchEmailConfig();
+    fetchEmailMetrics();
+  }, []);
+
+  const fetchEmailConfig = async () => {
+    try {
+      const response = await adminService.getEmailConfig();
+      setEmailSettings(prev => ({
+        ...prev,
+        ...response,
+        smtpPassword: prev.smtpPassword // Don't overwrite password for security
+      }));
+    } catch (error) {
+      console.error('Failed to fetch email config:', error);
+    }
+  };
+
+  const fetchEmailMetrics = async () => {
+    try {
+      const response = await adminService.getEmailMetrics();
+      setEmailMetrics(response);
+    } catch (error) {
+      console.error('Failed to fetch email metrics:', error);
+    }
+  };
 
   const handleSettingsChange = (field: string, value: string) => {
     setEmailSettings(prev => ({
@@ -44,15 +79,26 @@ const EmailConfiguration = () => {
     }));
   };
 
-  const handleSaveSettings = () => {
-    // Here you would typically save to backend
-    toast({
-      title: "Settings Saved",
-      description: "Email configuration has been updated successfully.",
-    });
+  const handleSaveSettings = async () => {
+    setLoading(true);
+    try {
+      await adminService.saveEmailConfig(emailSettings);
+      toast({
+        title: "Settings Saved",
+        description: "Email configuration has been updated successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save email configuration.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleTestEmail = () => {
+  const handleTestEmail = async () => {
     if (!testEmail) {
       toast({
         title: "Error",
@@ -62,13 +108,25 @@ const EmailConfiguration = () => {
       return;
     }
 
-    toast({
-      title: "Test Email Sent",
-      description: `Test email sent to ${testEmail}`,
-    });
+    setLoading(true);
+    try {
+      await adminService.sendTestEmail(testEmail);
+      toast({
+        title: "Test Email Sent",
+        description: `Test email sent to ${testEmail}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send test email.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleSendBulkEmail = () => {
+  const handleSendBulkEmail = async () => {
     if (!bulkEmailSettings.subject || !bulkEmailSettings.message) {
       toast({
         title: "Error",
@@ -78,10 +136,30 @@ const EmailConfiguration = () => {
       return;
     }
 
-    toast({
-      title: "Bulk Email Sent",
-      description: `Email sent to ${bulkEmailSettings.recipientType} users`,
-    });
+    setLoading(true);
+    try {
+      const response = await adminService.sendBulkEmail(bulkEmailSettings);
+      toast({
+        title: "Bulk Email Sent",
+        description: `Email sent to ${response.sentCount} users (${response.failedCount} failed)`,
+      });
+      // Clear form after successful send
+      setBulkEmailSettings({
+        subject: '',
+        message: '',
+        recipientType: 'all'
+      });
+      // Refresh metrics
+      fetchEmailMetrics();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send bulk email.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -130,7 +208,7 @@ const EmailConfiguration = () => {
                     id="smtpHost"
                     value={emailSettings.smtpHost}
                     onChange={(e) => handleSettingsChange('smtpHost', e.target.value)}
-                    placeholder="smtp.gmail.com"
+                    placeholder="mail.quluub.com"
                   />
                 </div>
                 <div className="space-y-2">
@@ -139,7 +217,7 @@ const EmailConfiguration = () => {
                     id="smtpPort"
                     value={emailSettings.smtpPort}
                     onChange={(e) => handleSettingsChange('smtpPort', e.target.value)}
-                    placeholder="587"
+                    placeholder="465"
                   />
                 </div>
               </div>
@@ -197,8 +275,19 @@ const EmailConfiguration = () => {
                 />
               </div>
 
-              <Button onClick={handleSaveSettings} className="w-full md:w-auto">
-                Save Configuration
+              <Button 
+                onClick={handleSaveSettings} 
+                className="w-full md:w-auto"
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  'Save Configuration'
+                )}
               </Button>
             </CardContent>
           </Card>
@@ -251,8 +340,19 @@ const EmailConfiguration = () => {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-4">
-                <Button onClick={handleSendBulkEmail} className="flex-1">
-                  Send Bulk Email
+                <Button 
+                  onClick={handleSendBulkEmail} 
+                  className="flex-1"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    'Send Bulk Email'
+                  )}
                 </Button>
                 <Button variant="outline" className="flex-1">
                   Save as Draft
@@ -283,8 +383,19 @@ const EmailConfiguration = () => {
                     placeholder="test@example.com"
                   />
                 </div>
-                <Button onClick={handleTestEmail} className="w-full">
-                  Send Test Email
+                <Button 
+                  onClick={handleTestEmail} 
+                  className="w-full"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    'Send Test Email'
+                  )}
                 </Button>
               </CardContent>
             </Card>
@@ -296,21 +407,21 @@ const EmailConfiguration = () => {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600">98.5%</div>
+                    <div className="text-2xl font-bold text-green-600">{emailMetrics.deliveryRate}%</div>
                     <div className="text-sm text-gray-600">Delivery Rate</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600">24.3%</div>
+                    <div className="text-2xl font-bold text-blue-600">{emailMetrics.openRate}%</div>
                     <div className="text-sm text-gray-600">Open Rate</div>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-600">1,247</div>
+                    <div className="text-2xl font-bold text-purple-600">{emailMetrics.sentToday}</div>
                     <div className="text-sm text-gray-600">Sent Today</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-orange-600">3</div>
+                    <div className="text-2xl font-bold text-orange-600">{emailMetrics.bounced}</div>
                     <div className="text-sm text-gray-600">Bounced</div>
                   </div>
                 </div>

@@ -426,6 +426,57 @@ export const adminService = {
       console.error('Admin update user plan error:', error);
       throw error;
     }
+  },
+
+  // Email configuration methods
+  getEmailConfig: async () => {
+    try {
+      const response = await apiClient.get('/admin/email-config');
+      return response.data;
+    } catch (error) {
+      console.error('Admin get email config error:', error);
+      throw error;
+    }
+  },
+
+  saveEmailConfig: async (configData: any) => {
+    try {
+      const response = await apiClient.post('/admin/email-config', configData);
+      return response.data;
+    } catch (error) {
+      console.error('Admin save email config error:', error);
+      throw error;
+    }
+  },
+
+  sendBulkEmail: async (emailData: any) => {
+    try {
+      const response = await apiClient.post('/admin/bulk-email', emailData);
+      return response.data;
+    } catch (error) {
+      console.error('Admin send bulk email error:', error);
+      throw error;
+    }
+  },
+
+  sendTestEmail: async (testEmail: string) => {
+    try {
+      const response = await apiClient.post('/admin/test-email', { testEmail });
+      return response.data;
+    } catch (error) {
+      console.error('Admin send test email error:', error);
+      throw error;
+    }
+  },
+
+  getEmailMetrics: async () => {
+    try {
+      const response = await apiClient.get('/admin/email-metrics');
+      return response.data;
+    } catch (error) {
+      console.error('Admin email metrics error:', error);
+      throw error;
+    }
   }
 };
 
