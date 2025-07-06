@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useAdminData } from '@/hooks/useAdminData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +12,7 @@ import SubscriptionOverview from '@/components/admin/SubscriptionOverview';
 import PaymentHistory from '@/components/admin/PaymentHistory';
 import SuggestedMatches from '@/components/admin/SuggestedMatches';
 import ReferralAnalysis from '@/components/admin/ReferralAnalysis';
+import EmailConfiguration from '@/components/admin/EmailConfiguration';
 
 const AdminDashboard = () => {
   const { adminUser, adminLogout } = useAdminAuth();
@@ -272,21 +272,7 @@ const AdminDashboard = () => {
 
           {/* Communication Tab */}
           <TabsContent value="communication">
-            <Card>
-              <CardHeader>
-                <CardTitle>Communication & Notifications</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8">
-                  <Mail className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Email Communication</h3>
-                  <p className="text-gray-500 mb-4">
-                    Send bulk emails, manage templates, and track email campaigns.
-                  </p>
-                  <Button>Configure Email Settings</Button>
-                </div>
-              </CardContent>
-            </Card>
+            <EmailConfiguration />
           </TabsContent>
 
           {/* Calls Tab */}
