@@ -1,7 +1,8 @@
 const User = require('../models/User');
 const Call = require('../models/Call');
-const crypto = require('crypto');
-const mongoose = require('mongoose');
+const Chat = require('../models/Chat');
+const Relationship = require('../models/Relationship');
+const { sendBulkEmail, sendTestEmail, updateEmailConfig } = require('../utils/emailService');
 
 // @desc    Get admin stats
 // @route   GET /api/admin/stats
@@ -636,71 +637,10 @@ exports.getReferralAnalysis = async (req, res) => {
   }
 };
 
-// @desc    Save email configuration
-// @route   POST /api/admin/email-config
-// @access  Private/Admin
-exports.saveEmailConfig = async (req, res) => {
+// Email Configuration Controllers
+const getEmailConfig = async (req, res) => {
   try {
-    const { 
-      smtpHost, 
-      smtpPort, 
-      smtpUser, 
-      smtpPassword, 
-      fromName, 
-      fromEmail, 
-      replyTo 
-    } = req.body;
-
-    console.log('Saving email configuration:', { smtpHost, smtpPort, smtpUser, fromEmail });
-
-    // Here you would typically save to a settings collection in the database
-    // For now, we'll use environment variables approach
-    
-    // Update the email service configuration
-    const { updateEmailConfig } = require('../utils/emailService');
-    const success = await updateEmailConfig({
-      smtpHost,
-      smtpPort: parseInt(smtpPort),
-      smtpUser,
-      smtpPassword,
-      fromName,
-      fromEmail,
-      replyTo
-    });
-
-    if (!success) {
-      return res.status(500).json({ 
-        message: 'Failed to update email configuration' 
-      });
-    }
-
-    res.json({ 
-      message: 'Email configuration saved successfully',
-      config: {
-        smtpHost,
-        smtpPort,
-        smtpUser,
-        fromName,
-        fromEmail,
-        replyTo
-      }
-    });
-
-  } catch (error) {
-    console.error('Error saving email configuration:', error);
-    res.status(500).json({ 
-      message: 'Server error', 
-      error: error.message 
-    });
-  }
-};
-
-// @desc    Get email configuration
-// @route   GET /api/admin/email-config
-// @access  Private/Admin
-exports.getEmailConfig = async (req, res) => {
-  try {
-    // Return current email configuration (without password for security)
+    // Return current email configuration (without sensitive data)
     const config = {
       smtpHost: process.env.SMTP_HOST || 'mail.quluub.com',
       smtpPort: process.env.SMTP_PORT || '465',
@@ -709,144 +649,150 @@ exports.getEmailConfig = async (req, res) => {
       fromEmail: process.env.FROM_EMAIL || 'mail@quluub.com',
       replyTo: process.env.REPLY_TO || 'support@quluub.com'
     };
-
+    
     res.json(config);
-
   } catch (error) {
-    console.error('Error getting email configuration:', error);
-    res.status(500).json({ 
-      message: 'Server error', 
-      error: error.message 
-    });
+    console.error('Get email config error:', error);
+    res.status(500).json({ message: 'Failed to get email configuration' });
   }
 };
 
-// @desc    Send bulk email
-// @route   POST /api/admin/bulk-email
-// @access  Private/Admin
-exports.sendBulkEmail = async (req, res) => {
+const saveEmailConfig = async (req, res) => {
   try {
-    const { recipientType, subject, message } = req.body;
-
-    if (!subject || !message) {
-      return res.status(400).json({ 
-        message: 'Subject and message are required' 
-      });
+    const { smtpHost, smtpPort, smtpUser, smtpPassword, fromName, fromEmail, replyTo } = req.body;
+    
+    // Update the email service configuration
+    const configUpdated = await updateEmailConfig({
+      smtpHost,
+      smtpPort,
+      smtpUser,
+      smtpPassword,
+      fromName,
+      fromEmail,
+      replyTo
+    });
+    
+    if (configUpdated) {
+      res.json({ message: 'Email configuration updated successfully' });
+    } else {
+      res.status(400).json({ message: 'Failed to update email configuration' });
     }
+  } catch (error) {
+    console.error('Save email config error:', error);
+    res.status(500).json({ message: 'Failed to save email configuration' });
+  }
+};
 
-    console.log('Sending bulk email:', { recipientType, subject });
-
-    // Get users based on recipient type
-    let users = [];
-    const User = require('../models/User');
-
+const sendBulkEmailController = async (req, res) => {
+  try {
+    const { subject, message, recipientType } = req.body;
+    
+    if (!subject || !message) {
+      return res.status(400).json({ message: 'Subject and message are required' });
+    }
+    
+    // Build query based on recipient type
+    let query = {};
     switch (recipientType) {
-      case 'all':
-        users = await User.find({ status: 'active' }).select('email fname lname');
-        break;
       case 'premium':
-        users = await User.find({ 
-          status: 'active', 
-          plan: { $in: ['premium', 'pro'] } 
-        }).select('email fname lname');
+        query = { plan: { $ne: 'free' } };
         break;
       case 'free':
-        users = await User.find({ 
-          status: 'active', 
-          plan: 'free' 
-        }).select('email fname lname');
+        query = { plan: 'free' };
         break;
       case 'inactive':
-        users = await User.find({ 
-          status: 'inactive' 
-        }).select('email fname lname');
+        query = { lastLogin: { $lt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } }; // 30 days ago
         break;
       default:
-        users = await User.find({ status: 'active' }).select('email fname lname');
+        query = {}; // all users
     }
-
-    // Send bulk email using the email service
-    const { sendBulkEmail } = require('../utils/emailService');
+    
+    const users = await User.find(query).select('email fname');
+    
+    if (users.length === 0) {
+      return res.status(400).json({ message: 'No users found for the selected recipient type' });
+    }
+    
     const result = await sendBulkEmail(users, subject, message);
-
-    console.log('Bulk email sent:', result);
-
+    
     res.json({
-      message: 'Bulk email sent successfully',
+      message: 'Bulk email sent',
       sentCount: result.successCount,
       failedCount: result.failedCount,
-      totalRecipients: users.length
+      totalUsers: users.length
     });
-
   } catch (error) {
-    console.error('Error sending bulk email:', error);
-    res.status(500).json({ 
-      message: 'Server error', 
-      error: error.message 
-    });
+    console.error('Send bulk email error:', error);
+    res.status(500).json({ message: 'Failed to send bulk email' });
   }
 };
 
-// @desc    Send test email
-// @route   POST /api/admin/test-email
-// @access  Private/Admin
-exports.sendTestEmail = async (req, res) => {
+const sendTestEmailController = async (req, res) => {
   try {
     const { testEmail } = req.body;
-
+    
     if (!testEmail) {
-      return res.status(400).json({ 
-        message: 'Test email address is required' 
-      });
+      return res.status(400).json({ message: 'Test email address is required' });
     }
-
-    console.log('Sending test email to:', testEmail);
-
-    const { sendTestEmail } = require('../utils/emailService');
+    
     const success = await sendTestEmail(testEmail);
-
-    if (!success) {
-      return res.status(500).json({ 
-        message: 'Failed to send test email' 
-      });
+    
+    if (success) {
+      res.json({ message: 'Test email sent successfully' });
+    } else {
+      res.status(500).json({ message: 'Failed to send test email' });
     }
-
-    res.json({ 
-      message: 'Test email sent successfully',
-      recipient: testEmail
-    });
-
   } catch (error) {
-    console.error('Error sending test email:', error);
-    res.status(500).json({ 
-      message: 'Server error', 
-      error: error.message 
-    });
+    console.error('Send test email error:', error);
+    res.status(500).json({ message: 'Failed to send test email' });
   }
 };
 
-// @desc    Get email metrics
-// @route   GET /api/admin/email-metrics
-// @access  Private/Admin
-exports.getEmailMetrics = async (req, res) => {
+const getEmailMetrics = async (req, res) => {
   try {
-    // Mock email metrics - in a real app, you'd track these in the database
+    // Mock email metrics - in a real app, you'd track these in your database
     const metrics = {
       deliveryRate: 98.5,
-      openRate: 24.3,
-      sentToday: 1247,
-      bounced: 3,
-      totalSent: 45670,
-      totalBounced: 234
+      openRate: 65.2,
+      sentToday: 45,
+      bounced: 2
     };
-
+    
     res.json(metrics);
-
   } catch (error) {
-    console.error('Error getting email metrics:', error);
-    res.status(500).json({ 
-      message: 'Server error', 
-      error: error.message 
-    });
+    console.error('Get email metrics error:', error);
+    res.status(500).json({ message: 'Failed to get email metrics' });
   }
+};
+
+module.exports = {
+  getStats,
+  getAllUsers,
+  getUserDetails,
+  updateUserStatus,
+  updateUserPlan,
+  updateUser,
+  deleteUser,
+  resetUserPassword,
+  getSystemMetrics,
+  getAllCalls,
+  saveCallRecord,
+  uploadCallRecording,
+  getChatReports,
+  sendChatReport,
+  getReportedProfiles,
+  dismissReport,
+  getVipUsers,
+  getPotentialMatches,
+  sendMatchSuggestions,
+  getMatchingInsights,
+  getEngagementMetrics,
+  getConversionMetrics,
+  getChurnAnalysis,
+  getReferralAnalysis,
+  getEmailConfig,
+  saveEmailConfig,
+  sendBulkEmail: sendBulkEmailController,
+  sendTestEmail: sendTestEmailController,
+  getEmailMetrics
 };
