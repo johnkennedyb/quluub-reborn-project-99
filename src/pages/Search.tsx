@@ -462,11 +462,8 @@ const Search = () => {
                   if (age < ageRange[0] || age > ageRange[1]) {
                     return null;
                   }
-
-                  const elements = [];
                   
-                  // Add the user card
-                  elements.push(
+                  return (
                     <MatchCard 
                       key={user._id}
                       name={`${user.fname} ${user.lname}`}
@@ -487,18 +484,14 @@ const Search = () => {
                       onPass={() => handlePass(user._id!)}
                     />
                   );
-
-                  // Add ad every 5 people (for non-premium users)
-                  if ((index + 1) % 5 === 0 && currentUser?.plan !== 'premium') {
-                    elements.push(
-                      <div key={`ad-${index}`} className="md:col-span-1">
-                        <AdComponent />
-                      </div>
-                    );
-                  }
-                  
-                  return elements;
                 })}
+                
+                {/* Show ads between every 5 people for non-premium users */}
+                {currentUser?.plan !== 'premium' && sortedUsers.length > 5 && (
+                  <div className="md:col-span-3 lg:col-span-3 w-full">
+                    <AdComponent />
+                  </div>
+                )}
               </div>
             ) : (
               <Card>

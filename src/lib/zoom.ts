@@ -24,8 +24,8 @@ interface ZoomUsage {
 
 // Mock Zoom API - Replace with actual Zoom SDK integration
 const ZOOM_CONFIG = {
-  apiKey: import.meta.env.VITE_ZOOM_API_KEY || 'demo_key',
-  apiSecret: import.meta.env.VITE_ZOOM_API_SECRET || 'demo_secret',
+  apiKey: 'demo_key',
+  apiSecret: 'demo_secret',
   costPerMinute: 0.02, // £0.02 per minute for pay-as-you-go
   freeMinutesPerMonth: 120 // 2 hours free per month for premium users
 };

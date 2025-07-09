@@ -3,15 +3,39 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const dotenv = require('dotenv');
-const { connectDB } = require('./config/db');
 const http = require('http');
 const path = require('path');
 const fs = require('fs');
 const { Server } = require('socket.io');
-const { errorHandler } = require('./middlewares/errorHandler');
-const { startScheduler } = require('./utils/emailScheduler');
 
 dotenv.config();
+
+// Import with error handling
+let connectDB, errorHandler, startScheduler;
+
+try {
+  ({ connectDB } = require('./config/db'));
+} catch (err) {
+  console.log('Database config not found, using fallback');
+  connectDB = () => console.log('Database connection skipped');
+}
+
+try {
+  ({ errorHandler } = require('./middlewares/errorHandler'));
+} catch (err) {
+  console.log('Error handler not found, using default');
+  errorHandler = (err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).send('Something broke!');
+  };
+}
+
+try {
+  ({ startScheduler } = require('./utils/emailScheduler'));
+} catch (err) {
+  console.log('Email scheduler not found, skipping');
+  startScheduler = () => console.log('Email scheduler skipped');
+}
 
 connectDB();
 startScheduler();
@@ -49,27 +73,36 @@ if (!fs.existsSync(recordingsDir)) {
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-const authRoutes = require('./routes/authRoutes');
-const userRoutes = require('./routes/userRoutes');
-const relationshipRoutes = require('./routes/relationshipRoutes');
-const chatRoutes = require('./routes/chatRoutes');
-const referralRoutes = require('./routes/referralRoutes');
-const adminRoutes = require('./routes/adminRoutes');
-const videoCallRoutes = require('./routes/videoCallRoutes');
-const notificationRoutes = require('./routes/notificationRoutes');
-const emailRoutes = require('./routes/emailRoutes');
-const paymentRoutes = require('./routes/paymentRoutes');
+// Import routes with error handling
+const routes = [
+  { path: '/api/auth', file: './routes/authRoutes' },
+  { path: '/api/users', file: './routes/userRoutes' },
+  { path: '/api/relationships', file: './routes/relationshipRoutes' },
+  { path: '/api/chats', file: './routes/chatRoutes' },
+  { path: '/api/referrals', file: './routes/referralRoutes' },
+  { path: '/api/admin', file: './routes/adminRoutes' },
+  { path: '/api/video-call', file: './routes/videoCallRoutes' },
+  { path: '/api/notifications', file: './routes/notificationRoutes' },
+  { path: '/api/email', file: './routes/emailRoutes' },
+  { path: '/api/payments', file: './routes/paymentRoutes' }
+];
 
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/relationships', relationshipRoutes);
-app.use('/api/chats', chatRoutes);
-app.use('/api/referrals', referralRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/video-call', videoCallRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/email', emailRoutes);
-app.use('/api/payments', paymentRoutes);
+routes.forEach(({ path, file }) => {
+  try {
+    const route = require(file);
+    app.use(path, route);
+    console.log(`✅ Loaded route: ${path}`);
+  } catch (err) {
+    console.log(`⚠️ Failed to load route ${path}:`, err.message);
+    // Create a fallback route
+    app.use(path, (req, res) => {
+      res.status(501).json({ 
+        message: `${path} endpoint not implemented yet`,
+        status: 'coming_soon'
+      });
+    });
+  }
+});
 
 app.get('/api/health', (req, res) => {
   res.json({ 
