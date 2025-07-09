@@ -1,17 +1,11 @@
 import axios from 'axios';
 import { LoginCredentials, SignupData, User } from '@/types/user';
 
-// Hardcoded API URL configuration
+// Full-stack deployment: frontend and backend on same domain
 const getAPIBaseURL = () => {
   if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
-    // Option 1: Use existing backend (current working setup)
-    return 'https://quluub-reborn-project-33-8lca.onrender.com/api';
-    
-    // Option 2: Use new full-stack deployment (uncomment this line and comment above)
-    // return 'https://quluub-reborn-project-99.vercel.app/api';
-    
-    // Option 3: Use relative URLs for same-domain deployment (uncomment this line and comment above)
-    // return '/api';
+    // Use relative URLs for full-stack deployment (same domain)
+    return '/api';
   }
   
   // In development, use localhost

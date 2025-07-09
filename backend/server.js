@@ -18,11 +18,12 @@ startScheduler();
 
 const app = express();
 
-// Hardcoded CORS origins for reliable deployment
+// CORS configuration for full-stack deployment
 const corsOptions = {
   origin: [
-    // Production domains
+    // Full-stack Vercel deployment (same domain - shouldn't need CORS but included for safety)
     'https://quluub-reborn-project-99.vercel.app',
+    // Other production domains
     'https://quluub-reborn-project-33.vercel.app', 
     'https://quluub-reborn-project-33-8lca.onrender.com',
     'https://preview--quluub-reborn-project-99.lovable.app',
@@ -201,16 +202,17 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT || 5000;
 
 // Only start server if not in serverless environment (Vercel)
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+if (!process.env.VERCEL) {
   server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`CORS enabled for: ${corsOptions.origin}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`Serverless mode: ${process.env.VERCEL ? 'YES' : 'NO'}`);
   });
+} else {
+  console.log('Running in Vercel serverless mode');
+  console.log(`CORS enabled for: ${corsOptions.origin}`);
 }
 
-// Export for serverless deployment
+// Export for serverless deployment (Vercel)
 module.exports = app;
-module.exports.app = app;
-module.exports.server = server;
-module.exports.io = io;

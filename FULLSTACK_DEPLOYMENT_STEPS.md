@@ -2,10 +2,14 @@
 
 ## 🎯 **Goal: Deploy Complete App to Single Domain**
 
-Your app will be available at: `https://quluub-reborn-project-99.vercel.app`
-- Frontend: React app served from root `/`
-- Backend: API endpoints at `/api/*`
-- Uploads: File access at `/uploads/*`
+Deploy both your React frontend AND Node.js backend to the same Vercel domain:
+
+**Your app will be available at:** `https://quluub-reborn-project-99.vercel.app`
+- **Frontend**: React app served from root `/`
+- **Backend**: Node.js API endpoints at `/api/*` (serverless functions)
+- **Uploads**: File access at `/uploads/*`
+- **Database**: MongoDB Atlas connection
+- **No CORS issues**: Same domain = no cross-origin problems
 
 ## 📋 **Step-by-Step Deployment**
 
