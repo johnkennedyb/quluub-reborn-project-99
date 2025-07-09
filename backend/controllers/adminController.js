@@ -31,21 +31,41 @@ const getStats = async (req, res) => {
     const maleMembers = await User.countDocuments({ gender: 'male' });
     const femaleMembers = await User.countDocuments({ gender: 'female' });
     const premiumMembers = await User.countDocuments({ plan: 'premium' });
-    const proMembers = await User.countDocuments({ plan: 'pro' });
-    const hiddenProfiles = await User.countDocuments({ isHidden: true });
+    const proMembers = 0; // No pro plan anymore
+    const hiddenProfiles = await User.countDocuments({ hidden: true });
     const recentRegistrations = await User.countDocuments({ createdAt: { $gte: oneWeekAgo } });
     const monthlyRegistrations = await User.countDocuments({ createdAt: { $gte: oneMonthAgo } });
 
-    // Activity Stats
+    // Activity Stats - Fixed inactive user calculation
     const activeToday = await User.countDocuments({ lastSeen: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } });
     const activeThisWeek = await User.countDocuments({ lastSeen: { $gte: oneWeekAgo } });
     const activeThisMonth = await User.countDocuments({ lastSeen: { $gte: oneMonthAgo } });
 
-    // Inactivity Stats
-    const inactiveUsers = await User.countDocuments({ lastSeen: { $lt: oneMonthAgo } });
-    const inactiveQuarter = await User.countDocuments({ lastSeen: { $lt: threeMonthsAgo } });
-    const inactiveSixMonths = await User.countDocuments({ lastSeen: { $lt: sixMonthsAgo } });
-    const inactiveYear = await User.countDocuments({ lastSeen: { $lt: oneYearAgo } });
+    // Inactivity Stats - Fixed calculations
+    const inactiveUsers = await User.countDocuments({ 
+      $or: [
+        { lastSeen: { $lt: oneMonthAgo } },
+        { lastSeen: { $exists: false } }
+      ]
+    });
+    const inactiveQuarter = await User.countDocuments({ 
+      $or: [
+        { lastSeen: { $lt: threeMonthsAgo } },
+        { lastSeen: { $exists: false } }
+      ]
+    });
+    const inactiveSixMonths = await User.countDocuments({ 
+      $or: [
+        { lastSeen: { $lt: sixMonthsAgo } },
+        { lastSeen: { $exists: false } }
+      ]
+    });
+    const inactiveYear = await User.countDocuments({ 
+      $or: [
+        { lastSeen: { $lt: oneYearAgo } },
+        { lastSeen: { $exists: false } }
+      ]
+    });
 
     // Match Stats
     const totalMatches = await Relationship.countDocuments({ status: 'matched' });
@@ -63,24 +83,26 @@ const getStats = async (req, res) => {
     // Financial & Growth Stats
     const totalSubscriptions = await Subscription.countDocuments({ status: 'active' });
     const conversionRate = totalMembers > 0 ? (totalSubscriptions / totalMembers) * 100 : 0;
-    const freeToProConversions = await Subscription.countDocuments({ plan: { $in: ['premium', 'pro'] }, createdAt: { $gte: oneMonthAgo } });
+    const freeToProConversions = await Subscription.countDocuments({ plan: 'premium', createdAt: { $gte: oneMonthAgo } });
 
     // Corrected Churn & Growth Rate Calculations
     const membersAtStartOfMonth = await User.countDocuments({ createdAt: { $lt: oneMonthAgo } });
-    const churnedUsersLastMonth = await User.countDocuments({ status: 'inactive', lastSeen: { $lt: oneMonthAgo, $gte: threeMonthsAgo } }); // Example: users who became inactive last month
+    const churnedUsersLastMonth = await User.countDocuments({ status: 'inactive', lastSeen: { $lt: oneMonthAgo, $gte: threeMonthsAgo } });
     const churnRate = membersAtStartOfMonth > 0 ? (churnedUsersLastMonth / membersAtStartOfMonth) * 100 : 0;
     const growthRate = membersAtStartOfMonth > 0 ? ((totalMembers - membersAtStartOfMonth) / membersAtStartOfMonth) * 100 : 0;
 
     // Engagement Rate
     const engagementRate = totalMembers > 0 ? (activeThisWeek / totalMembers) * 100 : 0;
 
-    // Geographic & Referral Stats
+    // Geographic & Referral Stats - Fixed country aggregation
     const geographicDistribution = await User.aggregate([
+      { $match: { country: { $exists: true, $ne: null, $ne: '' } } },
       { $group: { _id: '$country', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
-      { $limit: 10 },
+      { $limit: 20 },
       { $project: { country: '$_id', count: '$count' } },
     ]);
+
     const topReferrers = await User.aggregate([
       { $match: { referredBy: { $exists: true } } },
       { $group: { _id: '$referredBy', totalReferrals: { $sum: 1 } } },
@@ -88,7 +110,29 @@ const getStats = async (req, res) => {
       { $limit: 5 },
       { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'referrerInfo' } },
       { $unwind: '$referrerInfo' },
-      { $project: { _id: 0, fname: '$referrerInfo.fname', lname: '$referrerInfo.lname', username: '$referrerInfo.username', totalReferrals: '$totalReferrals' } },
+      { $project: { 
+        _id: '$_id', 
+        fname: '$referrerInfo.fname', 
+        lname: '$referrerInfo.lname', 
+        username: '$referrerInfo.username', 
+        totalReferrals: '$totalReferrals',
+        activeReferrals: '$totalReferrals' // Simplified for now
+      } },
+    ]);
+
+    // Age distribution
+    const ageDistribution = await User.aggregate([
+      { $match: { dob: { $exists: true } } },
+      { $addFields: { 
+        age: { 
+          $floor: { 
+            $divide: [{ $subtract: [new Date(), '$dob'] }, 1000 * 60 * 60 * 24 * 365] 
+          } 
+        } 
+      }},
+      { $group: { _id: '$age', count: { $sum: 1 } } },
+      { $sort: { _id: 1 } },
+      { $limit: 10 }
     ]);
 
     res.json({
@@ -98,7 +142,8 @@ const getStats = async (req, res) => {
       totalMatches, pendingRequests, rejectedRequests, successRate: successRate.toFixed(2), avgMatchesPerUser: avgMatchesPerUser.toFixed(2),
       messagesExchanged, messagesThisWeek, messagesThisMonth, matchToChatRate: matchToChatRate.toFixed(2),
       conversionRate: conversionRate.toFixed(2), freeToProConversions, churnRate: churnRate.toFixed(2), growthRate: growthRate.toFixed(2), engagementRate: engagementRate.toFixed(2),
-      geographicDistribution, topReferrers
+      geographicDistribution, topReferrers, ageDistribution,
+      totalReferrals: topReferrers.reduce((sum, ref) => sum + ref.totalReferrals, 0)
     });
   } catch (error) {
     console.error('Error fetching admin stats:', error);
@@ -106,7 +151,7 @@ const getStats = async (req, res) => {
   }
 };
 
-// @desc    Get all users
+// @desc    Get all users with enhanced filtering
 // @route   GET /api/admin/users
 // @access  Private/Admin
 const getAllUsers = async (req, res) => {
@@ -139,7 +184,12 @@ const getAllUsers = async (req, res) => {
     }
 
     if (plan && plan !== 'all') {
-      query.plan = plan;
+      // Map plan correctly - only freemium and premium
+      if (plan === 'free') {
+        query.plan = 'freemium';
+      } else if (plan === 'premium') {
+        query.plan = 'premium';
+      }
     }
 
     if (status && status !== 'all') {
@@ -154,31 +204,74 @@ const getAllUsers = async (req, res) => {
       query.city = { $regex: city, $options: 'i' };
     }
 
+    // Fixed inactivity filtering
     if (inactiveFor && inactiveFor !== 'all') {
       const days = parseInt(inactiveFor, 10);
       if (!isNaN(days)) {
         const date = new Date();
         date.setDate(date.getDate() - days);
-        query.lastSeen = { $lt: date };
+        query.$or = [
+          { lastSeen: { $lt: date } },
+          { lastSeen: { $exists: false } }
+        ];
       }
     }
 
     const totalUsers = await User.countDocuments(query);
     const users = await User.find(query)
-      .select('-password')
+      .select('-password -validationToken -resetPasswordToken')
       .limit(parseInt(limit))
       .skip((page - 1) * parseInt(limit))
       .sort({ createdAt: -1 });
 
+    // Enhanced user data with calculated fields
+    const enhancedUsers = await Promise.all(users.map(async (user) => {
+      const userObj = user.toObject();
+      
+      // Calculate age
+      if (user.dob) {
+        const age = Math.floor((Date.now() - user.dob.getTime()) / (1000 * 60 * 60 * 24 * 365));
+        userObj.age = age;
+      }
+
+      // Calculate days since last seen
+      if (user.lastSeen) {
+        const daysSinceLastSeen = Math.floor((Date.now() - user.lastSeen.getTime()) / (1000 * 60 * 60 * 24));
+        userObj.lastSeenAgo = daysSinceLastSeen;
+      } else {
+        userObj.lastSeenAgo = null;
+      }
+
+      // Calculate days since joining
+      if (user.createdAt) {
+        const daysSinceJoining = Math.floor((Date.now() - user.createdAt.getTime()) / (1000 * 60 * 60 * 24));
+        userObj.joinedAgo = daysSinceJoining;
+      }
+
+      // Get match and message counts
+      const matchCount = await Relationship.countDocuments({
+        $or: [{ user1: user._id }, { user2: user._id }],
+        status: 'matched'
+      });
+
+      const messageCount = await Chat.countDocuments({
+        participants: user._id
+      });
+
+      userObj.matchCount = matchCount;
+      userObj.messageCount = messageCount;
+      userObj.fullName = `${user.fname} ${user.lname}`;
+
+      return userObj;
+    }));
+
     res.json({
-      users,
-      pagination: {
-        total: totalUsers,
-        currentPage: parseInt(page),
-        totalPages: Math.ceil(totalUsers / limit),
-        hasNextPage: parseInt(page) * parseInt(limit) < totalUsers,
-        hasPrevPage: parseInt(page) > 1,
-      },
+      users: enhancedUsers,
+      totalUsers,
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(totalUsers / limit),
+      hasNextPage: parseInt(page) * parseInt(limit) < totalUsers,
+      hasPrevPage: parseInt(page) > 1,
     });
   } catch (error) {
     console.error('Error fetching users:', error);
@@ -186,293 +279,152 @@ const getAllUsers = async (req, res) => {
   }
 };
 
-// @desc    Get user details
-// @route   GET /api/admin/users/:id
+// @desc    Get VIP users (Premium users)
+// @route   GET /api/admin/vip-users
 // @access  Private/Admin
-const getUserDetails = async (req, res) => {
+const getVipUsers = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select('-password');
-    if (user) {
-      res.json(user);
-    } else {
-      res.status(404).json({ message: 'User not found' });
-    }
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-};
+    const vipUsers = await User.find({ 
+      plan: 'premium',
+      status: 'active'
+    })
+    .select('-password -validationToken -resetPasswordToken')
+    .sort({ createdAt: -1 })
+    .limit(50);
 
-// @desc    Update user status
-// @route   PUT /api/admin/users/:id/status
-// @access  Private/Admin
-const updateUserAccountStatus = async (req, res) => {
-  try {
-    const { status, reportId } = req.body;
-    const user = await User.findById(req.params.id);
-
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    user.status = status || user.status;
-    const updatedUser = await user.save();
-
-    // If a reportId is provided, update the report status to 'action_taken'
-    if (reportId) {
-      const report = await Report.findById(reportId);
-      if (report) {
-        report.status = 'action_taken';
-        await report.save();
+    const enhancedVips = await Promise.all(vipUsers.map(async (user) => {
+      const userObj = user.toObject();
+      
+      // Calculate age
+      if (user.dob) {
+        const age = Math.floor((Date.now() - user.dob.getTime()) / (1000 * 60 * 60 * 24 * 365));
+        userObj.age = age;
       }
-    }
 
-    res.json(updatedUser);
+      // Get match count
+      const matchCount = await Relationship.countDocuments({
+        $or: [{ user1: user._id }, { user2: user._id }],
+        status: 'matched'
+      });
+
+      userObj.matchCount = matchCount;
+      userObj.fullName = `${user.fname} ${user.lname}`;
+
+      return userObj;
+    }));
+
+    res.json({ vips: enhancedVips });
   } catch (error) {
-    console.error('Error updating user status:', error);
+    console.error('Error fetching VIP users:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
 
-// @desc    Update user plan
-// @route   PUT /api/admin/users/:id/plan
+// @desc    Get potential matches for a user
+// @route   GET /api/admin/users/:id/potential-matches
 // @access  Private/Admin
-const updateUserPlan = async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-    if (user) {
-      user.plan = req.body.plan || user.plan;
-      const updatedUser = await user.save();
-      res.json(updatedUser);
-    } else {
-      res.status(404).json({ message: 'User not found' });
-    }
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// @desc    Update user
-// @route   PUT /api/admin/users/:id
-// @access  Private/Admin
-const updateUser = async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-    if (user) {
-      user.fname = req.body.fname || user.fname;
-      user.lname = req.body.lname || user.lname;
-      user.email = req.body.email || user.email;
-      user.plan = req.body.plan || user.plan;
-      user.status = req.body.status || user.status;
-      user.isVerified = req.body.isVerified;
-      user.city = req.body.city || user.city;
-      user.country = req.body.country || user.country;
-      user.gender = req.body.gender || user.gender;
-      user.dob = req.body.dob || user.dob;
-      const updatedUser = await user.save();
-      res.json(updatedUser);
-    } else {
-      res.status(404).json({ message: 'User not found' });
-    }
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// @desc    Delete user
-// @route   DELETE /api/admin/users/:id
-// @access  Private/Admin
-const deleteUser = async (req, res) => {
-  const session = await User.startSession();
-  session.startTransaction();
+const getPotentialMatches = async (req, res) => {
   try {
     const userId = req.params.id;
-    const user = await User.findById(userId).session(session);
-
+    const user = await User.findById(userId);
+    
     if (!user) {
-      await session.abortTransaction();
-      session.endSession();
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Remove all associated data
-    await Relationship.deleteMany({ $or: [{ user1: userId }, { user2: userId }] }, { session });
-    await Chat.deleteMany({ participants: userId }, { session });
-    await Notification.deleteMany({ recipient: userId }, { session });
-    await Payment.deleteMany({ user: userId }, { session });
-    await Subscription.deleteMany({ user: userId }, { session });
-    await UserActivityLog.deleteMany({ user: userId }, { session });
-    await WaliChat.deleteMany({ participants: userId }, { session });
-    await PushNotification.deleteMany({ recipient: userId }, { session });
+    // Get users of opposite gender who are active and premium
+    const oppositeGender = user.gender === 'male' ? 'female' : 'male';
+    
+    // Get existing relationships to exclude
+    const existingRelationships = await Relationship.find({
+      $or: [{ user1: userId }, { user2: userId }]
+    });
+    
+    const excludeUserIds = existingRelationships.map(rel => 
+      rel.user1.toString() === userId ? rel.user2 : rel.user1
+    );
+    excludeUserIds.push(userId); // Exclude self
 
-    // Remove user from other users' arrays (e.g., blocked, favorites)
-    await User.updateMany({}, { $pull: { blockedUsers: userId, favoriteUsers: userId, viewedBy: userId } }, { session });
+    const potentialMatches = await User.find({
+      _id: { $nin: excludeUserIds },
+      gender: oppositeGender,
+      status: 'active',
+      plan: 'premium' // VIP users should see premium users
+    })
+    .select('-password -validationToken -resetPasswordToken')
+    .limit(20)
+    .sort({ lastSeen: -1 });
 
-    // Finally, delete the user
-    await User.deleteOne({ _id: userId }, { session });
-
-    await session.commitTransaction();
-    session.endSession();
-
-    res.json({ message: 'User and all associated data have been successfully deleted.' });
-
-  } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-    console.error('Error during user deletion:', error);
-    res.status(500).json({ message: 'Server error during user deletion process.' });
-  }
-};
-
-// @desc    Manually verify user email
-// @route   POST /api/admin/users/:id/verify-email
-// @access  Private/Admin
-const verifyUserEmail = async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-    if (user) {
-      user.isVerified = true;
-      await user.save();
-      res.json({ message: 'User email verified successfully.' });
-    } else {
-      res.status(404).json({ message: 'User not found' });
-    }
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// @desc    Send password reset link to user
-// @route   POST /api/admin/users/:id/reset-password
-// @access  Private/Admin
-const sendPasswordResetLink = async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-    if (user) {
-      const resetToken = crypto.randomBytes(32).toString('hex');
-      user.passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-      user.passwordResetExpires = Date.now() + 3600000; // 1 hour
-      await user.save();
-
-      // This URL should point to your frontend's password reset page
-      const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
-      const message = `You are receiving this email because you (or an administrator) have requested the reset of the password for your account.\n\nPlease click on the following link, or paste it into your browser to complete the process within one hour of receiving it:\n\n${resetUrl}\n\nIf you did not request this, please ignore this email and your password will remain unchanged.\n`;
-
-      try {
-        await sendBulkEmailService([user], 'Password Reset Request', message);
-        res.json({ message: 'Password reset link sent to user.' });
-      } catch (emailError) {
-        console.error('Email sending error:', emailError);
-        user.passwordResetToken = undefined;
-        user.passwordResetExpires = undefined;
-        await user.save();
-        return res.status(500).json({ message: 'Error sending password reset email.' });
+    const enhancedMatches = await Promise.all(potentialMatches.map(async (match) => {
+      const matchObj = match.toObject();
+      
+      if (match.dob) {
+        const age = Math.floor((Date.now() - match.dob.getTime()) / (1000 * 60 * 60 * 24 * 365));
+        matchObj.age = age;
       }
-    } else {
-      res.status(404).json({ message: 'User not found' });
+
+      matchObj.fullName = `${match.fname} ${match.lname}`;
+      return matchObj;
+    }));
+
+    res.json({ matches: enhancedMatches });
+  } catch (error) {
+    console.error('Error fetching potential matches:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Send match suggestions to user
+// @route   POST /api/admin/users/:id/suggest-matches
+// @access  Private/Admin
+const sendMatchSuggestions = async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { suggestedUserIds } = req.body;
+
+    if (!suggestedUserIds || !Array.isArray(suggestedUserIds)) {
+      return res.status(400).json({ message: 'Please provide valid user IDs' });
     }
+
+    // Create notifications for suggested matches
+    const notifications = suggestedUserIds.map(suggestedUserId => ({
+      recipient: userId,
+      type: 'admin_suggestion',
+      title: 'New Match Suggestion',
+      message: 'Admin has suggested a potential match for you',
+      relatedUser: suggestedUserId,
+      createdAt: new Date()
+    }));
+
+    await Notification.insertMany(notifications);
+
+    res.json({ message: 'Match suggestions sent successfully' });
   } catch (error) {
+    console.error('Error sending match suggestions:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
 
-// @desc    Get system metrics
-// @route   GET /api/admin/system
+// @desc    Schedule email for later sending
+// @route   POST /api/admin/schedule-email
 // @access  Private/Admin
-const getSystemMetrics = async (req, res) => {
+const scheduleEmail = async (req, res) => {
   try {
-    res.json({ cpuUsage: '75%', memoryUsage: '60%', diskUsage: '80%' });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// @desc    Get all calls
-// @route   GET /api/admin/calls
-// @access  Private/Admin
-const getAllCalls = async (req, res) => {
-  try {
-        const calls = await Call.find({}).populate('caller recipient', 'fname lname');
-    res.json(calls);
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// @desc    Save call record
-// @route   POST /api/admin/calls
-// @access  Private/Admin
-const saveCallRecord = async (req, res) => {
-  try {
-    const newCall = new Call(req.body);
-    const savedCall = await newCall.save();
-    res.status(201).json(savedCall);
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// @desc    Upload call recording
-// @route   POST /api/admin/call-recordings
-// @access  Private/Admin
-const getReportedProfiles = async (req, res) => {
-  try {
-    const reports = await Report.find()
-      .populate('reporter', 'fname lname username')
-      .populate('reported', 'fname lname username')
-      .sort({ createdAt: -1 });
-    res.json({ reports });
-  } catch (error) {
-    console.error('Error fetching reported profiles:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-const dismissReport = async (req, res) => {
-  try {
-    const report = await Report.findById(req.params.id);
-    if (!report) {
-      return res.status(404).json({ message: 'Report not found' });
+    const { userIds, subject, message, sendToAll, sendAt } = req.body;
+    
+    if (!sendAt) {
+      return res.status(400).json({ message: 'Send time is required for scheduling' });
     }
-    report.status = 'dismissed';
-    await report.save();
-    res.json({ message: 'Report dismissed successfully' });
-  } catch (error) {
-    console.error('Error dismissing report:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
 
-const uploadCallRecording = async (req, res) => {
-  try {
-    if (req.file) {
-      res.json({ message: 'File uploaded successfully', path: req.file.path });
+    let recipients = [];
+    if (sendToAll === 'true' || sendToAll === true) {
+      // Will be populated when email is actually sent
+      recipients = [];
     } else {
-      res.status(400).json({ message: 'No file uploaded' });
-    }
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// @desc    Send bulk email
-// @route   POST /api/admin/bulk-email
-// @access  Private/Admin
-const sendBulkEmail = async (req, res) => {
-  try {
-    const { userIds, subject, message, sendToAll } = req.body;
-    let users = [];
-
-    if (sendToAll === 'true') {
-      users = await User.find({});
-    } else {
-      if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
-        return res.status(400).json({ message: 'Please select at least one user.' });
+      if (!userIds || !Array.isArray(userIds)) {
+        return res.status(400).json({ message: 'Please select recipients' });
       }
-      users = await User.find({ '_id': { $in: userIds } });
-    }
-
-    if (users.length === 0) {
-      return res.status(404).json({ message: 'No users found to send email to.' });
+      recipients = userIds;
     }
 
     let attachments = [];
@@ -484,82 +436,209 @@ const sendBulkEmail = async (req, res) => {
       }));
     }
 
-    await sendBulkEmailService(users, subject, message, attachments);
-    res.json({ message: `Bulk email sent successfully to ${users.length} users.` });
+    const scheduledEmail = new ScheduledEmail({
+      subject,
+      message,
+      recipients,
+      sendToAll: sendToAll === 'true' || sendToAll === true,
+      sendAt: new Date(sendAt),
+      attachments,
+      status: 'pending'
+    });
+
+    await scheduledEmail.save();
+    res.json({ message: 'Email scheduled successfully', id: scheduledEmail._id });
   } catch (error) {
-    console.error('Error sending bulk email:', error);
-    res.status(500).json({ message: 'Failed to send bulk email.' });
+    console.error('Error scheduling email:', error);
+    res.status(500).json({ message: 'Failed to schedule email' });
   }
 };
 
-// @desc    Send test email
-// @route   POST /api/admin/test-email
+// @desc    Get scheduled emails
+// @route   GET /api/admin/scheduled-emails
 // @access  Private/Admin
-const sendTestEmail = async (req, res) => {
+const getScheduledEmails = async (req, res) => {
   try {
-    const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ message: 'Email address is required' });
-    }
+    const scheduledEmails = await ScheduledEmail.find()
+      .populate('recipients', 'fname lname email')
+      .sort({ sendAt: 1 });
     
-    await sendTestEmailService(email);
-    res.json({ message: 'Test email sent successfully' });
+    res.json(scheduledEmails);
   } catch (error) {
-    console.error('Error sending test email:', error);
-    res.status(500).json({ message: 'Failed to send test email' });
-  }
-};
-
-// @desc    Get email config
-// @route   GET /api/admin/email-config
-// @access  Private/Admin
-const getEmailConfig = async (req, res) => {
-  try {
-    const config = await getEmailConfigService();
-    res.json(config);
-  } catch (error) {
-    console.error('Error fetching email config:', error);
+    console.error('Error fetching scheduled emails:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
 
-// @desc    Save email config
-// @route   POST /api/admin/email-config
+// @desc    Cancel scheduled email
+// @route   DELETE /api/admin/scheduled-emails/:id
 // @access  Private/Admin
-const saveEmailConfig = async (req, res) => {
+const cancelScheduledEmail = async (req, res) => {
   try {
-    const success = await updateEmailConfig(req.body);
-    if (success) {
-      res.json({ message: 'Email config updated successfully' });
-    } else {
-      res.status(400).json({ message: 'Failed to update email config' });
+    const email = await ScheduledEmail.findById(req.params.id);
+    
+    if (!email) {
+      return res.status(404).json({ message: 'Scheduled email not found' });
     }
+
+    if (email.status === 'sent') {
+      return res.status(400).json({ message: 'Cannot cancel already sent email' });
+    }
+
+    await ScheduledEmail.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Scheduled email cancelled successfully' });
   } catch (error) {
-    console.error('Error saving email config:', error);
+    console.error('Error cancelling scheduled email:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
 
-// @desc    Get email metrics
-// @route   GET /api/admin/email-metrics
+// @desc    Send admin push notification
+// @route   POST /api/admin/push-notifications
 // @access  Private/Admin
-const getEmailMetrics = async (req, res) => {
+const sendAdminPushNotification = async (req, res) => {
   try {
-    const metrics = await getEmailMetricsService();
-    res.json(metrics);
+    const { title, message, target, targetUsers } = req.body;
+    
+    if (!title || !message) {
+      return res.status(400).json({ message: 'Title and message are required' });
+    }
+
+    let recipients = [];
+    
+    switch (target) {
+      case 'all':
+        recipients = await User.find({ status: 'active' }).select('_id deviceTokens');
+        break;
+      case 'premium':
+        recipients = await User.find({ plan: 'premium', status: 'active' }).select('_id deviceTokens');
+        break;
+      case 'free':
+        recipients = await User.find({ plan: 'freemium', status: 'active' }).select('_id deviceTokens');
+        break;
+      case 'inactive':
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        recipients = await User.find({ 
+          $or: [
+            { lastSeen: { $lt: thirtyDaysAgo } },
+            { lastSeen: { $exists: false } }
+          ]
+        }).select('_id deviceTokens');
+        break;
+      case 'custom':
+        if (targetUsers && targetUsers.length > 0) {
+          recipients = await User.find({ _id: { $in: targetUsers } }).select('_id deviceTokens');
+        }
+        break;
+    }
+
+    // Create notification record
+    const notification = new PushNotification({
+      title,
+      message,
+      target,
+      targetUsers: target === 'custom' ? targetUsers : [],
+      status: 'sent',
+      sentAt: new Date(),
+      sentCount: recipients.length,
+      createdBy: req.user._id
+    });
+
+    await notification.save();
+
+    // Send actual push notifications
+    if (recipients.length > 0) {
+      await sendPushNotificationService(recipients, { title, message });
+    }
+
+    res.json({ 
+      message: 'Push notification sent successfully', 
+      sentCount: recipients.length 
+    });
   } catch (error) {
-    console.error('Error fetching email metrics:', error);
+    console.error('Error sending push notification:', error);
+    res.status(500).json({ message: 'Failed to send push notification' });
+  }
+};
+
+// @desc    Get admin push notifications
+// @route   GET /api/admin/push-notifications
+// @access  Private/Admin
+const getAdminPushNotifications = async (req, res) => {
+  try {
+    const notifications = await PushNotification.find()
+      .populate('createdBy', 'fname lname')
+      .sort({ createdAt: -1 })
+      .limit(50);
+    
+    res.json(notifications);
+  } catch (error) {
+    console.error('Error fetching push notifications:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Get payment history
+// @route   GET /api/admin/payments
+// @access  Private/Admin
+const getPaymentHistory = async (req, res) => {
+  try {
+    const payments = await Payment.find()
+      .populate('user', 'fname lname email username')
+      .sort({ createdAt: -1 })
+      .limit(100);
+
+    const enhancedPayments = payments.map(payment => ({
+      ...payment.toObject(),
+      user: {
+        ...payment.user.toObject(),
+        fullName: `${payment.user.fname} ${payment.user.lname}`
+      }
+    }));
+
+    res.json(enhancedPayments);
+  } catch (error) {
+    console.error('Error fetching payment history:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Process refund
+// @route   POST /api/admin/payments/:id/refund
+// @access  Private/Admin
+const processRefund = async (req, res) => {
+  try {
+    const payment = await Payment.findById(req.params.id);
+    
+    if (!payment) {
+      return res.status(404).json({ message: 'Payment not found' });
+    }
+
+    if (payment.status === 'refunded') {
+      return res.status(400).json({ message: 'Payment already refunded' });
+    }
+
+    // Update payment status
+    payment.status = 'refunded';
+    payment.refundedAt = new Date();
+    await payment.save();
+
+    // Update user plan if needed
+    if (payment.plan !== 'freemium') {
+      await User.findByIdAndUpdate(payment.user, { 
+        plan: 'freemium',
+        premiumExpirationDate: null
+      });
+    }
+
+    res.json({ message: 'Refund processed successfully', payment });
+  } catch (error) {
+    console.error('Error processing refund:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
 
 module.exports = {
-  getReportedProfiles,
-  dismissReport,
-  getAdminPushNotifications,
-  scheduleEmail,
-  getScheduledEmails,
-  cancelScheduledEmail,
   getStats,
   getAllUsers,
   getUserDetails,
@@ -578,29 +657,23 @@ module.exports = {
   getEmailMetrics,
   saveEmailConfig,
   getEmailConfig,
-  getMatchingInsights,
-  getEngagementMetrics,
-  getConversionMetrics,
-  getChurnAnalysis,
-  getReferralAnalysis,
-  getChatReports,
+  scheduleEmail,
+  getScheduledEmails,
+  cancelScheduledEmail,
+  sendAdminPushNotification,
+  getAdminPushNotifications,
   getReportedProfiles,
-  sendChatReport,
   dismissReport,
   getVipUsers,
   getPotentialMatches,
-  processRefund,
-  getPaymentHistory,
   sendMatchSuggestions,
-  getReportDetails,
-  resolveReport,
-  getSystemSettings,
-  sendAdminNotification,
-  getAdminNotifications,
-  markNotificationAsRead,
-  sendAdminPushNotification,
-  getAdminPushNotifications,
-  getEmailConfig,
-  saveEmailConfig,
-  getEmailMetrics
+  getPaymentHistory,
+  processRefund,
+  getMatchingInsights: async (req, res) => res.json({ message: 'Feature coming soon' }),
+  getEngagementMetrics: async (req, res) => res.json({ message: 'Feature coming soon' }),
+  getConversionMetrics: async (req, res) => res.json({ message: 'Feature coming soon' }),
+  getChurnAnalysis: async (req, res) => res.json({ message: 'Feature coming soon' }),
+  getReferralAnalysis: async (req, res) => res.json({ message: 'Feature coming soon' }),
+  getChatReports: async (req, res) => res.json({ message: 'Feature coming soon' }),
+  sendChatReport: async (req, res) => res.json({ message: 'Feature coming soon' })
 };

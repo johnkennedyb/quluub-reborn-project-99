@@ -8,10 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import UserProfileCard from './UserProfileCard';
-import { useToast } from '@/hooks/use-toast';
 import EditUserDialog from './EditUserDialog';
+import { useToast } from '@/hooks/use-toast';
 import { Search, Edit, Trash2, User, Users, Eye } from 'lucide-react';
 
 interface MemberManagementProps {
@@ -41,8 +39,6 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
     setFilters(prev => ({ ...prev, [key]: value, page: 1 }));
   };
 
-
-
   const handleDeleteUser = async (userId: string) => {
     if (!confirm('Are you sure you want to permanently delete this user and all their associated data? This action cannot be undone.')) {
       return;
@@ -51,7 +47,6 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
     try {
       await deleteUser(userId);
       toast({ title: 'Success', description: 'User has been successfully deleted.' });
-      // refetchData is already called within the deleteUser hook on success
     } catch (error: any) {
       console.error('Failed to delete user:', error);
       toast({ title: 'Error', description: error.message || 'An unexpected error occurred.', variant: 'destructive' });
@@ -76,7 +71,7 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
                   {user.gender}
                 </Badge>
                 <Badge variant={user.plan === 'premium' ? 'default' : 'outline'}>
-                  {user.plan}
+                  {user.plan === 'freemium' ? 'Free' : user.plan}
                 </Badge>
                 <Badge variant={user.status === 'active' ? 'default' : 'destructive'}>
                   {user.status}
@@ -92,15 +87,15 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
               {user.country && <span> • {user.country}</span>}
             </div>
             <div className="text-sm text-gray-500">
-              Matches: {user.matchCount} • Messages: {user.messageCount}
+              Matches: {user.matchCount || 0} • Messages: {user.messageCount || 0}
             </div>
             <div className="text-sm text-gray-500">
-              {user.lastSeenAgo !== null ? `Last seen ${user.lastSeenAgo} days ago` : 'Never logged in'}
+              {user.lastSeenAgo !== null && user.lastSeenAgo !== undefined 
+                ? `Last seen ${user.lastSeenAgo} days ago` 
+                : 'Never logged in'}
             </div>
             
             <div className="flex space-x-2">
-
-              
               <Link to={`/admin/user/${user._id}`}>
                 <Button size="sm" variant="outline">
                   <Eye className="h-4 w-4" />
@@ -214,7 +209,6 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
                 <SelectItem value="all">All Plans</SelectItem>
                 <SelectItem value="free">Free</SelectItem>
                 <SelectItem value="premium">Premium</SelectItem>
-
               </SelectContent>
             </Select>
             
@@ -300,8 +294,6 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
         </CardContent>
       </Card>
 
-
-
       {/* Edit User Dialog */}
       {selectedUser && (
         <EditUserDialog
@@ -310,7 +302,7 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
           onOpenChange={setEditDialogOpen}
           onUserUpdate={(userId, data) => {
             updateUser(userId, data);
-            setEditDialogOpen(false); // Close dialog on successful update
+            setEditDialogOpen(false);
           }}
           sendPasswordReset={sendPasswordReset}
         />

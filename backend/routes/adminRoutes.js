@@ -42,6 +42,7 @@ const {
 const {
   getAllSubscriptions
 } = require('../controllers/subscriptionController');
+const { createSampleReports } = require('../utils/createSampleReports');
 
 const { protect, isAdmin } = require('../middlewares/auth');
 const cache = require('../middlewares/cache');
@@ -125,6 +126,16 @@ router.route('/push-notifications').get(getAdminPushNotifications).post(sendAdmi
 // Reported profiles routes
 router.get('/reported-profiles', getReportedProfiles);
 router.patch('/reported-profiles/:id/dismiss', dismissReport);
+
+// Create sample reports for testing (remove in production)
+router.post('/create-sample-reports', async (req, res) => {
+  try {
+    await createSampleReports();
+    res.json({ message: 'Sample reports created successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error creating sample reports' });
+  }
+});
 
 // Analytics routes
 router.get('/matching-insights', getMatchingInsights);
