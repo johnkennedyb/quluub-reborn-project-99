@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Heart, X, Send, UserPlus, Search, Filter, Star } from "lucide-react";
+import AdComponent from '@/components/AdComponent';
+import { useAuth } from '@/contexts/AuthContext';
 import { userService, relationshipService } from "@/lib/api-client";
 import { useToast } from "@/components/ui/use-toast";
 import { User } from "@/types/user";
@@ -30,7 +32,7 @@ const Browse = () => {
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [usersPerPage] = useState(8); // Show 8 users per page
+  const [usersPerPage] = useState(30); // Show 30 users per page
   const [loading, setLoading] = useState(true);
   const [processingAction, setProcessingAction] = useState(false);
   const [pendingConnections, setPendingConnections] = useState<string[]>([]);
@@ -39,6 +41,7 @@ const Browse = () => {
   const [favoriteUsers, setFavoriteUsers] = useState<string[]>([]);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -262,61 +265,70 @@ const Browse = () => {
         ) : filteredUsers.length > 0 ? (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-              {currentUsers.map(user => (
-                <div key={user._id || user.id} className="flex flex-col h-full">
-                  <UserProfileCard 
-                    user={user} 
-                    onView={handleViewProfile}
-                    onLike={(id) => handleLike(id)}
-                    onMessage={(id) => handleMessage(id)}
-                  />
-                  <div className="flex justify-between space-x-2 mt-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-10 w-10 rounded-full"
-                      onClick={() => handleSkip(user._id || user.id || '')}
-                      disabled={processingAction}
-                    >
-                      <X className="h-5 w-5 text-red-500" />
-                    </Button>
-                    
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-10 w-10 rounded-full"
-                      onClick={() => handleToggleFavorite(user._id || user.id || '')}
-                      disabled={processingAction}
-                    >
-                      <Star className={`h-5 w-5 ${favoriteUsers.includes(user._id || user.id || '') ? 'fill-yellow-500 text-yellow-500' : 'text-gray-400'}`} />
-                    </Button>
-                    
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-10 w-10 rounded-full"
-                      onClick={() => handleLike(user._id || user.id || '')}
-                      disabled={processingAction || pendingConnections.includes(user._id || user.id || '')}
-                    >
-                      {pendingConnections.includes(user._id || user.id || '') ? (
-                        <UserPlus className="h-5 w-5 text-amber-500" />
-                      ) : (
-                        <Heart className="h-5 w-5 text-green-500" />
-                      )}
-                    </Button>
-                    
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-10 w-10 rounded-full"
-                      onClick={() => handleMessage(user._id || user.id || '')}
-                      disabled={processingAction}
-                    >
-                      <Send className="h-5 w-5 text-purple-500" />
-                    </Button>
+              {currentUsers.reduce((acc, user, index) => {
+                acc.push(
+                  <div key={user._id || user.id} className="flex flex-col h-full">
+                    <UserProfileCard
+                      user={user}
+                      onView={handleViewProfile}
+                      onLike={(id) => handleLike(id)}
+                      onMessage={(id) => handleMessage(id)}
+                    />
+                    <div className="flex justify-between space-x-2 mt-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10 rounded-full"
+                        onClick={() => handleSkip(user._id || user.id || '')}
+                        disabled={processingAction}
+                      >
+                        <X className="h-5 w-5 text-red-500" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10 rounded-full"
+                        onClick={() => handleToggleFavorite(user._id || user.id || '')}
+                        disabled={processingAction}
+                      >
+                        <Star className={`h-5 w-5 ${favoriteUsers.includes(user._id || user.id || '') ? 'fill-yellow-500 text-yellow-500' : 'text-gray-400'}`} />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10 rounded-full"
+                        onClick={() => handleLike(user._id || user.id || '')}
+                        disabled={processingAction || pendingConnections.includes(user._id || user.id || '')}
+                      >
+                        {pendingConnections.includes(user._id || user.id || '') ? (
+                          <UserPlus className="h-5 w-5 text-amber-500" />
+                        ) : (
+                          <Heart className="h-5 w-5 text-green-500" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10 rounded-full"
+                        onClick={() => handleMessage(user._id || user.id || '')}
+                        disabled={processingAction}
+                      >
+                        <Send className="h-5 w-5 text-purple-500" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+
+                if (user?.plan !== 'premium' && (index + 1) % 5 === 0 && (index + 1) < currentUsers.length) {
+                  acc.push(
+                    <div key={`ad-${index}`} className="sm:col-span-2 lg:col-span-4 my-4">
+                      <AdComponent />
+                    </div>
+                  );
+                }
+
+                return acc;
+              }, [] as JSX.Element[])}
             </div>
             
             <Pagination className="mt-6">
@@ -335,6 +347,7 @@ const Browse = () => {
                 <PaginationItem className="flex items-center px-4">
                   Page {currentPage} of {totalPages}
                 </PaginationItem>
+
                 <PaginationItem>
                   <Button 
                     variant="outline" 

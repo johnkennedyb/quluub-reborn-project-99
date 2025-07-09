@@ -203,8 +203,9 @@ exports.initiateCall = asyncHandler(async (req, res) => {
       try {
         await sendVideoCallNotificationEmail(
           recipient.parentGuardianEmail,
-          caller,
-          recipient,
+          recipient.parentGuardianName || 'Guardian',
+          `${recipient.fname} ${recipient.lname}`,
+          `${caller.fname} ${caller.lname}`,
           jitsiRoomUrl
         );
         emailSent = true;

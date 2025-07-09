@@ -10,17 +10,17 @@ const crypto = require('crypto');
 // @access  Private
 exports.getUserProfile = async (req, res) => {
   try {
-    // req.user is set from the auth middleware
-    const user = await User.findById(req.user._id).select('-password');
-    
+    const userId = req.params.userId || req.user._id;
+    const user = await User.findById(userId).select('-password');
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    
+
     res.json(user);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error('Get user profile error:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -58,7 +58,7 @@ exports.updateUserProfile = async (req, res) => {
       'fname', 'lname', 'parentEmail', 'nationality', 'country', 'build', 
       'appearance', 'maritalStatus', 'patternOfSalaah', 
       'genotype', 'summary', 'workEducation', 'hidden',
-      'profile_pic', 'kunya', 'dob', 'ethnicity', 'waliDetails'
+      'profile_pic', 'kunya', 'dob', 'ethnicity', 'waliDetails', 'hijab', 'beard'
     ];
     
     updatableFields.forEach(field => {
@@ -94,7 +94,9 @@ exports.updateUserProfile = async (req, res) => {
       dob: updatedUser.dob,
       ethnicity: updatedUser.ethnicity,  
       profile_pic: updatedUser.profile_pic,
-      waliDetails: updatedUser.waliDetails
+      waliDetails: updatedUser.waliDetails,
+      hijab: updatedUser.hijab,
+      beard: updatedUser.beard
     });
   } catch (error) {
     console.error(error);
@@ -119,16 +121,8 @@ exports.getBrowseUsers = async (req, res) => {
       _id: { $ne: req.user._id }, // Exclude current user
     };
     
-    // If not showing all users, filter by gender
-    if (!req.query.showAll) {
-      // Match with opposite gender
-      filters.gender = currentUser.gender === 'male' ? 'female' : 'male';
-      
-      // Match with same country if provided
-      if (currentUser.country) {
-        filters.country = currentUser.country;
-      }
-    }
+    // Always filter by opposite gender
+    filters.gender = currentUser.gender === 'male' ? 'female' : 'male';
     
     // Additional filters from query
     if (req.query.country) {
@@ -138,20 +132,37 @@ exports.getBrowseUsers = async (req, res) => {
     if (req.query.nationality) {
       filters.nationality = req.query.nationality;
     }
+
+    if (req.query.hijab === 'Yes') {
+      filters.hijab = 'Yes';
+    }
+
+    if (req.query.beard === 'Yes') {
+      filters.beard = 'Yes';
+    }
     
     console.log("Applying filters:", filters);
     
     // Allow pagination for large datasets
-    const limit = req.query.limit ? parseInt(req.query.limit) : 100;
+    const limit = req.query.limit ? parseInt(req.query.limit) : 30;
+    const page = req.query.page ? parseInt(req.query.page) : 1;
+    const skip = (page - 1) * limit;
+
+    const count = await User.countDocuments(filters);
     
     const users = await User.find(filters)
       .select('-password -resetPasswordToken -resetPasswordTokenExpiration -validationToken')
       .sort({ lastSeen: -1 }) // Most recently active first
-      .limit(limit);
+      .limit(limit)
+      .skip(skip);
     
-    console.log(`Found ${users.length} users matching the criteria`);
+    console.log(`Found ${users.length} users matching the criteria on page ${page}`);
     
-    res.json(users);
+    res.json({
+      users,
+      page,
+      pages: Math.ceil(count / limit)
+    });
   } catch (error) {
     console.error("Error in getBrowseUsers:", error);
     res.status(500).json({ message: 'Server error', error: error.message });

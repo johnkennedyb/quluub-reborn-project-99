@@ -8,7 +8,9 @@ const {
   getChat,
   addChat,
   updateChat,
-  getAllChatReceived
+  getAllChatReceived,
+  contactWali,
+  initiateVideoCall
 } = require('../controllers/chatController');
 const { protect } = require('../middlewares/auth');
 
@@ -19,6 +21,8 @@ router.get('/conversations', protect, getConversations);
 router.get('/messages/:userId', protect, getMessages);
 router.post('/send', protect, sendMessage);
 router.get('/unread', protect, getUnreadCount);
+router.post('/contact-wali', protect, contactWali);
+router.post('/video-call', protect, initiateVideoCall);
 
 // Legacy routes for compatibility
 router.get('/chat', protect, getChat);

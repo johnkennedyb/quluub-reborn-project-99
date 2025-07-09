@@ -35,6 +35,10 @@ const userSchema = new mongoose.Schema(
       enum: ["freemium", "premium", "pro", null ,"NEW"], 
       default: "freemium" 
     },
+    premiumExpirationDate: {
+      type: Date,
+      default: null
+    },
     gender: { 
       type: String, 
       enum: ["male", "female", "other"], 
@@ -96,7 +100,7 @@ const userSchema = new mongoose.Schema(
     },
     referralStats: {
       totalReferrals: { type: Number, default: 0 },
-      activeReferrals: { type: Number, default: 0 },
+
       completedReferrals: { type: Number, default: 0 }
     },
     videoCallCredits: {
@@ -113,15 +117,21 @@ const userSchema = new mongoose.Schema(
     region: { type: String },
     build: { type: String },
     appearance: { type: String },
+    hijab: { type: String, enum: ['Yes', 'No'], default: 'No' },
+    beard: { type: String, enum: ['Yes', 'No'], default: 'No' },
     maritalStatus: { type: String },
     noOfChildren: { type: String },
-    ethnicity: { type: String },
+    ethnicity: {
+      type: [String],
+      validate: [val => val.length <= 2, 'Ethnicity cannot have more than 2 entries.']
+    },
     patternOfSalaah: { type: String },
     genotype: { type: String },
     summary: { type: String },
     workEducation: { type: String },
     lastSeen: { type: Date },
     favorites: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    deviceTokens: [{ type: String }],
   },
   {
     timestamps: true,

@@ -5,11 +5,12 @@ const jwt = require('jsonwebtoken');
 const generateToken = require('../utils/generateToken');
 const axios = require('axios');
 const crypto = require('crypto');
+const { sendValidationEmail, sendWelcomeEmail, sendWaliNewJoinerEmail } = require('../utils/emailService');
 
 // Regular signup
 const signup = async (req, res) => {
   try {
-    const { username, email, password, fname, lname, gender, parentEmail } = req.body;
+    const { username, email, password, fname, lname, gender, parentEmail, ethnicity } = req.body;
 
     console.log('Signup attempt:', { username, email, fname, lname, gender });
 
@@ -44,10 +45,29 @@ const signup = async (req, res) => {
       lname,
       gender,
       parentEmail: parentEmail || email, // Use parentEmail if provided, otherwise use user email
-      type: 'USER'
+      type: 'USER',
+      ethnicity: ethnicity || []
     });
 
     if (user) {
+      // Send validation and welcome emails
+      try {
+        const verificationToken = crypto.randomBytes(32).toString('hex');
+        user.emailVerificationToken = crypto.createHash('sha256').update(verificationToken).digest('hex');
+        user.emailVerificationExpires = Date.now() + 3600000; // 1 hour
+        await user.save();
+
+        sendValidationEmail(user.email, user.fname, verificationToken);
+        sendWelcomeEmail(user.email, user.fname);
+
+        // If the user is female and provided a parent's email, notify the Wali
+        if (user.gender === 'female' && user.parentEmail && user.parentEmail !== user.email) {
+          sendWaliNewJoinerEmail(user.parentEmail, "Guardian", user.fname);
+        }
+      } catch (emailError) {
+        console.error('Error sending emails during signup:', emailError);
+      }
+
       const token = generateToken(user._id);
       res.status(201).json({
         _id: user._id,
@@ -172,6 +192,9 @@ const login = async (req, res) => {
     }
 
     if (user && (await bcrypt.compare(password, user.password))) {
+      user.lastSeen = new Date();
+      await user.save();
+
       const token = generateToken(user._id);
       
       console.log(`✅ Login successful for: ${username} (Type: ${user.type})`);
@@ -373,6 +396,44 @@ const changePassword = async (req, res) => {
   }
 };
 
+const resendValidationEmail = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      // To prevent email enumeration, we send a success response even if the user doesn't exist.
+      return res.status(200).json({ message: 'If your email is registered, you will receive a verification link.' });
+    }
+
+    if (user.emailVerified) {
+      return res.status(400).json({ message: 'This email has already been verified.' });
+    }
+
+    // Create a new verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    user.emailVerificationToken = crypto.createHash('sha256').update(verificationToken).digest('hex');
+    user.emailVerificationExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+
+    await user.save();
+
+    // Send the email
+    try {
+      await sendValidationEmail(user.email, user.fname, verificationToken);
+      res.status(200).json({ message: 'A new verification email has been sent.' });
+    } catch (emailError) {
+      console.error('Failed to send verification email:', emailError);
+      // Even if email fails, we don't want to leak info. The user can try again.
+      // The controller has done its job of creating the token.
+      res.status(500).json({ message: 'There was an error sending the verification email.' });
+    }
+
+  } catch (error) {
+    console.error('Resend validation email error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   signup,
   adminSignup,
@@ -380,5 +441,6 @@ module.exports = {
   googleAuth,
   getUserProfile,
   getAllUsers,
-  changePassword
+  changePassword,
+  resendValidationEmail
 };

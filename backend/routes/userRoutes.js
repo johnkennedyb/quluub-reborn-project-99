@@ -16,6 +16,7 @@ const router = express.Router();
 
 // Profile routes
 router.get('/profile', protect, getUserProfile);
+router.get('/profile/:userId', protect, getUserProfile);
 router.put('/:id', protect, updateUserProfile);
 
 // Browse routes

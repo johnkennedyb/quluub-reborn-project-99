@@ -13,27 +13,40 @@ interface EditUserDialogProps {
   user: any;
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onUserUpdate: () => void;
+  onUserUpdate: (userId: string, data: any) => void;
+  sendPasswordReset: (userId: string) => Promise<void>;
 }
 
 const formSchema = z.object({
   fname: z.string().min(2, 'First name must be at least 2 characters'),
   lname: z.string().min(2, 'Last name must be at least 2 characters'),
-  username: z.string().min(3, 'Username must be at least 3 characters'),
+  email: z.string().email('Invalid email address'),
+  plan: z.enum(['free', 'premium']),
+  status: z.enum(['active', 'inactive', 'suspended', 'banned']),
+  isVerified: z.boolean(),
   city: z.string().optional(),
   country: z.string().optional(),
+  gender: z.enum(['male', 'female']),
+  dob: z.string().refine((val) => !isNaN(Date.parse(val)), {
+    message: "Invalid date format",
+  }),
 });
 
-const EditUserDialog = ({ user, isOpen, onOpenChange, onUserUpdate }: EditUserDialogProps) => {
+const EditUserDialog = ({ user, isOpen, onOpenChange, onUserUpdate, sendPasswordReset }: EditUserDialogProps) => {
   const { toast } = useToast();
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      fname: '',
-      lname: '',
-      username: '',
-      city: '',
-      country: '',
+      fname: user?.fname || '',
+      lname: user?.lname || '',
+      email: user?.email || '',
+      plan: user?.plan || 'free',
+      status: user?.status || 'active',
+      isVerified: user?.isVerified || false,
+      city: user?.city || '',
+      country: user?.country || '',
+      gender: user?.gender || 'male',
+      dob: user?.dob ? new Date(user.dob).toISOString().split('T')[0] : '',
     },
   });
 
@@ -42,66 +55,38 @@ const EditUserDialog = ({ user, isOpen, onOpenChange, onUserUpdate }: EditUserDi
       form.reset({
         fname: user.fname || '',
         lname: user.lname || '',
-        username: user.username || '',
+        email: user.email || '',
+        plan: user.plan || 'free',
+        status: user.status || 'active',
+        isVerified: user.isVerified || false,
         city: user.city || '',
         country: user.country || '',
+        gender: user.gender || 'male',
+        dob: user.dob ? new Date(user.dob).toISOString().split('T')[0] : '',
       });
     }
   }, [user, form]);
 
   const handleSaveChanges = async (values: z.infer<typeof formSchema>) => {
     try {
-      const response = await fetch(`/api/admin/users/${user._id}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
-          },
-          body: JSON.stringify(values),
-        }
-      );
-      if (!response.ok) throw new Error('Failed to update user details');
+      await onUserUpdate(user._id, values);
       toast({ title: 'Success', description: 'User details updated successfully.' });
-      onUserUpdate();
       onOpenChange(false);
     } catch (error) {
       toast({ title: 'Error', description: 'Could not update user details.', variant: 'destructive' });
     }
   };
 
-  const handlePlanChange = async (plan: string) => {
-    try {
-      const response = await fetch(`/api/admin/users/${user._id}/plan`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
-          },
-          body: JSON.stringify({ plan }),
-        }
-      );
-      if (!response.ok) throw new Error('Failed to update plan');
-      toast({ title: 'Success', description: `User plan upgraded to ${plan}.` });
-      onUserUpdate();
-    } catch (error) {
-      toast({ title: 'Error', description: 'Could not update user plan.', variant: 'destructive' });
-    }
-  };
+
+
+
+
+
 
   const handleResetPassword = async () => {
     if (!confirm('Are you sure you want to send a password reset link to this user?')) return;
     try {
-      const response = await fetch(`/api/admin/users/${user._id}/reset-password`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
-          },
-        }
-      );
-      if (!response.ok) throw new Error('Failed to send reset link');
+      await sendPasswordReset(user._id);
       toast({ title: 'Success', description: 'Password reset link sent to user.' });
     } catch (error) {
       toast({ title: 'Error', description: 'Could not send password reset link.', variant: 'destructive' });
@@ -119,77 +104,119 @@ const EditUserDialog = ({ user, isOpen, onOpenChange, onUserUpdate }: EditUserDi
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSaveChanges)} className="space-y-6">
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Personal Details</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <FormField control={form.control} name="fname" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>First Name</FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="lname" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Last Name</FormLabel>
-                    <FormControl><Input {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-              </div>
-              <FormField control={form.control} name="username" render={({ field }) => (
+            {/* Personal Details */}
+            <div className="grid grid-cols-2 gap-4">
+              <FormField control={form.control} name="fname" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Username</FormLabel>
+                  <FormLabel>First Name</FormLabel>
                   <FormControl><Input {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
-              <div className="grid grid-cols-2 gap-4">
-                 <FormField control={form.control} name="city" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>City</FormLabel>
-                    <FormControl><Input {...field} placeholder="User's city" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="country" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Country</FormLabel>
-                    <FormControl><Input {...field} placeholder="User's country" /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-              </div>
+              <FormField control={form.control} name="lname" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Last Name</FormLabel>
+                  <FormControl><Input {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
             </div>
-            <div className="flex justify-end">
+            <FormField control={form.control} name="email" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl><Input {...field} type="email" /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField control={form.control} name="gender" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Gender</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="dob" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Date of Birth</FormLabel>
+                  <FormControl><Input {...field} type="date" /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="city" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>City</FormLabel>
+                  <FormControl><Input {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="country" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Country</FormLabel>
+                  <FormControl><Input {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
+
+            {/* Account Settings */}
+            <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+              <FormField control={form.control} name="plan" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Plan</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger><SelectValue placeholder="Select a plan" /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="free">Free</SelectItem>
+                      <SelectItem value="premium">Premium</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="status" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Status</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger><SelectValue placeholder="Select a status" /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                      <SelectItem value="suspended">Suspended</SelectItem>
+                      <SelectItem value="banned">Banned</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t">
               <Button type="submit">Save Changes</Button>
+              <Button type="button" variant="secondary" onClick={handleResetPassword}>Send Password Reset</Button>
             </div>
           </form>
         </Form>
-        
-        <div className="space-y-4 pt-6 border-t">
-          <h3 className="text-lg font-medium">Plan Management</h3>
-          <div className="flex items-center justify-between">
-            <p className="text-sm">Current Plan: <span className="font-semibold">{user.plan}</span></p>
-            <Select onValueChange={handlePlanChange} defaultValue={user.plan}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Change plan" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="freemium">Freemium</SelectItem>
-                <SelectItem value="premium">Premium</SelectItem>
-                <SelectItem value="pro">Pro</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
 
-        <div className="space-y-4 pt-6 border-t">
-          <h3 className="text-lg font-medium">Account Actions</h3>
-          <div className="flex items-center justify-between">
-            <p className="text-sm">Send password reset link to user.</p>
-            <Button variant="destructive" onClick={handleResetPassword}>Reset Password</Button>
-          </div>
+        {/* Other Actions */}
+        <div className="space-y-4 pt-4 border-t">
+            <h3 className="text-lg font-medium">Account Actions</h3>
+            <div className="flex items-center justify-between">
+                <p className="text-sm">Send a password reset link to the user's email.</p>
+                <Button variant="destructive" onClick={handleResetPassword}>Reset Password</Button>
+            </div>
         </div>
       </DialogContent>
     </Dialog>

@@ -1,7 +1,7 @@
 
 const User = require('../models/User');
 const crypto = require('crypto');
-const { sendValidationEmail } = require('../utils/emailService');
+const { sendValidationEmail, sendResetPasswordEmail } = require('../utils/emailService');
 
 // @desc    Send email validation
 // @route   POST /api/email/send-validation
@@ -208,8 +208,8 @@ exports.sendPasswordResetEmail = async (req, res) => {
     await user.save();
     
     // Send password reset email
-    const { sendPasswordResetEmail } = require('../utils/emailService');
-    const emailSent = await sendPasswordResetEmail(email, resetToken);
+    const resetLink = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}`;
+    const emailSent = await sendResetPasswordEmail(user.email, user.fname, resetLink);
     
     if (!emailSent) {
       console.error('Failed to send password reset email to:', email);

@@ -25,15 +25,8 @@ const Auth = () => {
     navigate('/dashboard');
   };
 
-  const handleSignup = async (name: string, email: string, password: string, gender: string) => {
-    const [fname, ...lnameParts] = name.split(' ');
-    const lname = lnameParts.join(' ') || '';
-    
-    await login({
-      username: email, // Use email as username for signup
-      password,
-      // Additional signup data would be handled by the signup endpoint
-    });
+  const handleSignup = async (data: any) => {
+    await signup(data);
     navigate('/dashboard');
   };
 

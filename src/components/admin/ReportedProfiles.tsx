@@ -43,17 +43,19 @@ const ReportedProfiles = () => {
                       <h4 className="font-semibold">Description</h4>
                       <p className="text-sm text-gray-600 italic">{report.description}</p>
                     </div>
-                    <div className="flex justify-end space-x-2 mt-4">
-                      <Button variant="outline" size="sm" onClick={() => dismissReport(report._id)}>
-                        Dismiss Report
-                      </Button>
-                      <Button variant="destructive" size="sm" onClick={() => updateUserStatus(report.reported._id, 'suspended')}>
-                        Suspend User
-                      </Button>
-                      <Button variant="destructive" size="sm" onClick={() => updateUserStatus(report.reported._id, 'banned')}>
-                        Ban User
-                      </Button>
-                    </div>
+                    {report.status === 'pending' && (
+                      <div className="flex justify-end space-x-2 mt-4">
+                        <Button variant="outline" size="sm" onClick={() => dismissReport(report._id)}>
+                          Dismiss Report
+                        </Button>
+                        <Button variant="destructive" size="sm" onClick={() => updateUserStatus(report.reported._id, 'suspended')}>
+                          Suspend User
+                        </Button>
+                        <Button variant="destructive" size="sm" onClick={() => updateUserStatus(report.reported._id, 'banned')}>
+                          Ban User
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}

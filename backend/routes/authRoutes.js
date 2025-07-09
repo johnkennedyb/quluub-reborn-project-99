@@ -6,7 +6,8 @@ const {
   getUserProfile, 
   changePassword,
   adminSignup,
-  googleAuth
+  googleAuth,
+  resendValidationEmail
 } = require('../controllers/authController');
 const { protect } = require('../middlewares/auth');
 
@@ -18,5 +19,6 @@ router.post('/login', login);
 router.post('/google', googleAuth); // New Google OAuth route
 router.get('/profile', protect, getUserProfile);
 router.put('/change-password', protect, changePassword);
+router.post('/resend-validation', resendValidationEmail);
 
 module.exports = router;

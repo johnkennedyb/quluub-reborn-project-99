@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAdminData } from '@/hooks/useAdminData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,8 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import UserProfileCard from './UserProfileCard';
 import { useToast } from '@/hooks/use-toast';
-import ViewProfileDialog from './ViewProfileDialog';
 import EditUserDialog from './EditUserDialog';
 import { Search, Edit, Trash2, User, Users, Eye } from 'lucide-react';
 
@@ -25,51 +26,35 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
     status: 'all',
     country: '',
     city: '',
-    inactiveMonths: 'all',
+    inactiveFor: 'all',
     page: 1,
     limit: 20
   });
 
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [viewProfileDialogOpen, setViewProfileDialogOpen] = useState(false);
-  const { users, loading, pagination, updateUserStatus, refetchData } = useAdminData(filters);
+
+  const { users, loading, pagination, refetchData, deleteUser, updateUser, sendPasswordReset } = useAdminData(filters);
   const { toast } = useToast();
 
   const handleFilterChange = (key: string, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value, page: 1 }));
   };
 
-  const handleStatusChange = async (userId: string, newStatus: string) => {
-    try {
-      await updateUserStatus(userId, newStatus);
-      toast({ title: "Success", description: "User status updated successfully" });
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to update user status", variant: "destructive" });
-    }
-  };
+
 
   const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+    if (!confirm('Are you sure you want to permanently delete this user and all their associated data? This action cannot be undone.')) {
       return;
     }
 
     try {
-      const response = await fetch(`/api/admin/users/${userId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
-        },
-      });
-
-      if (response.ok) {
-        toast({ title: "Success", description: "User deleted successfully" });
-        refetchData();
-      } else {
-        throw new Error('Failed to delete user');
-      }
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to delete user", variant: "destructive" });
+      await deleteUser(userId);
+      toast({ title: 'Success', description: 'User has been successfully deleted.' });
+      // refetchData is already called within the deleteUser hook on success
+    } catch (error: any) {
+      console.error('Failed to delete user:', error);
+      toast({ title: 'Error', description: error.message || 'An unexpected error occurred.', variant: 'destructive' });
     }
   };
 
@@ -84,14 +69,13 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
               </AvatarFallback>
             </Avatar>
             <div>
-              <h3 className="font-semibold">{user.fullName}</h3>
-              <p className="text-sm text-gray-500">@{user.username}</p>
+              <h3 className="font-semibold">{user.fname} {user.lname}</h3>
               <p className="text-sm text-gray-500">{user.email}</p>
               <div className="flex items-center space-x-2 mt-1">
                 <Badge variant={user.gender === 'male' ? 'default' : 'secondary'}>
                   {user.gender}
                 </Badge>
-                <Badge variant={user.plan === 'premium' || user.plan === 'pro' ? 'default' : 'outline'}>
+                <Badge variant={user.plan === 'premium' ? 'default' : 'outline'}>
                   {user.plan}
                 </Badge>
                 <Badge variant={user.status === 'active' ? 'default' : 'destructive'}>
@@ -115,24 +99,13 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
             </div>
             
             <div className="flex space-x-2">
-              <Select onValueChange={(value) => handleStatusChange(user._id, value)} defaultValue={user.status}>
-                <SelectTrigger className="w-24">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="suspended">Suspended</SelectItem>
-                  <SelectItem value="banned">Banned</SelectItem>
-                </SelectContent>
-              </Select>
+
               
-              <Button size="sm" variant="outline" onClick={() => {
-                setSelectedUser(user);
-                setViewProfileDialogOpen(true);
-              }}>
-                <Eye className="h-4 w-4" />
-              </Button>
+              <Link to={`/admin/user/${user._id}`}>
+                <Button size="sm" variant="outline">
+                  <Eye className="h-4 w-4" />
+                </Button>
+              </Link>
 
               <Button size="sm" variant="outline" onClick={() => {
                 setSelectedUser(user);
@@ -176,7 +149,7 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
           <CardContent>
             <div className="text-2xl font-bold">{stats?.premiumMembers || 0}</div>
             <p className="text-xs text-muted-foreground">
-              Including {stats?.proMembers || 0} pro members
+              {stats?.premiumMembers || 0} / {stats?.totalMembers || 0} total
             </p>
           </CardContent>
         </Card>
@@ -239,9 +212,9 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Plans</SelectItem>
-                <SelectItem value="freemium">Freemium</SelectItem>
+                <SelectItem value="free">Free</SelectItem>
                 <SelectItem value="premium">Premium</SelectItem>
-                <SelectItem value="pro">Pro</SelectItem>
+
               </SelectContent>
             </Select>
             
@@ -258,16 +231,16 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
               </SelectContent>
             </Select>
 
-            <Select value={filters.inactiveMonths} onValueChange={(value) => handleFilterChange('inactiveMonths', value)}>
+            <Select value={filters.inactiveFor} onValueChange={(value) => handleFilterChange('inactiveFor', value)}>
               <SelectTrigger>
                 <SelectValue placeholder="Inactive Period" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Users</SelectItem>
-                <SelectItem value="1">1+ months inactive</SelectItem>
-                <SelectItem value="3">3+ months inactive</SelectItem>
-                <SelectItem value="6">6+ months inactive</SelectItem>
-                <SelectItem value="12">12+ months inactive</SelectItem>
+                <SelectItem value="30">1+ month inactive</SelectItem>
+                <SelectItem value="90">3+ months inactive</SelectItem>
+                <SelectItem value="180">6+ months inactive</SelectItem>
+                <SelectItem value="365">12+ months inactive</SelectItem>
               </SelectContent>
             </Select>
 
@@ -327,14 +300,7 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
         </CardContent>
       </Card>
 
-      {/* View Profile Dialog */}
-      {selectedUser && (
-        <ViewProfileDialog
-          user={selectedUser}
-          isOpen={viewProfileDialogOpen}
-          onOpenChange={setViewProfileDialogOpen}
-        />
-      )}
+
 
       {/* Edit User Dialog */}
       {selectedUser && (
@@ -342,7 +308,11 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
           user={selectedUser}
           isOpen={editDialogOpen}
           onOpenChange={setEditDialogOpen}
-          onUserUpdate={refetchData}
+          onUserUpdate={(userId, data) => {
+            updateUser(userId, data);
+            setEditDialogOpen(false); // Close dialog on successful update
+          }}
+          sendPasswordReset={sendPasswordReset}
         />
       )}
     </div>

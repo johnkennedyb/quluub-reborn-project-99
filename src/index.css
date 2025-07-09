@@ -30,7 +30,7 @@
     --accent: 174 84% 96%;
     --accent-foreground: 174 84% 33%;
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 72% 51%; /* A more refined red */
     --destructive-foreground: 210 40% 98%;
 
     --border: 214.3 31.8% 91.4%;
@@ -71,7 +71,7 @@
     --accent: 174 84% 16%;
     --accent-foreground: 210 40% 98%;
 
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 63% 40%; /* A refined red for dark mode */
     --destructive-foreground: 210 40% 98%;
 
     --border: 217.2 32.6% 17.5%;

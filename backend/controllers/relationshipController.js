@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const Relationship = require('../models/Relationship');
 const User = require('../models/User');
 const UserActivityLog = require('../models/UserActivityLog');
+const { sendConnectionRequestEmail, sendConnectionRejectedEmail, sendRequestWithdrawnEmail } = require('../utils/emailService');
 
 // @desc    Send a follow request
 // @route   POST /api/relationships/request
@@ -54,6 +55,12 @@ exports.sendRequest = async (req, res) => {
       receiverId: followedUserId,
       action: "FOLLOWED",
     });
+
+    // Send email notification to the followed user
+    const followerUser = await User.findById(followerUserId);
+    if (followedUser && followedUser.email) {
+      sendConnectionRequestEmail(followedUser.email, followedUser.fname, followerUser.username);
+    }
     
     res.status(201).json(relationship);
   } catch (error) {
@@ -104,6 +111,14 @@ exports.respondToRequest = async (req, res) => {
       receiverId: relationship.follower_user_id,
       action: status === 'matched' ? "FOLLOWED" : "REJECTED",
     });
+
+    // If rejected, send an email notification to the user who sent the request
+    if (status === 'rejected') {
+      const followerUser = await User.findById(relationship.follower_user_id);
+      if (followerUser && followerUser.email) {
+        sendConnectionRejectedEmail(followerUser.email, followerUser.fname);
+      }
+    }
     
     res.json(relationship);
   } catch (error) {
@@ -148,6 +163,13 @@ exports.withdrawRequest = async (req, res) => {
       receiverId: relationship.followed_user_id,
       action: "WITHDREW",
     });
+
+    // Send email notification to the user who received the request
+    const followedUser = await User.findById(relationship.followed_user_id);
+    const withdrawer = await User.findById(req.user._id);
+    if (followedUser && followedUser.email && withdrawer) {
+      sendRequestWithdrawnEmail(followedUser.email, followedUser.fname, withdrawer.username);
+    }
     
     res.json({ message: "Request withdrawn successfully" });
   } catch (error) {

@@ -62,9 +62,19 @@ exports.applyReferralCode = async (req, res) => {
     currentUser.referralStatus = 'Verified';
     await currentUser.save();
     
-    // Update referrer stats
-    referrer.referralStats.totalReferrals += 1;
-    referrer.referralStats.activeReferrals += 1;
+    // Check if the referrer has earned a premium reward
+    if (referrer.referralStats.completedReferrals > 0 && referrer.referralStats.completedReferrals % 5 === 0) {
+      referrer.plan = 'premium';
+      
+      const now = new Date();
+      const currentExpiration = referrer.premiumExpirationDate && referrer.premiumExpirationDate > now 
+        ? referrer.premiumExpirationDate 
+        : now;
+        
+      currentExpiration.setMonth(currentExpiration.getMonth() + 1);
+      referrer.premiumExpirationDate = currentExpiration;
+    }
+
     await referrer.save();
     
     res.json({ message: 'Referral code applied successfully' });

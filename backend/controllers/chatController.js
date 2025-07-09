@@ -3,7 +3,7 @@ const Chat = require('../models/Chat');
 const User = require('../models/User');
 const Relationship = require('../models/Relationship');
 const WaliChat = require('../models/WaliChat');
-const { sendMatchChatReportEmail } = require('../utils/emailService');
+const { sendWaliViewChatEmail, sendContactWaliEmail } = require('../utils/emailService');
 
 // Helper functions
 const plans = {
@@ -13,7 +13,8 @@ const plans = {
   },
   premium: {
     messageAllowance: 50,
-    wordCountPerMessage: 100
+    wordCountPerMessage: 100,
+    videoCall: true
   }
 };
 
@@ -46,22 +47,17 @@ const sendChatReportToParents = async (userId1, userId2) => {
 
     if (!user1 || !user2) return;
 
-    // Get all messages between the users
-    const messages = await Chat.find({
-      $or: [
-        { senderId: userId1, receiverId: userId2 },
-        { senderId: userId2, receiverId: userId1 }
-      ]
-    }).sort({ created: 1 });
+    // This link should ideally lead to a page where the guardian can view the chat
+    const chatLink = `${process.env.FRONTEND_URL}/wali/chat-view?user1=${userId1}&user2=${userId2}`;
 
     // Send to user1's parent if they have parentEmail
     if (user1.parentEmail && user1.parentEmail !== user1.email) {
-      await sendMatchChatReportEmail(user1.parentEmail, user1, user2, messages);
+      await sendWaliViewChatEmail(user1.parentEmail, "Guardian", user1.fname, user2.fname, chatLink);
     }
 
     // Send to user2's parent if they have parentEmail
     if (user2.parentEmail && user2.parentEmail !== user2.email) {
-      await sendMatchChatReportEmail(user2.parentEmail, user2, user1, messages);
+      await sendWaliViewChatEmail(user2.parentEmail, "Guardian", user2.fname, user1.fname, chatLink);
     }
 
     // Send to wali if user is female and has wali details
@@ -69,7 +65,7 @@ const sendChatReportToParents = async (userId1, userId2) => {
       try {
         const waliDetails = JSON.parse(user1.waliDetails);
         if (waliDetails.email) {
-          await sendMatchChatReportEmail(waliDetails.email, user1, user2, messages);
+          await sendWaliViewChatEmail(waliDetails.email, waliDetails.name || 'Wali', user1.fname, user2.fname, chatLink);
         }
       } catch (e) {
         console.error('Error parsing wali details for user1:', e);
@@ -80,7 +76,7 @@ const sendChatReportToParents = async (userId1, userId2) => {
       try {
         const waliDetails = JSON.parse(user2.waliDetails);
         if (waliDetails.email) {
-          await sendMatchChatReportEmail(waliDetails.email, user2, user1, messages);
+          await sendWaliViewChatEmail(waliDetails.email, waliDetails.name || 'Wali', user2.fname, user1.fname, chatLink);
         }
       } catch (e) {
         console.error('Error parsing wali details for user2:', e);
@@ -413,13 +409,100 @@ const getUnreadCount = async (req, res) => {
 // SEND MESSAGE (for API compatibility)
 const sendMessage = addChat;
 
+const contactWali = async (req, res) => {
+  const { userId } = req.body; // The user whose wali is being contacted
+  const currentUser = req.user; // The user initiating the contact
+
+  try {
+    const contactedUser = await User.findById(userId);
+
+    if (!contactedUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (contactedUser.gender !== 'female' || !contactedUser.waliDetails) {
+      return res.status(400).json({ message: 'This user does not have wali details available for contact.' });
+    }
+
+    let waliDetails;
+    try {
+      waliDetails = JSON.parse(contactedUser.waliDetails);
+    } catch (e) {
+      console.error('Error parsing wali details for contacted user:', e);
+      return res.status(500).json({ message: 'Error processing wali details.' });
+    }
+
+    if (!waliDetails.email) {
+      return res.status(400).json({ message: 'Wali email is not available.' });
+    }
+
+    // Create a record of the contact attempt
+    const waliChat = new WaliChat({
+      userId: contactedUser._id,
+      waliEmail: waliDetails.email,
+      contactedBy: currentUser._id,
+      message: `User ${currentUser.fname} (${currentUser._id}) initiated contact with the wali of ${contactedUser.fname} (${contactedUser._id}).`
+    });
+    await waliChat.save();
+
+    // Send email notification to the wali
+    await sendContactWaliEmail(waliDetails.email, currentUser.fname);
+
+    res.status(200).json({ message: 'Wali has been contacted successfully.' });
+
+  } catch (error) {
+    console.error('Error in contactWali controller:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// INITIATE VIDEO CALL
+const initiateVideoCall = async (req, res) => {
+  const userInfo = req.user;
+  const { userId } = req.body; // The user to call
+
+  try {
+    const currentUser = await findUser(userInfo._id);
+    const plan = plans[currentUser.plan] || plans.freemium;
+
+    // 1. Check if user's plan allows video calls
+    if (!plan.videoCall) {
+      return res.status(403).json({ message: 'Upgrade to premium to use video calls.' });
+    }
+
+    // 2. Check if users are matched
+    const isMatched = await areUsersMatched(userInfo._id.toString(), userId);
+    if (!isMatched) {
+      return res.status(403).json({ message: 'You can only call matched connections.' });
+    }
+
+    // 3. (Optional) Check for video call credits if you implement a credit system
+    // For now, we just check the plan.
+
+    // 4. Generate a unique room name for the video call
+    const roomName = uuidv4();
+
+    // In a real application, you would integrate with a service like Twilio or Agora here
+    // and return a token for the user to join the video call room.
+    console.log(`Video call initiated by ${currentUser.username} with user ${userId} in room ${roomName}`);
+
+    res.status(200).json({ message: 'Video call initiated successfully.', roomName });
+
+  } catch (error) {
+    console.error('Error initiating video call:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 module.exports = {
   getChat,
   getAllChatReceived,
   getConversations,
   getMessages,
   addChat,
-  sendMessage,
   updateChat,
-  getUnreadCount
+  getUnreadCount,
+  contactWali,
+  initiateVideoCall,
+  sendMessage
 };

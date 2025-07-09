@@ -30,9 +30,11 @@ export interface User {
   region?: string;
   build?: string;
   appearance?: string;
+  hijab?: string;
+  beard?: string;
   maritalStatus?: string;
   noOfChildren?: string;
-  ethnicity?: string;
+  ethnicity?: string[];
   patternOfSalaah?: string;
   genotype?: string;
   summary?: string;
@@ -67,6 +69,11 @@ export interface SignupData {
   fname: string;
   lname: string;
   gender: 'male' | 'female' | 'other';
+  dateOfBirth: Date | null;
+  ethnicity: string[];
+  countryOfResidence: string;
+  cityOfResidence: string;
+  summary: string;
   parentEmail?: string;
 }
 

@@ -15,8 +15,10 @@ import TopNavbar from "@/components/TopNavbar";
 import Navbar from "@/components/Navbar";
 import MatchCard from "@/components/MatchCard";
 import { useBrowseUsers } from "@/hooks/useBrowseUsers";
+import { useAuth } from "@/contexts/AuthContext";
 import { relationshipService } from "@/lib/api-client";
 import { userService } from "@/lib/api-client"; // ensure this is imported
+import AdComponent from '@/components/AdComponent';
 
 import { useToast } from "@/components/ui/use-toast";
 import { User } from "@/types/user";
@@ -31,9 +33,17 @@ const Search = () => {
   const [maritalStatus, setMaritalStatus] = useState("any");
   const [patternOfSalaah, setPatternOfSalaah] = useState("any");
   const [sortBy, setSortBy] = useState("newest");
-  const [isApplyingFilters, setIsApplyingFilters] = useState(false);
+  const [searchGender, setSearchGender] = useState("any");
   const [showHijabOnly, setShowHijabOnly] = useState(false);
   const [showBeardOnly, setShowBeardOnly] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const { user: currentUser } = useAuth();
+
+  useEffect(() => {
+    if (currentUser) {
+      setSearchGender(currentUser.gender === 'male' ? 'female' : 'male');
+    }
+  }, [currentUser]);
   
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -41,12 +51,41 @@ const Search = () => {
   const [filterParams, setFilterParams] = useState<{
     country?: string;
     nationality?: string;
-    showAll?: boolean;
-  }>({
-    showAll: true
-  });
+    gender?: string;
+    hijab?: string;
+    beard?: string;
+    page?: number;
+  }>({});
   
-  const { users, isLoading, error } = useBrowseUsers(filterParams);
+  useEffect(() => {
+    const params: any = {};
+
+    if (searchGender !== "any") {
+      params.gender = searchGender;
+    }
+
+    if (location !== "anywhere") {
+      params.country = location;
+    }
+
+    if (nationality !== "any") {
+      params.nationality = nationality;
+    }
+
+    if (showHijabOnly) {
+      params.hijab = 'Yes';
+    }
+
+    if (showBeardOnly) {
+      params.beard = 'Yes';
+    }
+
+    params.page = currentPage;
+
+    setFilterParams(params);
+  }, [currentUser, location, nationality, showHijabOnly, showBeardOnly, currentPage, searchGender]);
+
+  const { users, page, pages, isLoading, error } = useBrowseUsers(filterParams);
   const [pendingConnections, setPendingConnections] = useState<string[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
   
@@ -99,24 +138,7 @@ const Search = () => {
     return tags.slice(0, 3);
   };
   
-  const handleApplyFilters = () => {
-    setIsApplyingFilters(true);
-    
-    const params: { country?: string; nationality?: string; showAll?: boolean } = {
-      showAll: true
-    };
-    
-    if (location !== "anywhere") {
-      params.country = location;
-    }
-    
-    if (nationality !== "any") {
-      params.nationality = nationality;
-    }
-    
-    setFilterParams(params);
-    setIsApplyingFilters(false);
-  };
+
   
   const handleSendRequest = async (userId: string) => {
     try {
@@ -391,11 +413,7 @@ const Search = () => {
                     <Label htmlFor="hijab" className="text-sm font-medium">Hijab</Label>
                     <p className="text-xs text-muted-foreground">Show only sisters who wear hijab</p>
                   </div>
-                  <Switch 
-                    id="hijab" 
-                    checked={showHijabOnly} 
-                    onCheckedChange={setShowHijabOnly}
-                  />
+                  <Switch id="hijab" checked={showHijabOnly} onCheckedChange={setShowHijabOnly} disabled={currentUser?.gender !== 'male'} />
                 </div>
                 
                 <div className="flex items-center justify-between">
@@ -403,20 +421,21 @@ const Search = () => {
                     <Label htmlFor="beard" className="text-sm font-medium">Beard</Label>
                     <p className="text-xs text-muted-foreground">Show only brothers with beard</p>
                   </div>
-                  <Switch 
-                    id="beard" 
-                    checked={showBeardOnly} 
-                    onCheckedChange={setShowBeardOnly}
-                  />
+                  <Switch id="beard" checked={showBeardOnly} onCheckedChange={setShowBeardOnly} disabled={currentUser?.gender !== 'female'} />
                 </div>
-                
-                <Button 
-                  className="w-full" 
-                  onClick={handleApplyFilters}
-                  disabled={isApplyingFilters}
-                >
-                  {isApplyingFilters ? 'Applying...' : 'Apply Filters'}
-                </Button>
+
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Gender</label>
+                  <Select value={searchGender} onValueChange={setSearchGender}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select gender" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">Male</SelectItem>
+                      <SelectItem value="female">Female</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -473,6 +492,37 @@ const Search = () => {
                   <p className="text-center text-muted-foreground">No users match your current filters. Try adjusting your criteria.</p>
                 </CardContent>
               </Card>
+            )}
+
+            {/* Pagination Controls */}
+            {pages && pages > 1 && (
+              <div className="flex justify-center mt-6 items-center space-x-2">
+                <Button 
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={page <= 1 || isLoading}
+                  variant="outline"
+                >
+                  Previous
+                </Button>
+                {Array.from({ length: pages }, (_, i) => i + 1).map(pageNumber => (
+                  <Button 
+                    key={pageNumber} 
+                    onClick={() => setCurrentPage(pageNumber)}
+                    disabled={isLoading}
+                    variant={pageNumber === page ? 'default' : 'outline'}
+                  >
+                    {pageNumber}
+                  </Button>
+                ))}
+                {currentUser?.plan !== 'premium' && <AdComponent />}
+                <Button 
+                  onClick={() => setCurrentPage(prev => prev + 1)}
+                  disabled={page >= pages || isLoading}
+                  variant="outline"
+                >
+                  Next
+                </Button>
+              </div>
             )}
           </div>
         </div>

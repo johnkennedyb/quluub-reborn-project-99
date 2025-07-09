@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import ReactSelect from "react-select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +15,6 @@ import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { parseJsonField } from "@/utils/dataUtils";
-import Navbar from "@/components/Navbar";
 
 interface ProfileEditSectionsProps {
   user: User;
@@ -24,8 +24,7 @@ interface ProfileEditSectionsProps {
 
 const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProps) => {
   const [currentSection, setCurrentSection] = useState(0);
-  
-  // Parse JSON fields from database
+
   const parseEthnicity = () => {
     try {
       return Array.isArray(parseJsonField(user.ethnicity)) ? parseJsonField(user.ethnicity) : [];
@@ -65,6 +64,8 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
     weight: user.weight || "",
     build: user.build || "",
     appearance: user.appearance || "",
+    hijab: user.hijab || "No",
+    beard: user.beard || "No",
     genotype: user.genotype || "",
     patternOfSalaah: user.patternOfSalaah || "",
     revert: user.revert || "",
@@ -79,21 +80,33 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
     icebreakers: user.icebreakers || "",
     waliDetails: parseWaliDetails(),
     parentEmail: user.parentEmail || "",
-
   });
 
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [selectedTraits, setSelectedTraits] = useState<string[]>(parseTraits());
   const [selectedEthnicity, setSelectedEthnicity] = useState<string[]>(parseEthnicity());
 
+  const handleEthnicityChange = (selectedOptions: any) => {
+    if (selectedOptions.length <= 2) {
+      setSelectedEthnicity(selectedOptions.map((option: any) => option.value));
+    }
+  };
+
+  const countries = [
+    { name: "Nigeria", cities: ["Lagos", "Abuja", "Kano"] },
+    { name: "United Kingdom", cities: ["London", "Manchester", "Birmingham"] },
+    { name: "United States", cities: ["New York", "Los Angeles", "Chicago"] },
+  ];
+
   const sections = [
     "Basic Info",
-    "Location and Ethnicity", 
+    "Location and Ethnicity",
     "Appearance and Co",
     "Lifestyle and Traits",
     "Interests",
     "Matching Details",
-    "Deen"
+    "Deen",
+    ...(user.gender === 'female' ? ["Wali Details"] : []),
   ];
 
   const sidebarItems = [
@@ -103,10 +116,10 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
     { icon: "🎭", label: "Lifestyle and Traits" },
     { icon: "🎯", label: "Interests" },
     { icon: "💕", label: "Matching Details" },
-    { icon: "🕌", label: "Deen" }
+    { icon: "🕌", label: "Deen" },
+    ...(user.gender === 'female' ? [{ icon: "👨‍👧", label: "Wali Details" }] : []),
   ];
 
-  // Comprehensive nationality options
   const nationalityOptions = [
     "Afghan", "Albanian", "Algerian", "American", "Andorran", "Angolan", "Antiguans", "Argentinean", "Armenian", "Australian",
     "Austrian", "Azerbaijani", "Bahamian", "Bahraini", "Bangladeshi", "Barbadian", "Barbudans", "Batswana", "Belarusian", "Belgian",
@@ -130,7 +143,6 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
     "Yemenite", "Zambian", "Zimbabwean"
   ];
 
-  // Comprehensive ethnicity options
   const ethnicityOptions = [
     "Afghan", "African American", "Albanian", "Algerian", "American Indian", "Arab", "Armenian", "Asian", "Australian Aboriginal",
     "Azerbaijani", "Bangladeshi", "Basque", "Belarusian", "Bengali", "Berber", "Bosnian", "Brazilian", "Bulgarian", "Burmese",
@@ -143,17 +155,17 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
     "Moldovan", "Mongolian", "Moroccan", "Native American", "Native Hawaiian", "Nepalese", "Nigerian", "Nordic", "North African", "Norwegian",
     "Pacific Islander", "Pakistani", "Palestinian", "Persian", "Polish", "Portuguese", "Punjabi", "Romanian", "Russian", "Samoan",
     "Scandinavian", "Scottish", "Serbian", "Sindhi", "Sinhalese", "Slavic", "Slovak", "Slovenian", "Somali", "South African",
-    "South Asian", "Southeast Asian", "Spanish", "Sri Lankan", "Sudanese", "Swedish", "Syrian", "Tajik", "Tamil",
-    "Thai", "Tibetan", "Turkish", "Turkmen", "Ukrainian", "Urdu", "Uzbek", "Vietnamese", "Welsh", "West African",
+    "South Asian", "Southeast Asian", "Spanish", "Sri Lankan", "Sudanese", "Swedish", "Swiss", "Syrian", "Taiwanese", "Tajik",
+    "Tamil", "Thai", "Tibetan", "Turkish", "Turkmen", "Ukrainian", "Urdu", "Uzbek", "Vietnamese", "Welsh", "West African",
     "White", "Yoruba", "Zulu"
   ];
 
   const interestOptions = [
     "Board Games", "Playing Card Games", "Fashion", "Museums", "Reading", "Tropics", "Nature Lover", "Flower Lover",
-    "Cat Lover", "Mountain Lover", "Sunrise Lover", "Sunset Lover", "Star Lover", 
+    "Cat Lover", "Mountain Lover", "Sunrise Lover", "Sunset Lover", "Star Lover",
     "Mango", "Avocado", "Potato", "Spice", "Steak", "Ramen", "Sushi", "Ice Cream", "Chocolate", "Coffee",
     "Tea", "Bubble Tea", "Matcha", "Beaches", "Architecture", "Umrah", "Camping", "Fun Fairs", "Theme Parks",
-    "Bullet Train", "Cruises", "Jetsetter", "Skydiving", "Fireworks", "Competitions", "Football", "Basketball", 
+    "Bullet Train", "Cruises", "Jetsetter", "Skydiving", "Fireworks", "Competitions", "Football", "Basketball",
     "Rugby", "American Football", "Baseball", "Bowling"
   ];
 
@@ -167,30 +179,34 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
   ];
 
   const handleInputChange = (field: string, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    if (field.startsWith('waliDetails.')) {
+      const key = field.split('.')[1];
+      setFormData(prev => ({
+        ...prev,
+        waliDetails: { ...prev.waliDetails, [key]: value },
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [field]: value,
+        ...(field === 'country' && { region: '' }),
+      }));
+    }
   };
 
   const toggleInterest = (interest: string) => {
-    setSelectedInterests(prev => 
-      prev.includes(interest) 
+    setSelectedInterests(prev =>
+      prev.includes(interest)
         ? prev.filter(i => i !== interest)
         : [...prev, interest]
     );
   };
 
   const toggleTrait = (trait: string) => {
-    setSelectedTraits(prev => 
-      prev.includes(trait) 
+    setSelectedTraits(prev =>
+      prev.includes(trait)
         ? prev.filter(t => t !== trait)
         : [...prev, trait]
-    );
-  };
-
-  const toggleEthnicity = (ethnicity: string) => {
-    setSelectedEthnicity(prev => 
-      prev.includes(ethnicity) 
-        ? prev.filter(e => e !== ethnicity)
-        : [...prev, ethnicity]
     );
   };
 
@@ -202,19 +218,63 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
       ethnicity: JSON.stringify(selectedEthnicity),
       waliDetails: JSON.stringify(formData.waliDetails),
     };
-  
-    // Remove or sanitize problematic fields if they exist and are invalid
+
     if ((updatedData as any).type === "NEW") {
       delete (updatedData as any).type;
     }
-  
+
     if ((updatedData as any).status === "NEW") {
       delete (updatedData as any).status;
     }
-  
+
     onSave(updatedData);
   };
-  
+
+  const renderWaliDetailsSection = () => (
+    <div className="space-y-4">
+      <div>
+        <Label>Wali's Name</Label>
+        <Input
+          value={formData.waliDetails.name}
+          onChange={(e) => handleInputChange("waliDetails.name", e.target.value)}
+          placeholder="Enter your Wali's name"
+        />
+      </div>
+      <div>
+        <Label>Wali's Email</Label>
+        <Input
+          type="email"
+          value={formData.waliDetails.email}
+          onChange={(e) => handleInputChange("waliDetails.email", e.target.value)}
+          placeholder="Enter your Wali's email"
+        />
+      </div>
+      <div>
+        <Label>Wali's WhatsApp Number</Label>
+        <Input
+          value={formData.waliDetails.whatsapp}
+          onChange={(e) => handleInputChange("waliDetails.whatsapp", e.target.value)}
+          placeholder="Enter your Wali's WhatsApp number"
+        />
+      </div>
+      <div>
+        <Label>Wali's Telegram</Label>
+        <Input
+          value={formData.waliDetails.telegram}
+          onChange={(e) => handleInputChange("waliDetails.telegram", e.target.value)}
+          placeholder="Enter your Wali's Telegram username"
+        />
+      </div>
+      <div>
+        <Label>Wali's Other Contact Number</Label>
+        <Input
+          value={formData.waliDetails.otherNumber}
+          onChange={(e) => handleInputChange("waliDetails.otherNumber", e.target.value)}
+          placeholder="Another contact number for your Wali"
+        />
+      </div>
+    </div>
+  );
 
   const renderSection = () => {
     switch (currentSection) {
@@ -314,59 +374,60 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div>
+                <Label>Country of Residence</Label>
+                <Select value={formData.country} onValueChange={(value) => handleInputChange("country", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select country" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {countries.map((country) => (
+                      <SelectItem key={country.name} value={country.name}>{country.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>City of Residence</Label>
+                <Select
+                  value={formData.region} // Using 'region' field for city
+                  onValueChange={(value) => handleInputChange("region", value)}
+                  disabled={!formData.country}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select city" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {formData.country &&
+                      countries.find((c) => c.name === formData.country)?.cities.map((city) => (
+                        <SelectItem key={city} value={city}>{city}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
                 <Label>Nationality</Label>
                 <Select value={formData.nationality} onValueChange={(value) => handleInputChange("nationality", value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select nationality" />
                   </SelectTrigger>
                   <SelectContent className="max-h-60">
-                    {nationalityOptions.map((nationality) => (
-                      <SelectItem key={nationality} value={nationality}>{nationality}</SelectItem>
+                    {nationalityOptions.map((nat) => (
+                      <SelectItem key={nat} value={nat}>{nat}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label>Region</Label>
-                <Select value={formData.region} onValueChange={(value) => handleInputChange("region", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select region" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Lagos">Lagos</SelectItem>
-                    <SelectItem value="Abuja">Abuja</SelectItem>
-                    <SelectItem value="Kano">Kano</SelectItem>
-                    <SelectItem value="Kaduna">Kaduna</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div>
-              <Label>Country of Residence</Label>
-              <Select value={formData.country} onValueChange={(value) => handleInputChange("country", value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select country" />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  {nationalityOptions.map((country) => (
-                    <SelectItem key={country} value={country}>{country}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Ethnicity (Select all that apply)</Label>
-              <div className="grid grid-cols-4 gap-2 mt-2 max-h-40 overflow-y-auto">
-                {ethnicityOptions.map((ethnicity) => (
-                  <Badge
-                    key={ethnicity}
-                    variant={selectedEthnicity.includes(ethnicity) ? "default" : "outline"}
-                    className="cursor-pointer justify-center text-xs py-1"
-                    onClick={() => toggleEthnicity(ethnicity)}
-                  >
-                    {ethnicity}
-                  </Badge>
-                ))}
+                <Label>Ethnicity</Label>
+                <ReactSelect
+                  isMulti
+                  options={ethnicityOptions.map(e => ({ value: e, label: e }))}
+                  value={selectedEthnicity.map(e => ({ value: e, label: e }))}
+                  onChange={handleEthnicityChange}
+                  placeholder="Select up to 2 ethnicities"
+                />
               </div>
             </div>
           </div>
@@ -374,52 +435,16 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
 
       case 2: // Appearance and Co
         return (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <Label>Height</Label>
-                <Select value={formData.height} onValueChange={(value) => handleInputChange("height", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select height" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="4 feet 0 inches">4 feet 0 inches</SelectItem>
-                    <SelectItem value="5 feet 0 inches">5 feet 0 inches</SelectItem>
-                    <SelectItem value="5 feet 6 inches">5 feet 6 inches</SelectItem>
-                    <SelectItem value="6 feet 0 inches">6 feet 0 inches</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label>Height (cm)</Label>
+                <Input value={formData.height} onChange={(e) => handleInputChange("height", e.target.value)} />
               </div>
               <div>
-                <Label>Weight</Label>
-                <Select value={formData.weight} onValueChange={(value) => handleInputChange("weight", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select weight" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="31 to 35kg">31 to 35kg</SelectItem>
-                    <SelectItem value="51 to 60kg">51 to 60kg</SelectItem>
-                    <SelectItem value="61 to 70kg">61 to 70kg</SelectItem>
-                    <SelectItem value="71 to 80kg">71 to 80kg</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label>Weight (kg)</Label>
+                <Input value={formData.weight} onChange={(e) => handleInputChange("weight", e.target.value)} />
               </div>
-              <div>
-                <Label>Genotype</Label>
-                <Select value={formData.genotype} onValueChange={(value) => handleInputChange("genotype", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="AA">AA</SelectItem>
-                    <SelectItem value="AS">AS</SelectItem>
-                    <SelectItem value="SS">SS</SelectItem>
-                    <SelectItem value="SC">SC</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Build</Label>
                 <Select value={formData.build} onValueChange={(value) => handleInputChange("build", value)}>
@@ -427,42 +452,95 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
                     <SelectValue placeholder="Select build" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Skinny">Skinny</SelectItem>
-                    <SelectItem value="Average">Average</SelectItem>
+                    <SelectItem value="Slim">Slim</SelectItem>
                     <SelectItem value="Athletic">Athletic</SelectItem>
-                    <SelectItem value="Heavy">Heavy</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Appearance</Label>
-                <Select value={formData.appearance} onValueChange={(value) => handleInputChange("appearance", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select appearance" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Standout">Standout</SelectItem>
                     <SelectItem value="Average">Average</SelectItem>
-                    <SelectItem value="Attractive">Attractive</SelectItem>
+                    <SelectItem value="Few Extra Pounds">A few extra pounds</SelectItem>
+                    <SelectItem value="Big & Tall/Full Figured">Big & Tall/Full Figured</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
+            <div>
+              <Label>Appearance</Label>
+              <Select value={formData.appearance} onValueChange={(value) => handleInputChange("appearance", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select appearance" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Handsome">Handsome</SelectItem>
+                  <SelectItem value="Beautiful">Beautiful</SelectItem>
+                  <SelectItem value="Good Looking">Good Looking</SelectItem>
+                  <SelectItem value="Pretty">Pretty</SelectItem>
+                  <SelectItem value="Ok">Ok</SelectItem>
+                  <SelectItem value="Average">Average</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {user.gender === 'female' && (
+              <div>
+                <Label>Hijab</Label>
+                <Select value={formData.hijab} onValueChange={(value) => handleInputChange("hijab", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select hijab style" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Niqab">Niqab</SelectItem>
+                    <SelectItem value="Jilbab">Jilbab</SelectItem>
+                    <SelectItem value="Hijab">Hijab</SelectItem>
+                    <SelectItem value="No">No</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {user.gender === 'male' && (
+              <div>
+                <Label>Beard</Label>
+                <Select value={formData.beard} onValueChange={(value) => handleInputChange("beard", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select beard style" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Sunnah">Sunnah</SelectItem>
+                    <SelectItem value="Trimmed">Trimmed</SelectItem>
+                    <SelectItem value="No">No</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
         );
 
       case 3: // Lifestyle and Traits
         return (
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div>
-              <Label>Which of these Traits describe you (Select all that apply)</Label>
-              <div className="grid grid-cols-4 gap-2 mt-2">
+              <Label>Genotype</Label>
+              <Select value={formData.genotype} onValueChange={(value) => handleInputChange("genotype", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select genotype" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="AA">AA</SelectItem>
+                  <SelectItem value="AS">AS</SelectItem>
+                  <SelectItem value="AC">AC</SelectItem>
+                  <SelectItem value="SS">SS</SelectItem>
+                  <SelectItem value="SC">SC</SelectItem>
+                  <SelectItem value="CC">CC</SelectItem>
+                  <SelectItem value="Unknown">I don't know</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Traits</Label>
+              <div className="flex flex-wrap gap-2">
                 {traitOptions.map((trait) => (
                   <Badge
                     key={trait}
-                    variant={selectedTraits.includes(trait) ? "default" : "outline"}
-                    className="cursor-pointer justify-center text-xs py-1"
+                    variant={selectedTraits.includes(trait) ? "default" : "secondary"}
                     onClick={() => toggleTrait(trait)}
+                    className="cursor-pointer"
                   >
                     {trait}
                   </Badge>
@@ -474,51 +552,19 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
 
       case 4: // Interests
         return (
-          <div className="space-y-6">
-            <div>
-              <Label>Which of these Recreational activities appeal to you (Select all that apply)</Label>
-              <div className="grid grid-cols-4 gap-2 mt-2">
-                {interestOptions.slice(0, 15).map((interest) => (
-                  <Badge
-                    key={interest}
-                    variant={selectedInterests.includes(interest) ? "default" : "outline"}
-                    className="cursor-pointer justify-center text-xs py-1"
-                    onClick={() => toggleInterest(interest)}
-                  >
-                    {interest}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-            <div>
-              <Label>Which of these Food and Travel activities appeal to you (Select all that apply)</Label>
-              <div className="grid grid-cols-4 gap-2 mt-2">
-                {interestOptions.slice(15, 35).map((interest) => (
-                  <Badge
-                    key={interest}
-                    variant={selectedInterests.includes(interest) ? "default" : "outline"}
-                    className="cursor-pointer justify-center text-xs py-1"
-                    onClick={() => toggleInterest(interest)}
-                  >
-                    {interest}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-            <div>
-              <Label>Which of these Sports and Relaxation activities appeal to you (Select all that apply)</Label>
-              <div className="grid grid-cols-4 gap-2 mt-2">
-                {interestOptions.slice(35).map((interest) => (
-                  <Badge
-                    key={interest}
-                    variant={selectedInterests.includes(interest) ? "default" : "outline"}
-                    className="cursor-pointer justify-center text-xs py-1"
-                    onClick={() => toggleInterest(interest)}
-                  >
-                    {interest}
-                  </Badge>
-                ))}
-              </div>
+          <div>
+            <Label>Interests</Label>
+            <div className="flex flex-wrap gap-2">
+              {interestOptions.map((interest) => (
+                <Badge
+                  key={interest}
+                  variant={selectedInterests.includes(interest) ? "default" : "secondary"}
+                  onClick={() => toggleInterest(interest)}
+                  className="cursor-pointer"
+                >
+                  {interest}
+                </Badge>
+              ))}
             </div>
           </div>
         );
@@ -527,33 +573,34 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
         return (
           <div className="space-y-6">
             <div>
-              <Label>Open to matches from... (Select all that apply)</Label>
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                <Badge variant="outline" className="cursor-pointer justify-center py-2">
-                  😌 Reverts
-                </Badge>
-                <Badge variant="outline" className="cursor-pointer justify-center py-2">
-                  👤 Widows/Widowers
-                </Badge>
-                <Badge variant="outline" className="cursor-pointer justify-center py-2">
-                  ∞ Divorcees
-                </Badge>
-                <Badge variant="outline" className="cursor-pointer justify-center py-2">
-                  👥 Parents
-                </Badge>
-              </div>
+              <Label>Open to matches from</Label>
+              <Select value={formData.openToMatches} onValueChange={(value) => handleInputChange("openToMatches", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select preference" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Anywhere">Anywhere in the world</SelectItem>
+                  <SelectItem value="My Country">My country of residence</SelectItem>
+                  <SelectItem value="My City">My city of residence</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
-              <Label htmlFor="icebreakers">Add Icebreakers</Label>
+              <Label>Dealbreakers</Label>
               <Textarea
-                id="icebreakers"
-                value={formData.icebreakers}
-                onChange={(e) => handleInputChange("icebreakers", e.target.value)}
-                placeholder="What would be good conversation starters..."
-                className="min-h-[80px]"
+                value={formData.dealbreakers}
+                onChange={(e) => handleInputChange("dealbreakers", e.target.value)}
+                placeholder="What are your absolute dealbreakers?"
               />
             </div>
-           
+            <div>
+              <Label>Icebreakers</Label>
+              <Textarea
+                value={formData.icebreakers}
+                onChange={(e) => handleInputChange("icebreakers", e.target.value)}
+                placeholder="Suggest some fun icebreakers for your matches!"
+              />
+            </div>
           </div>
         );
 
@@ -562,70 +609,81 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Are you a revert?</Label>
-                <Select value={formData.revert} onValueChange={(value) => handleInputChange("revert", value)}>
+                <Label>Pattern of Salaah</Label>
+                <Select value={formData.patternOfSalaah} onValueChange={(value) => handleInputChange("patternOfSalaah", value)}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select" />
+                    <SelectValue placeholder="Select pattern" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="yes">Yes</SelectItem>
-                    <SelectItem value="no">No</SelectItem>
+                    <SelectItem value="5 Times">5 times a day</SelectItem>
+                    <SelectItem value="Sometimes">Sometimes</SelectItem>
+                    <SelectItem value="Jummah">Only Jummah</SelectItem>
+                    <SelectItem value="Learning">Learning</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label>When did you start practicing?</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !formData.startedPracticing && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formData.startedPracticing ? format(formData.startedPracticing, "dd MMM yyyy") : "Pick a date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={formData.startedPracticing}
-                      onSelect={(date) => handleInputChange("startedPracticing", date)}
-                      initialFocus
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
+                <Label>Are you a revert?</Label>
+                <Select value={formData.revert} onValueChange={(value) => handleInputChange("revert", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select option" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Yes">Yes</SelectItem>
+                    <SelectItem value="No">No</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div>
-              <Label>How often do you pray?</Label>
-              <Select value={formData.patternOfSalaah} onValueChange={(value) => handleInputChange("patternOfSalaah", value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select frequency" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="never">Never or One-offs</SelectItem>
-                  <SelectItem value="sometimes">Sometimes</SelectItem>
-                  <SelectItem value="usually">Usually</SelectItem>
-                  <SelectItem value="always">Always</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>When did you start practicing?</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !formData.startedPracticing && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formData.startedPracticing ? format(formData.startedPracticing, "dd MMM yyyy") : "Pick a date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={formData.startedPracticing}
+                    onSelect={(date) => handleInputChange("startedPracticing", date)}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
-              <Label htmlFor="practice-details">Details about how you practice deen, where you learn (scholars/speakers)?</Label>
-              <Textarea
-                id="practice-details"
-                value={formData.scholarsSpeakers}
-                onChange={(e) => handleInputChange("scholarsSpeakers", e.target.value)}
-                placeholder="Tell us about your religious practice and learning..."
-                className="min-h-[100px]"
-              />
+              <Label>Sect/Methodology</Label>
+              <Input value={formData.sect} onChange={(e) => handleInputChange("sect", e.target.value)} placeholder="e.g. Sunni, Salafi, etc."/>
+            </div>
+            <div>
+              <Label>Scholars/Speakers you listen to</Label>
+              <Input value={formData.scholarsSpeakers} onChange={(e) => handleInputChange("scholarsSpeakers", e.target.value)} placeholder="e.g. Mufti Menk, etc."/>
+            </div>
+            <div>
+              <Label>Dressing/Covering</Label>
+              <Textarea value={formData.dressingCovering} onChange={(e) => handleInputChange("dressingCovering", e.target.value)} placeholder="Describe your usual dressing style."/>
+            </div>
+            <div>
+              <Label>What are you doing to improve your Islamic practice?</Label>
+              <Textarea value={formData.islamicPractice} onChange={(e) => handleInputChange("islamicPractice", e.target.value)} placeholder="e.g. Taking classes, reading books, etc."/>
             </div>
           </div>
         );
+
+      case 7: // Wali Details
+        if (user.gender === 'female') {
+          return renderWaliDetailsSection();
+        }
+        return null;
 
       default:
         return null;
@@ -633,83 +691,48 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      <div className="flex">
-        {/* Sidebar */}
-        <div className="w-80 bg-white shadow-sm min-h-screen">
-          <div className="p-6 border-b">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-                <span className="text-orange-600 font-semibold text-lg">
-                  {user.fname?.charAt(0)}{user.lname?.charAt(0)}
-                </span>
-              </div>
-              <div>
-                <h2 className="font-medium">{user.fname} {user.lname}</h2>
-                <p className="text-sm text-gray-500">Manage your profile here</p>
-              </div>
-            </div>
-          </div>
-          
-          <nav className="p-4">
+    <div className="flex h-screen bg-gray-50">
+      <aside className="w-64 bg-white p-6 border-r flex flex-col justify-between">
+        <div>
+          <h2 className="text-2xl font-bold mb-8 text-primary">Quluub</h2>
+          <nav className="space-y-2">
             {sidebarItems.map((item, index) => (
-              <button
-                key={index}
+              <Button
+                key={item.label}
+                variant={currentSection === index ? "secondary" : "ghost"}
+                className="w-full justify-start"
                 onClick={() => setCurrentSection(index)}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
-                  currentSection === index 
-                    ? 'bg-blue-50 text-blue-600 border-r-2 border-blue-600' 
-                    : 'text-gray-600 hover:bg-gray-50'
-                }`}
               >
-                <span className="text-lg">{item.icon}</span>
-                <span className="font-medium">{item.label}</span>
-              </button>
+                <span className="mr-2">{item.icon}</span>
+                {item.label}
+              </Button>
             ))}
           </nav>
-
-          <div className="p-4 border-t">
-            <Button onClick={handleSave} className="w-full mb-2">
-              Update my profile
-            </Button>
-          </div>
         </div>
-
-        {/* Main Content */}
-        <div className="flex-1 p-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-xl">{sections[currentSection]}</CardTitle>
-              <div className="flex space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentSection(Math.max(0, currentSection - 1))}
-                  disabled={currentSection === 0}
-                >
-                  <ArrowLeft className="h-4 w-4 mr-1" />
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentSection(Math.min(sections.length - 1, currentSection + 1))}
-                  disabled={currentSection === sections.length - 1}
-                >
-                  Next
-                  <ArrowRight className="h-4 w-4 ml-1" />
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="min-h-[500px]">
-              {renderSection()}
-            </CardContent>
-          </Card>
+        <div className="space-y-2">
+          <Button onClick={handleSave} className="w-full">Save Changes</Button>
+          <Button variant="outline" onClick={onCancel} className="w-full">Cancel</Button>
         </div>
-      </div>
+      </aside>
+      <main className="flex-1 p-6 overflow-y-auto">
+        <Card>
+          <CardHeader>
+            <CardTitle>{sections[currentSection]}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {renderSection()}
+          </CardContent>
+        </Card>
+        <div className="flex justify-between mt-6">
+          <Button onClick={() => setCurrentSection(s => Math.max(0, s - 1))} disabled={currentSection === 0}>
+            <ArrowLeft className="mr-2 h-4 w-4" /> Previous
+          </Button>
 
-      {/* Use consistent Navbar */}
-      <Navbar />
+          <Button onClick={() => setCurrentSection(s => Math.min(sections.length - 1, s + 1))} disabled={currentSection === sections.length - 1}>
+            Next <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
+      </main>
     </div>
   );
 };

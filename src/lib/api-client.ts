@@ -1,4 +1,5 @@
 import axios from 'axios';
+import type { LoginCredentials, SignupData, User } from '../types/user';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -70,7 +71,7 @@ apiClient.interceptors.response.use(
 
 // Auth service
 export const authService = {
-  login: async (credentials: { username: string; password: string }) => {
+  login: async (credentials: LoginCredentials) => {
     try {
       const response = await apiClient.post('/auth/login', credentials);
       if (response.data.token) {
@@ -83,15 +84,7 @@ export const authService = {
     }
   },
   
-  signup: async (userData: {
-    username: string;
-    email: string;
-    password: string;
-    fname: string;
-    lname: string;
-    gender: string;
-    parentEmail?: string;
-  }) => {
+  signup: async (userData: SignupData) => {
     try {
       const response = await apiClient.post('/auth/signup', userData);
       if (response.data.token) {
@@ -509,9 +502,15 @@ export const emailService = {
     return response.data;
   },
   
-  resendValidation: async () => {
-    console.log('API: Resending validation email');
-    const response = await apiClient.post('/email/resend-validation');
+  resendValidationEmail: async (email: string) => {
+    console.log(`API: Resending validation email to ${email}`);
+    const response = await apiClient.post('/auth/resend-validation', { email });
+    return response.data;
+  },
+  
+  resendValidationEmail: async (email: string) => {
+    console.log(`API: Resending validation email to ${email}`);
+    const response = await apiClient.post('/auth/resend-validation', { email });
     return response.data;
   },
   

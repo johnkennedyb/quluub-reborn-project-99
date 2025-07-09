@@ -1,16 +1,16 @@
-
 const express = require('express');
-const { createPaystackPayment, paystackWebhook } = require('../controllers/paymentController');
-const { auth } = require('../middlewares/auth');
-
 const router = express.Router();
+const { createCheckoutSession, handleStripeWebhook } = require('../controllers/paymentController');
+const { protect } = require('../middlewares/auth');
 
-// @route   POST /api/payments/create-paystack-payment
+// @route   POST /api/payments/create-checkout-session
+// @desc    Create a Stripe checkout session
 // @access  Private
-router.post('/create-paystack-payment', auth, createPaystackPayment);
+router.post('/create-checkout-session', protect, createCheckoutSession);
 
-// @route   POST /api/payments/paystack-webhook
-// @access  Public (Webhook)
-router.post('/paystack-webhook', paystackWebhook);
+// @route   POST /api/payments/webhook
+// @desc    Handle Stripe webhooks
+// @access  Public
+router.post('/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook);
 
 module.exports = router;

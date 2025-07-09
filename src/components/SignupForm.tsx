@@ -1,7 +1,9 @@
-
 import { useState, useEffect } from "react";
+import Select from "react-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select as UiSelect, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { 
@@ -12,14 +14,6 @@ import {
   CardHeader, 
   CardTitle 
 } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { DatePicker } from "@/components/ui/date-picker";
 import {
   Dialog,
   DialogContent,
@@ -36,7 +30,7 @@ import { format } from "date-fns";
 import { ChevronLeft, ChevronRight, RefreshCcw, Eye, EyeOff } from "lucide-react";
 
 interface SignupFormProps {
-  onSignup: (name: string, email: string, password: string, gender: string) => void;
+  onSignup: (data: Omit<RegistrationData, 'username'>) => void;
   onSwitchToLogin: () => void;
 }
 
@@ -46,7 +40,7 @@ interface RegistrationData {
   lastName: string;
   password: string;
   dateOfBirth: Date | null;
-  ethnicity: string;
+  ethnicity: string[];
   countryOfResidence: string;
   cityOfResidence: string;
   summary: string;
@@ -55,21 +49,37 @@ interface RegistrationData {
 }
 
 const ethnicities = [
-  "African", "Arab", "Asian", "Bengali", "Black", "Caribbean", "Chinese", "East Asian",
-  "European", "Filipino", "Hispanic/Latino", "Indian", "Indigenous", "Japanese",
-  "Korean", "Middle Eastern", "Mixed/Multi-ethnic", "Native American", "Pacific Islander",
-  "South Asian", "Southeast Asian", "Turkish", "Vietnamese", "White", "Other"
+  { value: "African", label: "African" },
+  { value: "Arab", label: "Arab" },
+  { value: "Asian", label: "Asian" },
+  { value: "Bengali", label: "Bengali" },
+  { value: "Black", label: "Black" },
+  { value: "Caribbean", label: "Caribbean" },
+  { value: "Chinese", label: "Chinese" },
+  { value: "East Asian", label: "East Asian" },
+  { value: "European", label: "European" },
+  { value: "Filipino", label: "Filipino" },
+  { value: "Hispanic/Latino", label: "Hispanic/Latino" },
+  { value: "Indian", label: "Indian" },
+  { value: "Indigenous", label: "Indigenous" },
+  { value: "Japanese", label: "Japanese" },
+  { value: "Korean", label: "Korean" },
+  { value: "Middle Eastern", label: "Middle Eastern" },
+  { value: "Mixed/Multi-ethnic", label: "Mixed/Multi-ethnic" },
+  { value: "Native American", label: "Native American" },
+  { value: "Pacific Islander", label: "Pacific Islander" },
+  { value: "South Asian", label: "South Asian" },
+  { value: "Southeast Asian", label: "Southeast Asian" },
+  { value: "Turkish", label: "Turkish" },
+  { value: "Vietnamese", label: "Vietnamese" },
+  { value: "White", label: "White" },
+  { value: "Other", label: "Other" },
 ];
 
 const countries = [
-  "Afghanistan", "Albania", "Algeria", "Argentina", "Australia", "Austria", "Bangladesh",
-  "Belgium", "Brazil", "Canada", "China", "Denmark", "Egypt", "Finland", "France",
-  "Germany", "Ghana", "Greece", "India", "Indonesia", "Iran", "Iraq", "Ireland",
-  "Italy", "Japan", "Jordan", "Kenya", "Kuwait", "Lebanon", "Malaysia", "Mexico",
-  "Morocco", "Netherlands", "Nigeria", "Norway", "Pakistan", "Philippines", "Poland",
-  "Qatar", "Russia", "Saudi Arabia", "Singapore", "South Africa", "South Korea",
-  "Spain", "Sri Lanka", "Sweden", "Switzerland", "Thailand", "Tunisia", "Turkey",
-  "UAE", "Ukraine", "United Kingdom", "United States", "Vietnam", "Other"
+  { name: "Nigeria", cities: ["Lagos", "Abuja", "Kano"] },
+  { name: "United Kingdom", cities: ["London", "Manchester", "Birmingham"] },
+  { name: "United States", cities: ["New York", "Los Angeles", "Chicago"] },
 ];
 
 const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
@@ -79,35 +89,33 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
   const [verificationCode, setVerificationCode] = useState("");
   const [suggestedUsername, setSuggestedUsername] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  
+
   const [formData, setFormData] = useState<RegistrationData>({
     email: "",
     firstName: "",
     lastName: "",
     password: "",
     dateOfBirth: null,
-    ethnicity: "",
+    ethnicity: [],
     countryOfResidence: "",
     cityOfResidence: "",
     summary: "",
     username: "",
     gender: "male",
   });
-  
-  // Generate a random password
+
   useEffect(() => {
     if (formData.password === "") {
       const generatedPassword = generatePassword(10);
       setFormData(prev => ({ ...prev, password: generatedPassword }));
     }
   }, [formData.password]);
-  
-  // Generate suggested username when first name is filled (only first name + number)
+
   useEffect(() => {
     if (formData.firstName && step === 7) {
       const firstPart = formData.firstName.toLowerCase().replace(/\s+/g, '');
       const randomNum = Math.floor(Math.random() * 10000);
-      
+
       setSuggestedUsername(`${firstPart}${randomNum}`);
     }
   }, [formData.firstName, step]);
@@ -120,80 +128,68 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
     }
     return password;
   };
-  
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
-  
-  const handleSelectChange = (name: string, value: string) => {
+
+  const handleSelectChange = (name: string, value: string | string[]) => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
-  
+
   const handleDateChange = (date: Date | undefined) => {
     setFormData(prev => ({ ...prev, dateOfBirth: date || null }));
   };
-  
+
   const handleNextStep = () => {
     setStep(prev => prev + 1);
   };
-  
+
   const handlePrevStep = () => {
     setStep(prev => prev - 1);
   };
-  
+
   const handleSubmitInitial = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     try {
-      // Simulate email verification process
       await new Promise(resolve => setTimeout(resolve, 1000));
       setShowVerification(true);
     } finally {
       setIsLoading(false);
     }
   };
-  
+
   const handleVerifyEmail = async () => {
     setIsLoading(true);
-    
+
     try {
-      // In a real app, this would verify the OTP code
       await new Promise(resolve => setTimeout(resolve, 1000));
       setShowVerification(false);
-      handleNextStep(); // Move to the next step after verification
+      handleNextStep();
     } finally {
       setIsLoading(false);
     }
   };
-  
-  const handleResendCode = () => {
-    // In a real app, this would resend the verification code
-    console.log("Resending verification code to", formData.email);
-  };
-  
+
   const handleSuggestUsername = () => {
     setFormData(prev => ({ ...prev, username: suggestedUsername }));
   };
-  
+
   const handleFinalSubmit = async () => {
     setIsLoading(true);
-    
+
     try {
-      // In a real app, this would make an API call
       await new Promise(resolve => setTimeout(resolve, 1000));
-      onSignup(
-        `${formData.firstName} ${formData.lastName}`,
-        formData.email,
-        formData.password,
-        formData.gender
-      );
+      const { username, ...dataToSubmit } = formData;
+      onSignup(dataToSubmit);
     } finally {
       setIsLoading(false);
     }
   };
-  
+
   const renderStepContent = () => {
     switch (step) {
       case 1:
@@ -201,7 +197,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
           <form onSubmit={handleSubmitInitial} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email Address</Label>
-              <Input 
+              <Input
                 id="email"
                 name="email"
                 type="email"
@@ -211,10 +207,10 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                 required
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="firstName">First Name</Label>
-              <Input 
+              <Input
                 id="firstName"
                 name="firstName"
                 placeholder="Your first name"
@@ -223,10 +219,10 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                 required
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="lastName">Last Name</Label>
-              <Input 
+              <Input
                 id="lastName"
                 name="lastName"
                 placeholder="Your last name"
@@ -238,11 +234,11 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                 Your name will not be visible to other users
               </p>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
-                <Input 
+                <Input
                   id="password"
                   name="password"
                   type={showPassword ? "text" : "password"}
@@ -264,8 +260,8 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                       <Eye className="h-4 w-4" />
                     )}
                   </Button>
-                  <Button 
-                    type="button" 
+                  <Button
+                    type="button"
                     variant="ghost"
                     size="icon"
                     className="h-10 px-3"
@@ -279,7 +275,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                 </div>
               </div>
             </div>
-            
+
             <div className="space-y-1 text-xs">
               <p className="text-muted-foreground">By signing up you agree to our:</p>
               <div className="flex items-center gap-1">
@@ -288,17 +284,17 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                 <a href="#" className="text-primary hover:underline">Privacy Policy</a>
               </div>
             </div>
-            
-            <Button 
-              type="submit" 
-              className="w-full" 
+
+            <Button
+              type="submit"
+              className="w-full"
               disabled={isLoading}
             >
               {isLoading ? "Processing..." : "Submit"}
             </Button>
           </form>
         );
-        
+
       case 2:
         return (
           <div className="space-y-6">
@@ -314,7 +310,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                 </p>
               )}
             </div>
-            
+
             <div className="flex justify-between">
               <Button
                 type="button"
@@ -335,29 +331,28 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
             </div>
           </div>
         );
-        
+
       case 3:
         return (
           <div className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="ethnicity">Ethnicity (not nationality)</Label>
-              <Select 
-                value={formData.ethnicity} 
-                onValueChange={(value) => handleSelectChange("ethnicity", value)}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select your ethnicity" />
-                </SelectTrigger>
-                <SelectContent>
-                  {ethnicities.map((ethnicity) => (
-                    <SelectItem key={ethnicity} value={ethnicity}>
-                      {ethnicity}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Select
+                isMulti
+                name="ethnicity"
+                options={formData.ethnicity.length >= 2 ? [] : ethnicities}
+                className="basic-multi-select"
+                classNamePrefix="select"
+                onChange={(selectedOptions) => {
+                  if (selectedOptions.length <= 2) {
+                    handleSelectChange("ethnicity", selectedOptions.map(option => option.value));
+                  }
+                }}
+                value={ethnicities.filter(option => formData.ethnicity.includes(option.value))}
+                placeholder="Select up to 2 ethnicities"
+              />
             </div>
-            
+
             <div className="flex justify-between">
               <Button
                 type="button"
@@ -370,7 +365,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
               <Button
                 type="button"
                 onClick={handleNextStep}
-                disabled={!formData.ethnicity}
+                disabled={formData.ethnicity.length === 0}
                 className="flex items-center gap-1"
               >
                 Next <ChevronRight className="h-4 w-4" />
@@ -378,29 +373,32 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
             </div>
           </div>
         );
-        
+
       case 4:
         return (
           <div className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="countryOfResidence">Country of Residence</Label>
-              <Select 
-                value={formData.countryOfResidence} 
-                onValueChange={(value) => handleSelectChange("countryOfResidence", value)}
+              <UiSelect
+                value={formData.countryOfResidence}
+                onValueChange={(value) => {
+                  handleSelectChange("countryOfResidence", value);
+                  handleSelectChange("cityOfResidence", ""); // Reset city on country change
+                }}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select your country" />
                 </SelectTrigger>
                 <SelectContent>
                   {countries.map((country) => (
-                    <SelectItem key={country} value={country}>
-                      {country}
+                    <SelectItem key={country.name} value={country.name}>
+                      {country.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
-              </Select>
+              </UiSelect>
             </div>
-            
+
             <div className="flex justify-between">
               <Button
                 type="button"
@@ -421,22 +419,31 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
             </div>
           </div>
         );
-        
+
       case 5:
+        const selectedCountry = countries.find(c => c.name === formData.countryOfResidence);
         return (
           <div className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="cityOfResidence">City of Residence</Label>
-              <Input
-                id="cityOfResidence"
-                name="cityOfResidence"
-                placeholder="Your city"
+              <UiSelect
                 value={formData.cityOfResidence}
-                onChange={handleInputChange}
-                required
-              />
+                onValueChange={(value) => handleSelectChange("cityOfResidence", value)}
+                disabled={!formData.countryOfResidence}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select your city" />
+                </SelectTrigger>
+                <SelectContent>
+                  {selectedCountry && selectedCountry.cities.map((city) => (
+                    <SelectItem key={city} value={city}>
+                      {city}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </UiSelect>
             </div>
-            
+
             <div className="flex justify-between">
               <Button
                 type="button"
@@ -457,7 +464,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
             </div>
           </div>
         );
-        
+
       case 6:
         return (
           <div className="space-y-6">
@@ -693,13 +700,9 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
               
               <p className="text-sm text-muted-foreground">
                 Didn't receive a code?{" "}
-                <button 
-                  type="button"
-                  onClick={handleResendCode}
-                  className="text-primary hover:underline font-medium"
-                >
-                  Resend code
-                </button>
+                <p className="text-primary hover:underline font-medium">
+                  Check your email inbox and click the verification link.
+                </p>
               </p>
               
               <p className="text-xs text-center text-muted-foreground mt-2">

@@ -102,6 +102,7 @@ const Profile = () => {
           onSave={handleProfileSave}
           onCancel={() => setIsEditMode(false)}
         />
+        <Navbar />
       </div>
     );
   }

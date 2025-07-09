@@ -33,6 +33,7 @@ import Search from "@/pages/Search";
 import ValidateEmail from "@/pages/ValidateEmail";
 import NotFound from "@/pages/NotFound";
 import Alerts from "@/pages/Alerts";
+import UserProfilePage from "@/pages/admin/UserProfilePage";
 
 // Socket
 import { io, Socket } from "socket.io-client";
@@ -79,7 +80,9 @@ function App() {
 
     console.log('Setting up socket connection for user:', user._id);
 
-    const newSocket = io(import.meta.env.VITE_API_URL || "http://localhost:5000", {
+        const socketUrl = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace('/api', '');
+
+    const newSocket = io(socketUrl, {
       query: { userId: user._id },
       transports: ["websocket"],
       withCredentials: true,
@@ -199,12 +202,14 @@ function App() {
         <Route path="/browse" element={<PrivateRoute element={<Browse />} />} />
         <Route path="/messages" element={<PrivateRoute element={<Messages />} />} />
         <Route path="/profile" element={<PrivateRoute element={<Profile />} />} />
+        <Route path="/profile/:userId" element={<PrivateRoute element={<Profile />} />} />
         <Route path="/settings" element={<PrivateRoute element={<Settings />} />} />
         <Route path="/search" element={<PrivateRoute element={<Search />} />} />
         <Route path="/alerts" element={<PrivateRoute element={<Alerts />} />} />
 
         {/* Admin routes */}
-        <Route path="/admin" element={<AdminRoute element={<AdminDashboard />} />} />
+                <Route path="/admin" element={<AdminRoute element={<AdminDashboard />} />} />
+        <Route path="/admin/user/:userId" element={<AdminRoute element={<UserProfilePage />} />} />
 
         {/* 404 fallback */}
         <Route path="*" element={<NotFound />} />

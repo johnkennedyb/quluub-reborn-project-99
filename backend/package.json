@@ -20,8 +20,11 @@
     "mongoose": "^7.5.0",
     "morgan": "^1.10.0",
     "multer": "^2.0.1",
+    "node-cron": "^4.2.0",
     "nodemailer": "^7.0.3",
+    "redis": "^5.5.6",
     "socket.io": "^4.8.1",
+    "stripe": "^18.3.0",
     "uuid": "^9.0.0",
     "validator": "^13.11.0",
     "ws": "^8.18.2"

@@ -3,16 +3,18 @@ const {
   getStats,
   getAllUsers,
   getUserDetails,
-  updateUserStatus,
+  updateUserAccountStatus,
   updateUserPlan,
   updateUser,
   deleteUser,
-  resetUserPassword,
+  sendPasswordResetLink,
+  verifyUserEmail,
   getSystemMetrics,
   getAllCalls,
   saveCallRecord,
   uploadCallRecording,
   sendBulkEmail,
+  scheduleEmail,
   sendTestEmail,
   getEmailMetrics,
   saveEmailConfig,
@@ -28,16 +30,20 @@ const {
   dismissReport,
   getVipUsers,
   getPotentialMatches,
-  sendMatchSuggestions
+  sendMatchSuggestions,
+  getScheduledEmails,
+  cancelScheduledEmail,
+  sendAdminPushNotification,
+  getAdminPushNotifications,
+  getPaymentHistory,
+  processRefund
 } = require('../controllers/adminController');
 const {
   getAllSubscriptions
 } = require('../controllers/subscriptionController');
-const {
-  getAllPayments,
-  processRefund
-} = require('../controllers/paymentController');
-const { adminAuth } = require('../middlewares/adminAuth');
+
+const { protect, isAdmin } = require('../middlewares/auth');
+const cache = require('../middlewares/cache');
 const multer = require('multer');
 const path = require('path');
 
@@ -68,23 +74,31 @@ const upload = multer({
   }
 });
 
-// All admin routes require authentication
-router.use(adminAuth);
+// Multer config for email attachments
+const emailAttachmentUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit per file
+});
+
+// All admin routes require authentication and admin privileges
+router.post('/bulk-email', protect, isAdmin, emailAttachmentUpload.array('attachments', 5), sendBulkEmail);
+router.post('/schedule-email', protect, isAdmin, emailAttachmentUpload.array('attachments', 5), scheduleEmail);
+router.use(protect, isAdmin);
 
 // Admin dashboard routes
-router.get('/stats', getStats);
+router.get('/stats', cache(3600), getStats); // Cache for 1 hour
 router.get('/users', getAllUsers);
-router.get('/users/:id', getUserDetails);
+router.route('/users/:id').get(getUserDetails).put(updateUser).delete(deleteUser);
 router.get('/users/:id/potential-matches', getPotentialMatches);
 
 // User management routes
-router.put('/users/:id/status', updateUserStatus);
+router.patch('/users/:id/status', updateUserAccountStatus);
 router.put('/users/:id/plan', updateUserPlan);
-router.put('/users/:id', updateUser);
-router.put('/users/:id/reset-password', resetUserPassword);
+router.post('/users/:id/reset-password', sendPasswordResetLink);
+router.post('/users/:id/verify-email', verifyUserEmail);
 router.post('/users/:id/suggest-matches', sendMatchSuggestions);
-router.delete('/users/:id', deleteUser);
 
+// Push Notification routes
 // System routes
 router.get('/system', getSystemMetrics);
 
@@ -97,16 +111,22 @@ router.post('/call-recordings', upload.single('recording'), uploadCallRecording)
 router.get('/chat-reports', getChatReports);
 router.post('/send-chat-report', sendChatReport);
 
+// Email management routes
+router.post('/test-email', sendTestEmail);
+router.get('/email-metrics', getEmailMetrics);
+router.post('/email-config', saveEmailConfig);
+router.get('/email-config', getEmailConfig);
+router.get('/scheduled-emails', getScheduledEmails);
+router.delete('/scheduled-emails/:id', cancelScheduledEmail);
+
+// Push Notification routes
+router.route('/push-notifications').get(getAdminPushNotifications).post(sendAdminPushNotification);
+
 // Reported profiles routes
 router.get('/reported-profiles', getReportedProfiles);
 router.patch('/reported-profiles/:id/dismiss', dismissReport);
 
-// Email configuration and management routes
-router.get('/email-config', getEmailConfig);
-router.post('/email-config', saveEmailConfig);
-router.post('/bulk-email', sendBulkEmail);
-router.post('/test-email', sendTestEmail);
-router.get('/email-metrics', getEmailMetrics);
+
 
 // Analytics routes
 router.get('/matching-insights', getMatchingInsights);
@@ -120,7 +140,7 @@ router.get('/vip-users', getVipUsers);
 
 // Subscription and Payment routes
 router.get('/subscriptions', getAllSubscriptions);
-router.get('/payments', getAllPayments);
-router.post('/payments/:id/refund', processRefund);
+router.get('/payments', getPaymentHistory);
+router.post('/payments/:id/refund', protect, isAdmin, processRefund);
 
 module.exports = router;

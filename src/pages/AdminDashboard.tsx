@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { useAdminAuth } from '@/contexts/AdminAuthContext';
-import { Loader2, Users, BarChart3, Mail, Settings, Phone, CreditCard, Wallet, Heart, UserCheck, Menu } from 'lucide-react';
+import { Loader2, Users, BarChart3, Mail, Settings, Phone, CreditCard, Wallet, Heart, UserCheck, Menu, Bell } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import MemberManagement from '@/components/admin/MemberManagement';
@@ -15,7 +15,10 @@ import SubscriptionOverview from '@/components/admin/SubscriptionOverview';
 import PaymentHistory from '@/components/admin/PaymentHistory';
 import SuggestedMatches from '@/components/admin/SuggestedMatches';
 import ReferralAnalysis from '@/components/admin/ReferralAnalysis';
-import EmailConfiguration from '@/components/admin/EmailConfiguration';
+
+import EmailManagement from '@/components/admin/EmailManagement';
+import PushNotificationManagement from '@/components/admin/PushNotificationManagement';
+import VideoCallManagement from '@/components/admin/VideoCallManagement';
 
 const AdminDashboard = () => {
   const { adminUser, adminLogout } = useAdminAuth();
@@ -48,7 +51,8 @@ const AdminDashboard = () => {
     { value: 'overview', label: 'Overview', icon: BarChart3 },
     { value: 'members', label: 'Members', icon: Users },
     { value: 'insights', label: 'Insights', icon: BarChart3 },
-    { value: 'communication', label: 'Email', icon: Mail },
+    { value: 'email', label: 'Email', icon: Mail },
+    { value: 'notifications', label: 'Notifications', icon: Bell },
     { value: 'calls', label: 'Calls', icon: Phone },
     { value: 'reported', label: 'Reported', icon: Settings },
     { value: 'subscriptions', label: 'Subscriptions', icon: CreditCard },
@@ -297,44 +301,9 @@ const AdminDashboard = () => {
             <DashboardInsights stats={stats} />
           </TabsContent>
 
-          <TabsContent value="communication">
-            <EmailConfiguration />
-          </TabsContent>
 
           <TabsContent value="calls">
-            <Card>
-              <CardHeader>
-                <CardTitle>Video Call Management</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="text-center">
-                      <div className="text-xl md:text-2xl font-bold">{calls?.length || 0}</div>
-                      <div className="text-xs md:text-sm text-gray-600">Total Calls</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl md:text-2xl font-bold">5</div>
-                      <div className="text-xs md:text-sm text-gray-600">Min Limit</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl md:text-2xl font-bold">100%</div>
-                      <div className="text-xs md:text-sm text-gray-600">Recorded</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-xl md:text-2xl font-bold">24h</div>
-                      <div className="text-xs md:text-sm text-gray-600">Avg Response</div>
-                    </div>
-                  </div>
-                  
-                  <div className="text-center py-4">
-                    <p className="text-gray-500 text-sm md:text-base">
-                      All video calls are automatically recorded and sent to parent/wali emails.
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <VideoCallManagement />
           </TabsContent>
 
           <TabsContent value="reported">
@@ -355,6 +324,12 @@ const AdminDashboard = () => {
 
           <TabsContent value="referrals">
             <ReferralAnalysis />
+          </TabsContent>
+          <TabsContent value="email">
+            <EmailManagement />
+          </TabsContent>
+          <TabsContent value="notifications">
+            <PushNotificationManagement />
           </TabsContent>
         </Tabs>
       </main>

@@ -31,6 +31,20 @@ const Settings = () => {
   const [isLoadingPayment, setIsLoadingPayment] = useState(false);
   const [isUpgrading, setIsUpgrading] = useState(false);
   const { toast } = useToast();
+  const [currency, setCurrency] = useState<'GBP' | 'NGN'>('GBP');
+
+  const pricing = {
+    GBP: {
+      premium: '2',
+      original: '5',
+      symbol: '£',
+    },
+    NGN: {
+      premium: '3000',
+      original: '7500',
+      symbol: '₦',
+    },
+  };
 
   useEffect(() => {
     fetchReferralStats();
@@ -72,6 +86,7 @@ const Settings = () => {
         toast({
           title: "Referral code generated",
           description: "Your referral code has been created successfully.",
+          variant: "success",
         });
       }
     } catch (error) {
@@ -110,6 +125,7 @@ const Settings = () => {
         toast({
           title: "Referral applied",
           description: "Referral code applied successfully!",
+          variant: "success",
         });
         setApplyReferralCode("");
         fetchReferralStats();
@@ -138,23 +154,42 @@ const Settings = () => {
     });
   };
 
-  const handleUpgrade = async () => {
+    const handleUpgrade = async () => {
+    setIsUpgrading(true);
     try {
-      setIsUpgrading(true);
-      const { authorization_url } = await paymentService.createPaystackPayment();
-      
-      // Redirect to Paystack checkout
-      window.location.href = authorization_url;
+      if (currency === 'GBP') {
+        // Use the new Stripe backend endpoint
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/payments/create-checkout-session`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+          body: JSON.stringify({ priceId: 'price_1Q5CNeBbkcQFdkf0i8BryMoN' }), // Premium discounted price
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to create Stripe checkout session');
+        }
+
+        const session = await response.json();
+        window.location.href = session.url;
+      } else {
+        // Use the existing Paystack service for NGN
+        const { authorization_url } = await paymentService.createPaystackPayment();
+        window.location.href = authorization_url;
+      }
     } catch (error) {
       console.error('Payment error:', error);
       toast({
         title: "Payment Error",
-        description: "Failed to initiate payment. Please try again.",
+        description: (error as Error).message || "Failed to initiate payment. Please try again.",
         variant: "destructive",
       });
-    } finally {
       setIsUpgrading(false);
     }
+    // No finally block needed as we only want to stop loading on error. On success, the page redirects.
   };
 
   const handlePasswordChange = async () => {
@@ -193,6 +228,7 @@ const Settings = () => {
         toast({
           title: "Password changed",
           description: "Your password has been changed successfully.",
+          variant: "success",
         });
         setCurrentPassword("");
         setNewPassword("");
@@ -276,8 +312,16 @@ const Settings = () => {
                     <Button onClick={generateReferralCode}>Generate Code</Button>
                   )}
                   <div className="mt-2 text-sm text-muted-foreground">
-                    Referrals: {referralStats.totalReferrals} | Active: {referralStats.activeReferrals}
+                    Successful Referrals: <strong>{referralStats.completedReferrals}</strong>
                   </div>
+                  <p className="mt-1 text-sm text-green-600">
+                    You get 1 month of Premium for every 5 successful referrals!
+                  </p>
+                  {referralStats.completedReferrals > 0 && (
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      You are <strong>{5 - (referralStats.completedReferrals % 5)}</strong> referrals away from your next reward.
+                    </p>
+                  )}
                 </div>
                 
                 <div>
@@ -300,9 +344,15 @@ const Settings = () => {
           {/* Plan Management */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BadgeDollarSign className="h-5 w-5" />
-                Manage My Plan
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <BadgeDollarSign className="h-5 w-5" />
+                  Manage My Plan
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant={currency === 'GBP' ? 'default' : 'outline'} size="sm" onClick={() => setCurrency('GBP')}>GBP</Button>
+                  <Button variant={currency === 'NGN' ? 'default' : 'outline'} size="sm" onClick={() => setCurrency('NGN')}>NGN</Button>
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -316,7 +366,7 @@ const Settings = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="text-3xl font-bold text-center">£0<span className="text-base font-normal text-muted-foreground">/month</span></div>
+                    <div className="text-3xl font-bold text-center">{pricing[currency].symbol}0<span className="text-base font-normal text-muted-foreground">/month</span></div>
                     <ul className="space-y-2">
                       <li className="flex items-center justify-between">
                         <span>Requests Sent Per Month:</span>
@@ -333,6 +383,14 @@ const Settings = () => {
                       <li className="flex items-center justify-between">
                         <span>Word Count Per Message:</span>
                         <span className="font-medium">20</span>
+                      </li>
+                      <li className="flex items-center justify-between">
+                        <span>Ad-free Browsing:</span>
+                        <span className="font-medium">No</span>
+                      </li>
+                      <li className="flex items-center justify-between">
+                        <span>Video Calling:</span>
+                        <span className="font-medium">No</span>
                       </li>
                     </ul>
                     {!isPro && (
@@ -356,7 +414,10 @@ const Settings = () => {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="text-3xl font-bold text-center">£5<span className="text-base font-normal text-muted-foreground">/month</span></div>
+                    <div className="text-3xl font-bold text-center">
+                      {pricing[currency].symbol}{pricing[currency].premium} <span className="text-lg font-normal text-muted-foreground line-through">{pricing[currency].symbol}{pricing[currency].original}</span>
+                      <span className="text-base font-normal text-muted-foreground">/month</span>
+                    </div>
                     <ul className="space-y-2">
                       <li className="flex items-center justify-between">
                         <span>Requests Sent Per Month:</span>
@@ -367,6 +428,14 @@ const Settings = () => {
                         <span className="font-medium">Unlimited</span>
                       </li>
                       <li className="flex items-center justify-between">
+                        <span>Ad-free Browsing:</span>
+                        <span className="font-medium">Yes</span>
+                      </li>
+                      <li className="flex items-center justify-between">
+                        <span>Video Calling:</span>
+                        <span className="font-medium">Yes</span>
+                      </li>
+                      <li className="flex items-center justify-between">
                         <span>Message Allowance:</span>
                         <span className="font-medium">10</span>
                       </li>
@@ -375,8 +444,12 @@ const Settings = () => {
                         <span className="font-medium">20</span>
                       </li>
                       <li className="flex items-center justify-between">
-                        <span>Video Call Access:</span>
-                        <span className="font-medium">5 min calls</span>
+                        <span>Ad-free Browsing:</span>
+                        <span className="font-medium">Yes</span>
+                      </li>
+                      <li className="flex items-center justify-between">
+                        <span>Video Calling:</span>
+                        <span className="font-medium">Yes</span>
                       </li>
                     </ul>
                     {!isPro ? (

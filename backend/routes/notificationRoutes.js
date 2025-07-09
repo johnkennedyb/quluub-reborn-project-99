@@ -2,8 +2,9 @@ const express = require('express');
 const {
   getNotifications,
   markAsRead,
+  sendGlobalNotification,
 } = require('../controllers/notificationController');
-const { protect } = require('../middlewares/auth');
+const { protect, isAdmin: admin } = require('../middlewares/auth');
 
 const router = express.Router();
 
@@ -11,5 +12,10 @@ router.use(protect);
 
 router.get('/', getNotifications);
 router.put('/:id/read', markAsRead);
+
+// @desc    Send a global notification
+// @route   POST /api/notifications/global
+// @access  Private/Admin
+router.post('/global', admin, sendGlobalNotification);
 
 module.exports = router;

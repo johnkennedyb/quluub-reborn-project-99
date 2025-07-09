@@ -12,7 +12,10 @@ interface DashboardInsightsProps {
 const DashboardInsights = ({ stats }: DashboardInsightsProps) => {
   if (!stats) return <div>Loading insights...</div>;
 
-  const formatNumber = (num: number) => {
+    const formatNumber = (num: number | null | undefined): string => {
+    if (typeof num !== 'number') {
+      return '0';
+    }
     if (num >= 1000) {
       return (num / 1000).toFixed(1) + 'k';
     }
@@ -158,16 +161,16 @@ const DashboardInsights = ({ stats }: DashboardInsightsProps) => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex justify-between items-center">
-            <span className="text-sm">Inactive {'>'} 1 Month</span>
-            <Badge variant="secondary">{formatNumber(stats.inactiveLastMonth || 0)}</Badge>
+                        <span className="text-sm">Inactive {'>'} 1 Month</span>
+            <Badge variant="secondary">{formatNumber(stats.inactiveUsers || 0)}</Badge>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm">Inactive {'>'} 3 Months</span>
-            <Badge variant="secondary">{formatNumber(stats.inactiveLastQuarter || 0)}</Badge>
+                        <span className="text-sm">Inactive {'>'} 3 Months</span>
+            <Badge variant="secondary">{formatNumber(stats.inactiveQuarter || 0)}</Badge>
           </div>
           <div className="flex justify-between items-center">
-            <span className="text-sm">Inactive {'>'} 1 Year</span>
-            <Badge variant="secondary">{formatNumber(stats.inactiveLastYear || 0)}</Badge>
+                        <span className="text-sm">Inactive {'>'} 1 Year</span>
+            <Badge variant="secondary">{formatNumber(stats.inactiveYear || 0)}</Badge>
           </div>
         </CardContent>
       </Card>

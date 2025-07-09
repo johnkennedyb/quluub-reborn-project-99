@@ -8,17 +8,20 @@ const http = require('http');
 const path = require('path');
 const fs = require('fs');
 const { Server } = require('socket.io');
+const { errorHandler } = require('./middlewares/errorHandler');
+const { startScheduler } = require('./utils/emailScheduler');
 
 dotenv.config();
 
 connectDB();
+startScheduler();
 
 const app = express();
 
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
     ? ['https://quluub-reborn-project-33.vercel.app', 'https://quluub-reborn-project-33.onrender.com', 'http://localhost:8080', 'https://preview--quluub-reborn-project-99.lovable.app', 'https://www.your-domain.com']
-    : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:8080'],
+    : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:8080', 'http://localhost:8083'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
@@ -46,16 +49,27 @@ if (!fs.existsSync(recordingsDir)) {
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-app.use('/api/auth', require('./routes/authRoutes'));
-app.use('/api/email', require('./routes/emailRoutes'));
-app.use('/api/users', require('./routes/userRoutes'));
-app.use('/api/relationships', require('./routes/relationshipRoutes'));
-app.use('/api/chats', require('./routes/chatRoutes'));
-app.use('/api/referrals', require('./routes/referralRoutes'));
-app.use('/api/payments', require('./routes/paymentRoutes'));
-app.use('/api/admin', require('./routes/adminRoutes'));
-app.use('/api/video-call', require('./routes/videoCallRoutes'));
-app.use('/api/notifications', require('./routes/notificationRoutes'));
+const authRoutes = require('./routes/authRoutes');
+const userRoutes = require('./routes/userRoutes');
+const relationshipRoutes = require('./routes/relationshipRoutes');
+const chatRoutes = require('./routes/chatRoutes');
+const referralRoutes = require('./routes/referralRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const videoCallRoutes = require('./routes/videoCallRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const emailRoutes = require('./routes/emailRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
+
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/relationships', relationshipRoutes);
+app.use('/api/chats', chatRoutes);
+app.use('/api/referrals', referralRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/video-call', videoCallRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/email', emailRoutes);
+app.use('/api/payments', paymentRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ 
@@ -66,6 +80,8 @@ app.get('/api/health', (req, res) => {
     environment: process.env.NODE_ENV || 'development'
   });
 });
+
+app.use(errorHandler);
 
 const server = http.createServer(app);
 
@@ -125,7 +141,7 @@ io.on('connection', (socket) => {
   // Debug listener to help with troubleshooting
   socket.on('debug-ping', (data) => {
     console.log(`Debug ping from user ${data.userId}:`, data);
-    const roomSize = io.adapter.rooms.get(data.userId)?.size || 0;
+    const roomSize = io.adapter.rooms ? (io.adapter.rooms.get(data.userId)?.size || 0) : 0;
     socket.emit('debug-pong', { 
       message: 'Server received ping', 
       socketId: socket.id,

@@ -103,22 +103,31 @@ const Dashboard = () => {
   }, [relationshipData]);
 
   // Handle resend validation email
- const handleResendEmail = async () => {
-  try {
-    const { message, email } = await emailService.resendValidation();
-    toast({
-      title: "Email Sent",
-      description: message || `Validation link sent to ${email}`,
-    });
-  } catch (err: any) {
-    console.error("Resend validation failed:", err);
-    toast({
-      title: "Failed to Send",
-      description: err?.response?.data?.message || "Please try again later.",
-      variant: "destructive",
-    });
-  }
-};
+   const handleResendEmail = async () => {
+    if (!user?.email) {
+      toast({
+        title: "Error",
+        description: "Could not find your email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await emailService.resendValidationEmail(user.email);
+      toast({
+        title: "Verification Email Sent",
+        description: `A new verification email has been sent to ${user.email}.`,
+      });
+    } catch (err: any) {
+      console.error("Resend validation failed:", err);
+      toast({
+        title: "Failed to Send",
+        description: err?.response?.data?.message || "There was an error sending the email. Please try again later.",
+        variant: "destructive",
+      });
+    }
+  };
 
 
   const handleMessageMatch = (matchId: string) => {
