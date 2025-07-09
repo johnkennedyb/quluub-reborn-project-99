@@ -1,17 +1,17 @@
 import axios from 'axios';
 import { LoginCredentials, SignupData, User } from '@/types/user';
 
-// Full-stack deployment: use relative URLs in production
+// Hardcoded API URL configuration
 const getAPIBaseURL = () => {
-  // Check if we have an environment variable set (for external backend)
-  const envURL = (import.meta as any).env?.VITE_API_URL;
-  if (envURL) {
-    return envURL;
-  }
-  
-  // In production (full-stack deployment), use relative path
   if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
-    return '/api';
+    // Option 1: Use existing backend (current working setup)
+    return 'https://quluub-reborn-project-33-8lca.onrender.com/api';
+    
+    // Option 2: Use new full-stack deployment (uncomment this line and comment above)
+    // return 'https://quluub-reborn-project-99.vercel.app/api';
+    
+    // Option 3: Use relative URLs for same-domain deployment (uncomment this line and comment above)
+    // return '/api';
   }
   
   // In development, use localhost

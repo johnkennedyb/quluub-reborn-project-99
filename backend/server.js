@@ -18,22 +18,24 @@ startScheduler();
 
 const app = express();
 
+// Hardcoded CORS origins for reliable deployment
 const corsOptions = {
-  origin: process.env.NODE_ENV === 'production' 
-    ? [
-        'https://quluub-reborn-project-99.vercel.app', 
-        'https://quluub-reborn-project-33.vercel.app', 
-        'https://quluub-reborn-project-33-8lca.onrender.com', 
-        'http://localhost:8080', 
-        'https://preview--quluub-reborn-project-99.lovable.app',
-        // Add support for CLIENT_URL environment variable
-        ...(process.env.CLIENT_URL ? process.env.CLIENT_URL.split(',').map(url => url.trim()) : [])
-      ]
-    : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:8080', 'http://localhost:8083'],
+  origin: [
+    // Production domains
+    'https://quluub-reborn-project-99.vercel.app',
+    'https://quluub-reborn-project-33.vercel.app', 
+    'https://quluub-reborn-project-33-8lca.onrender.com',
+    'https://preview--quluub-reborn-project-99.lovable.app',
+    // Development domains
+    'http://localhost:3000',
+    'http://localhost:5173', 
+    'http://localhost:8080', 
+    'http://localhost:8083'
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
+  optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
