@@ -1,17 +1,17 @@
 import axios from 'axios';
 import { LoginCredentials, SignupData, User } from '@/types/user';
 
-// Environment variable or fallback to your existing backend
+// Full-stack deployment: use relative URLs in production
 const getAPIBaseURL = () => {
-  // Check if we have an environment variable set
+  // Check if we have an environment variable set (for external backend)
   const envURL = (import.meta as any).env?.VITE_API_URL;
   if (envURL) {
     return envURL;
   }
   
-  // In production, use your existing backend
+  // In production (full-stack deployment), use relative path
   if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
-    return 'https://quluub-reborn-project-33-8lca.onrender.com/api';
+    return '/api';
   }
   
   // In development, use localhost

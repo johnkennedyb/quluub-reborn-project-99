@@ -9,7 +9,7 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "vercel-build": "npm run build"
+    "vercel-build": "npm run build && cd backend && npm install"
   },
   "dependencies": {
     "@daily-co/daily-js": "^0.80.0",

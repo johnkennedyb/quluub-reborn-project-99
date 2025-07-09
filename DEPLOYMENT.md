@@ -1,85 +1,95 @@
-# 🚀 Deployment Guide
+# 🚀 Full-Stack Deployment Guide
 
-## Quick Deploy to Vercel
+## 🌟 Full-Stack Vercel Deployment (Recommended)
 
-### Option 1: One-Click Deploy (Recommended)
+This will deploy both your React frontend and Node.js backend to the same domain, eliminating CORS issues completely.
+
+### Option 1: One-Click Deploy
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/johnkennedyb/quluub-reborn-project-99)
 
-### Option 2: Manual Deployment
+### Option 2: Manual Full-Stack Deployment
 
-1. **Fork/Clone the repository**
-   ```bash
-   git clone https://github.com/johnkennedyb/quluub-reborn-project-99.git
-   cd quluub-reborn-project-99
-   ```
+1. **Go to Vercel Dashboard**
+   - Visit [vercel.com/dashboard](https://vercel.com/dashboard)
+   - Click "Add New Project"
 
-2. **Install Vercel CLI**
-   ```bash
-   npm i -g vercel
-   ```
+2. **Import Your Repository**
+   - Click "Import Git Repository"
+   - Select `johnkennedyb/quluub-reborn-project-99`
+   - Vercel will auto-detect it's a full-stack app
 
-3. **Deploy to Vercel**
-   ```bash
-   vercel --prod
-   ```
+3. **Configure Deployment**
+   - Framework Preset: **Vite** (auto-detected)
+   - Root Directory: **/** (leave default)
+   - Build Command: **npm run vercel-build** (auto-detected)
+   - Output Directory: **dist** (auto-detected)
 
 4. **Set Environment Variables**
-   In your Vercel dashboard, go to Settings > Environment Variables and add:
+   Click "Environment Variables" and add:
    
-   **Required:**
-   - `MONGODB_URI` - Your MongoDB connection string
-   - `JWT_SECRET` - A secure random string for JWT tokens
+   **Required for Backend:**
+   - `MONGODB_URI` = `mongodb+srv://johnkennedy3313:johnkennedy@cluster0.kqk80xr.mongodb.net/quluub?retryWrites=true&w=majority`
+   - `JWT_SECRET` = `quluub_secret_key_123456789`
+   - `NODE_ENV` = `production`
    
-   **Optional (for full functionality):**
-   - `SMTP_HOST` - Email server host
-   - `SMTP_PORT` - Email server port  
-   - `SMTP_USER` - Email username
-   - `SMTP_PASS` - Email password
-   - `STRIPE_SECRET_KEY` - Stripe payment key
-   - `PAYSTACK_SECRET_KEY` - Paystack payment key
-   - `GOOGLE_CLIENT_ID` - Google OAuth client ID
-   - `GOOGLE_CLIENT_SECRET` - Google OAuth client secret
+   **Payment Integration:**
+   - `STRIPE_SECRET_API_KEY` = `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`
+   - `PAYSTACK_SECRET_API_KEY` = `sk_live_92f26ac052547db6826c7f7a471c5ea72e4004b6`
+   
+   **Email Configuration:**
+   - `MAIL_USER` = `admin@quluub.com`
+   - `MAIL_PASSWORD` = `Q!mok@JX1?1GProd`
+   
+   **Optional:**
+   - `ADMIN_SIGNUP_KEY` = `admin123`
 
-## 📋 Pre-Deployment Checklist
+5. **Deploy**
+   - Click "Deploy" button
+   - Wait 3-5 minutes for deployment to complete
+   - Your full-stack app will be live!
 
-### Database Setup
-1. **MongoDB Atlas** (Recommended):
-   - Create account at [MongoDB Atlas](https://cloud.mongodb.com)
-   - Create a new cluster
-   - Get connection string
-   - Add to `MONGODB_URI` environment variable
+## 🎯 **What You Get with Full-Stack Deployment**
 
-### Domain Configuration
-1. Update CORS origins in `backend/server.js` if using custom domain
-2. Update `VITE_API_URL` in environment variables
+✅ **Same Domain**: Frontend and backend on `https://your-app.vercel.app`  
+✅ **No CORS Issues**: Frontend calls `/api` endpoints directly  
+✅ **Serverless Backend**: Auto-scaling Node.js functions  
+✅ **File Uploads**: Handled by backend functions  
+✅ **Real-time Features**: Socket.IO support  
+✅ **Database**: MongoDB Atlas connection  
+✅ **Payments**: Stripe & Paystack integration  
+✅ **Email**: Automated sending capabilities  
 
-## 🔧 Configuration Files
+## 🌐 **Your Live URLs**
 
-- `vercel.json` - Vercel deployment configuration
-- `.env.example` - Environment variables template
-- `package.json` - Contains `vercel-build` script
+After deployment:
+- **Main App**: `https://quluub-reborn-project-99.vercel.app`
+- **API Endpoints**: `https://quluub-reborn-project-99.vercel.app/api/*`
+- **Admin Panel**: `https://quluub-reborn-project-99.vercel.app/admin`
+- **File Uploads**: `https://quluub-reborn-project-99.vercel.app/uploads/*`
 
-## 🌐 Live Demo
-
-Once deployed, your application will be available at:
-- **Vercel URL**: `https://quluub-reborn-project-99.vercel.app`
-
-## 📱 Features Available
+## 📱 **Features Ready to Test**
 
 ✅ **User Features:**
 - Registration & Login
-- Profile Management
+- Profile Management  
 - User Discovery & Matching
 - Real-time Messaging
 - Video Calling
-- Payment Integration
+- Payment Integration (Stripe & Paystack)
 
 ✅ **Admin Features:**
 - User Management
 - Analytics Dashboard
-- Email Management
+- Email Management with attachments
 - Push Notifications
 - Content Moderation
+- VIP Matching
+
+## 🔧 **Configuration Files**
+
+- `vercel.json` - Full-stack deployment configuration
+- `backend/server.js` - Serverless-ready Express app
+- `package.json` - Contains `vercel-build` script
 
 ## 🆘 Troubleshooting
 
