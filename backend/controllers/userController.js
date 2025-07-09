@@ -55,10 +55,10 @@ exports.updateUserProfile = async (req, res) => {
     
     // Update fields
     const updatableFields = [
-      'fname', 'lname', 'parentEmail', 'nationality', 'country', 'build', 
-      'appearance', 'maritalStatus', 'patternOfSalaah', 
+      'fname', 'lname', 'parentEmail', 'nationality', 'country', 'region', 'build', 
+      'appearance', 'maritalStatus', 'noOfChildren', 'patternOfSalaah', 
       'genotype', 'summary', 'workEducation', 'hidden',
-      'profile_pic', 'kunya', 'dob', 'ethnicity', 'waliDetails', 'hijab', 'beard'
+      'profile_pic', 'kunya', 'dob', 'startedPracticing', 'ethnicity', 'waliDetails', 'hijab', 'beard'
     ];
     
     updatableFields.forEach(field => {
@@ -82,9 +82,11 @@ exports.updateUserProfile = async (req, res) => {
       gender: updatedUser.gender,
       nationality: updatedUser.nationality,
       country: updatedUser.country,
+      region: updatedUser.region,
       build: updatedUser.build,
       appearance: updatedUser.appearance,
       maritalStatus: updatedUser.maritalStatus,
+      noOfChildren: updatedUser.noOfChildren,
       patternOfSalaah: updatedUser.patternOfSalaah,
       genotype: updatedUser.genotype,
       summary: updatedUser.summary,
@@ -92,6 +94,7 @@ exports.updateUserProfile = async (req, res) => {
       hidden: updatedUser.hidden,
       kunya: updatedUser.kunya,
       dob: updatedUser.dob,
+      startedPracticing: updatedUser.startedPracticing,
       ethnicity: updatedUser.ethnicity,  
       profile_pic: updatedUser.profile_pic,
       waliDetails: updatedUser.waliDetails,
@@ -118,7 +121,8 @@ exports.getBrowseUsers = async (req, res) => {
     
     // Default filters - only exclude current user
     const filters = {
-      _id: { $ne: req.user._id }, // Exclude current user
+      _id: { $ne: req.user._id },
+      status: 'active' // Only show active users
     };
     
     // Always filter by opposite gender
@@ -126,42 +130,53 @@ exports.getBrowseUsers = async (req, res) => {
     
     // Additional filters from query
     if (req.query.country) {
-      filters.country = req.query.country;
+      filters.country = new RegExp(req.query.country, 'i');
     }
     
     if (req.query.nationality) {
-      filters.nationality = req.query.nationality;
+      filters.nationality = new RegExp(req.query.nationality, 'i');
     }
 
-    if (req.query.hijab === 'Yes') {
-      filters.hijab = 'Yes';
+    if (req.query.hijab) {
+      filters.hijab = req.query.hijab;
     }
 
-    if (req.query.beard === 'Yes') {
-      filters.beard = 'Yes';
+    if (req.query.beard) {
+      filters.beard = req.query.beard;
     }
     
     console.log("Applying filters:", filters);
     
     // Allow pagination for large datasets
-    const limit = req.query.limit ? parseInt(req.query.limit) : 30;
+    const limit = req.query.limit ? parseInt(req.query.limit) : 100;
     const page = req.query.page ? parseInt(req.query.page) : 1;
     const skip = (page - 1) * limit;
 
     const count = await User.countDocuments(filters);
     
     const users = await User.find(filters)
-      .select('-password -resetPasswordToken -resetPasswordTokenExpiration -validationToken')
+      .select('-password -resetPasswordToken -resetPasswordTokenExpiration -validationToken -deviceTokens')
       .sort({ lastSeen: -1 }) // Most recently active first
       .limit(limit)
       .skip(skip);
     
     console.log(`Found ${users.length} users matching the criteria on page ${page}`);
     
+    // Add calculated age for each user
+    const usersWithAge = users.map(user => {
+      const userObj = user.toObject();
+      if (userObj.dob) {
+        const age = Math.floor((Date.now() - new Date(userObj.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+        userObj.age = age;
+      }
+      return userObj;
+    });
+    
     res.json({
-      users,
+      users: usersWithAge,
       page,
-      pages: Math.ceil(count / limit)
+      pages: Math.ceil(count / limit),
+      total: count
     });
   } catch (error) {
     console.error("Error in getBrowseUsers:", error);

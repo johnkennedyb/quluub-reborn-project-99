@@ -8,13 +8,6 @@ import { userService, relationshipService } from "@/lib/api-client";
 import { useToast } from "@/components/ui/use-toast";
 import { User } from "@/types/user";
 import { useNavigate } from "react-router-dom";
-import { 
-  Pagination, 
-  PaginationContent, 
-  PaginationItem, 
-  PaginationNext, 
-  PaginationPrevious 
-} from "@/components/ui/pagination";
 import { Card, CardContent } from "@/components/ui/card";
 import { UserProfileCard } from "@/components/UserProfileCard";
 import { Loader2 } from "lucide-react";
@@ -32,7 +25,7 @@ const Browse = () => {
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [usersPerPage] = useState(30); // Show 30 users per page
+  const [usersPerPage] = useState(30);
   const [loading, setLoading] = useState(true);
   const [processingAction, setProcessingAction] = useState(false);
   const [pendingConnections, setPendingConnections] = useState<string[]>([]);
@@ -396,40 +389,45 @@ const Browse = () => {
             </div>
             
             {/* Pagination at bottom */}
-            <div className="flex justify-center mt-8">
-              <Pagination>
-                <PaginationContent>
-                  <PaginationItem>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={goToPrevPage} 
-                      disabled={currentPage === 1}
-                      className="cursor-pointer"
-                    >
-                      <PaginationPrevious />
-                    </Button>
-                  </PaginationItem>
+            <div className="flex justify-center items-center space-x-4 mt-8">
+              <Button 
+                variant="outline" 
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} 
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              
+              <div className="flex items-center space-x-2">
+                {/* Show page numbers */}
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                  if (pageNum > totalPages) return null;
                   
-                  <PaginationItem className="flex items-center px-4">
-                    <span className="text-sm font-medium">
-                      Page {currentPage} of {totalPages}
-                    </span>
-                  </PaginationItem>
-
-                  <PaginationItem>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={goToNextPage} 
-                      disabled={currentPage === totalPages}
-                      className="cursor-pointer"
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={currentPage === pageNum ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(pageNum)}
                     >
-                      <PaginationNext />
+                      {pageNum}
                     </Button>
-                  </PaginationItem>
-                </PaginationContent>
-              </Pagination>
+                  );
+                })}
+              </div>
+
+              <Button 
+                variant="outline" 
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} 
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </Button>
+            </div>
+
+            <div className="text-center mt-4 text-sm text-muted-foreground">
+              Showing {indexOfFirstUser + 1}-{Math.min(indexOfLastUser, filteredUsers.length)} of {filteredUsers.length} profiles
             </div>
           </>
         ) : (
