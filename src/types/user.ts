@@ -1,3 +1,4 @@
+
 export interface User {
   _id: string;
   id?: string;
@@ -9,6 +10,7 @@ export interface User {
   plan?: string;
   gender: 'male' | 'female' | 'other';
   dob?: Date;
+  dateOfBirth?: Date;
   startedPracticing?: Date;
   hidden?: boolean;
   emailVerified?: boolean;
@@ -27,7 +29,9 @@ export interface User {
   kunya?: string;
   nationality?: string;
   country?: string;
+  countryOfResidence?: string;
   region?: string;
+  cityOfResidence?: string;
   build?: string;
   appearance?: string;
   hijab?: string;
@@ -45,8 +49,19 @@ export interface User {
   createdAt?: Date;
   updatedAt?: Date;
   traits?: string;
+  interests?: string;
   height?: string;
   weight?: string;
+  hairColor?: string;
+  eyeColor?: string;
+  hijabType?: string;
+  beardLength?: string;
+  languagesSpoken?: string;
+  maritalExpectations?: string;
+  aboutFamily?: string;
+  partnerExpectations?: string;
+  contactNumber?: string;
+  waliContactNumber?: string;
   revert?: string;
   sect?: string;
   scholarsSpeakers?: string;

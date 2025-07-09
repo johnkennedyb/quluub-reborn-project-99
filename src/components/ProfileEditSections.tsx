@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { User } from '@/types/user';
 
@@ -11,7 +12,7 @@ const ProfileEditSections = ({ user, onUpdate, onClose }: ProfileEditSectionsPro
   const [formState, setFormState] = useState({
     interests: user.interests || '',
     traits: user.traits || '',
-    ethnicity: user.ethnicity || '',
+    ethnicity: Array.isArray(user.ethnicity) ? user.ethnicity.join(', ') : user.ethnicity || '',
     waliDetails: user.waliDetails || '',
     kunya: user.kunya || '',
     dob: user.dateOfBirth ? new Date(user.dateOfBirth) : new Date(),
@@ -56,9 +57,9 @@ const ProfileEditSections = ({ user, onUpdate, onClose }: ProfileEditSectionsPro
     e.preventDefault();
     
     const formData = {
-      interests: Array.isArray(formState.interests) ? formState.interests.join(', ') : formState.interests,
-      traits: Array.isArray(formState.traits) ? formState.traits.join(', ') : formState.traits,
-      ethnicity: Array.isArray(formState.ethnicity) ? formState.ethnicity : [formState.ethnicity].filter(Boolean),
+      interests: formState.interests,
+      traits: formState.traits,
+      ethnicity: formState.ethnicity.split(',').map(item => item.trim()).filter(Boolean),
       waliDetails: formState.waliDetails,
       kunya: formState.kunya,
       dob: formState.dob,
@@ -72,8 +73,8 @@ const ProfileEditSections = ({ user, onUpdate, onClose }: ProfileEditSectionsPro
       eyeColor: formState.eyeColor,
       hijabType: formState.hijabType,
       beardLength: formState.beardLength,
-      region: formState.region,
-      city: formState.city,
+      countryOfResidence: formState.region,
+      cityOfResidence: formState.city,
       nationality: formState.nationality,
       languagesSpoken: formState.languagesSpoken,
       maritalExpectations: formState.maritalExpectations,

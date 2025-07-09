@@ -1,7 +1,26 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+
+interface UserProfileCardProps {
+  user: {
+    _id: string;
+    fullName: string;
+    username: string;
+    plan: string;
+    status: string;
+    age?: number;
+    country: string;
+    joinedAgo?: number;
+    lastSeenAgo?: number;
+  };
+  onEdit: (user: any) => void;
+  onDelete: (userId: string) => void;
+  onViewProfile: (userId: string) => void;
+}
 
 const UserProfileCard = ({ user, onEdit, onDelete, onViewProfile }: UserProfileCardProps) => {
   const getPlanBadgeVariant = (plan: string) => {

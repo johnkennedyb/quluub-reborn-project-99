@@ -99,8 +99,8 @@ const Profile = () => {
         <TopNavbar />
         <ProfileEditSections
           user={profileUser}
-          onSave={handleProfileSave}
-          onCancel={() => setIsEditMode(false)}
+          onUpdate={handleProfileSave}
+          onClose={() => setIsEditMode(false)}
         />
         <Navbar />
       </div>

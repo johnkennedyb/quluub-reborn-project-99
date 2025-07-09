@@ -1,4 +1,3 @@
-
 import axios from 'axios';
 import { LoginCredentials, SignupData, User } from '@/types/user';
 
@@ -337,13 +336,13 @@ export const relationshipService = {
     return response.data;
   },
 
-  likeUser: async (userId: string) => {
-    const response = await apiClient.post(`/relationships/like/${userId}`);
+  likeUser: async (currentUserId: string, userId: string) => {
+    const response = await apiClient.post(`/relationships/like/${userId}`, { currentUserId });
     return response.data;
   },
 
-  passUser: async (userId: string) => {
-    const response = await apiClient.post(`/relationships/pass/${userId}`);
+  passUser: async (currentUserId: string, userId: string) => {
+    const response = await apiClient.post(`/relationships/pass/${userId}`, { currentUserId });
     return response.data;
   },
 };
@@ -373,6 +372,21 @@ export const chatService = {
     const response = await apiClient.post(`/chat/rooms/${roomId}/read`);
     return response.data;
   },
+
+  getChat: async (userId: string) => {
+    const response = await apiClient.get(`/chat/${userId}`);
+    return response.data;
+  },
+
+  addChat: async (userId: string, message: string) => {
+    const response = await apiClient.post('/chat', { userId, message });
+    return response.data;
+  },
+
+  updateChat: async (ids: string[]) => {
+    const response = await apiClient.put('/chat', { ids });
+    return response.data;
+  },
 };
 
 export const paymentService = {
@@ -395,6 +409,11 @@ export const paymentService = {
     const response = await apiClient.get('/payments/history');
     return response.data;
   },
+
+  createPaystackPayment: async (data: any) => {
+    const response = await apiClient.post('/payments/paystack', data);
+    return response.data;
+  },
 };
 
 export const emailService = {
@@ -405,6 +424,11 @@ export const emailService = {
 
   getEmailTemplates: async () => {
     const response = await apiClient.get('/email/templates');
+    return response.data;
+  },
+
+  resendValidationEmail: async (email: string) => {
+    const response = await apiClient.post('/email/resend-validation', { email });
     return response.data;
   },
 };
