@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { LoginCredentials, SignupData, User } from '@/types/user';
 
-// Environment variable or fallback to relative path in production
+// Environment variable or fallback to your existing backend
 const getAPIBaseURL = () => {
   // Check if we have an environment variable set
   const envURL = (import.meta as any).env?.VITE_API_URL;
@@ -9,9 +9,9 @@ const getAPIBaseURL = () => {
     return envURL;
   }
   
-  // In production (vercel/netlify/etc), use relative path
+  // In production, use your existing backend
   if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
-    return '/api';
+    return 'https://quluub-reborn-project-33-8lca.onrender.com/api';
   }
   
   // In development, use localhost
