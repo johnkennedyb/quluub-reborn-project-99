@@ -1,4 +1,16 @@
-const stripe = require('stripe')(process.env.STRIPE_SECRET_API_KEY);
+// Initialize Stripe only if API key is available
+let stripe;
+try {
+  const stripeKey = process.env.STRIPE_SECRET_KEY || process.env.STRIPE_SECRET_API_KEY;
+  if (stripeKey) {
+    stripe = require('stripe')(stripeKey);
+  } else {
+    console.log('⚠️ Stripe not configured - payment features will be disabled');
+  }
+} catch (error) {
+  console.log('⚠️ Stripe initialization failed:', error.message);
+}
+
 const User = require('../models/User');
 const { sendPlanPurchasedEmail, sendPlanExpiringEmail, sendPlanExpiredEmail } = require('../utils/emailService');
 
@@ -6,6 +18,12 @@ const { sendPlanPurchasedEmail, sendPlanExpiringEmail, sendPlanExpiredEmail } = 
 // @route   POST /api/payments/create-checkout-session
 // @access  Private
 const createCheckoutSession = async (req, res) => {
+  if (!stripe) {
+    return res.status(503).json({ 
+      message: 'Payment service not configured. Please contact administrator.' 
+    });
+  }
+
   const { priceId } = req.body;
   const userId = req.user.id;
 
@@ -42,6 +60,12 @@ const createCheckoutSession = async (req, res) => {
 // @route   POST /api/payments/webhook
 // @access  Public
 const handleStripeWebhook = async (req, res) => {
+  if (!stripe) {
+    return res.status(503).json({ 
+      message: 'Payment service not configured' 
+    });
+  }
+
   const sig = req.headers['stripe-signature'];
   let event;
 

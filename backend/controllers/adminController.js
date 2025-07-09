@@ -638,6 +638,84 @@ const processRefund = async (req, res) => {
   }
 };
 
+// @desc    Update user account status
+// @route   PATCH /api/admin/users/:id/status  
+// @access  Private/Admin
+const updateUserAccountStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    const userId = req.params.id;
+
+    if (!['active', 'inactive', 'suspended', 'banned'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { status },
+      { new: true, select: '-password' }
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ message: 'User status updated successfully', user });
+  } catch (error) {
+    console.error('Error updating user status:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Get user details by ID
+// @route   GET /api/admin/users/:id
+// @access  Private/Admin
+const getUserDetails = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id)
+      .select('-password -validationToken -resetPasswordToken');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Calculate additional user data
+    const userObj = user.toObject();
+    
+    // Calculate age
+    if (user.dob) {
+      const age = Math.floor((Date.now() - user.dob.getTime()) / (1000 * 60 * 60 * 24 * 365));
+      userObj.age = age;
+    }
+
+    // Calculate days since last seen
+    if (user.lastSeen) {
+      const daysSinceLastSeen = Math.floor((Date.now() - user.lastSeen.getTime()) / (1000 * 60 * 60 * 24));
+      userObj.lastSeenAgo = daysSinceLastSeen;
+    }
+
+    // Get relationship stats
+    const matchCount = await Relationship.countDocuments({
+      $or: [{ user1: user._id }, { user2: user._id }],
+      status: 'matched'
+    });
+
+    const pendingRequestsCount = await Relationship.countDocuments({
+      user2: user._id,
+      status: 'pending'
+    });
+
+    userObj.matchCount = matchCount;
+    userObj.pendingRequestsCount = pendingRequestsCount;
+    userObj.fullName = `${user.fname} ${user.lname}`;
+
+    res.json(userObj);
+  } catch (error) {
+    console.error('Error fetching user details:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   getStats,
   getAllUsers,

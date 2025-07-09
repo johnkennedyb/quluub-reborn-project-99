@@ -44,7 +44,7 @@ let emailSettings = {
 };
 
 // Create transporter with current configuration
-let transporter = nodemailer.createTransporter(emailConfig);
+let transporter = nodemailer.createTransport(emailConfig);
 
 // Verify transporter configuration
 const verifyTransporter = () => {
@@ -133,7 +133,7 @@ const updateEmailConfig = async (newConfig) => {
     };
 
     // Create new transporter with updated config
-    transporter = nodemailer.createTransporter(emailConfig);
+    transporter = nodemailer.createTransport(emailConfig);
     
     // Verify new configuration
     return new Promise((resolve) => {

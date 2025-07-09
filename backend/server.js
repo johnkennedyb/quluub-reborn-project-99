@@ -73,36 +73,86 @@ if (!fs.existsSync(recordingsDir)) {
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Import routes with error handling
-const routes = [
-  { path: '/api/auth', file: './routes/authRoutes' },
-  { path: '/api/users', file: './routes/userRoutes' },
-  { path: '/api/relationships', file: './routes/relationshipRoutes' },
-  { path: '/api/chats', file: './routes/chatRoutes' },
-  { path: '/api/referrals', file: './routes/referralRoutes' },
-  { path: '/api/admin', file: './routes/adminRoutes' },
-  { path: '/api/video-call', file: './routes/videoCallRoutes' },
-  { path: '/api/notifications', file: './routes/notificationRoutes' },
-  { path: '/api/email', file: './routes/emailRoutes' },
-  { path: '/api/payments', file: './routes/paymentRoutes' }
-];
+// Import and load routes
+try {
+  const authRoutes = require('./routes/authRoutes');
+  app.use('/api/auth', authRoutes);
+  console.log('✅ Loaded route: /api/auth');
+} catch (err) {
+  console.log('⚠️ Failed to load auth routes:', err.message);
+}
 
-routes.forEach(({ path, file }) => {
-  try {
-    const route = require(file);
-    app.use(path, route);
-    console.log(`✅ Loaded route: ${path}`);
-  } catch (err) {
-    console.log(`⚠️ Failed to load route ${path}:`, err.message);
-    // Create a fallback route
-    app.use(path, (req, res) => {
-      res.status(501).json({ 
-        message: `${path} endpoint not implemented yet`,
-        status: 'coming_soon'
-      });
-    });
-  }
-});
+try {
+  const userRoutes = require('./routes/userRoutes');
+  app.use('/api/users', userRoutes);
+  console.log('✅ Loaded route: /api/users');
+} catch (err) {
+  console.log('⚠️ Failed to load user routes:', err.message);
+}
+
+try {
+  const relationshipRoutes = require('./routes/relationshipRoutes');
+  app.use('/api/relationships', relationshipRoutes);
+  console.log('✅ Loaded route: /api/relationships');
+} catch (err) {
+  console.log('⚠️ Failed to load relationship routes:', err.message);
+}
+
+try {
+  const chatRoutes = require('./routes/chatRoutes');
+  app.use('/api/chats', chatRoutes);
+  console.log('✅ Loaded route: /api/chats');
+} catch (err) {
+  console.log('⚠️ Failed to load chat routes:', err.message);
+}
+
+try {
+  const referralRoutes = require('./routes/referralRoutes');
+  app.use('/api/referrals', referralRoutes);
+  console.log('✅ Loaded route: /api/referrals');
+} catch (err) {
+  console.log('⚠️ Failed to load referral routes:', err.message);
+}
+
+try {
+  const adminRoutes = require('./routes/adminRoutes');
+  app.use('/api/admin', adminRoutes);
+  console.log('✅ Loaded route: /api/admin');
+} catch (err) {
+  console.log('⚠️ Failed to load admin routes:', err.message);
+}
+
+try {
+  const videoCallRoutes = require('./routes/videoCallRoutes');
+  app.use('/api/video-call', videoCallRoutes);
+  console.log('✅ Loaded route: /api/video-call');
+} catch (err) {
+  console.log('⚠️ Failed to load video call routes:', err.message);
+}
+
+try {
+  const notificationRoutes = require('./routes/notificationRoutes');
+  app.use('/api/notifications', notificationRoutes);
+  console.log('✅ Loaded route: /api/notifications');
+} catch (err) {
+  console.log('⚠️ Failed to load notification routes:', err.message);
+}
+
+try {
+  const emailRoutes = require('./routes/emailRoutes');
+  app.use('/api/email', emailRoutes);
+  console.log('✅ Loaded route: /api/email');
+} catch (err) {
+  console.log('⚠️ Failed to load email routes:', err.message);
+}
+
+try {
+  const paymentRoutes = require('./routes/paymentRoutes');
+  app.use('/api/payments', paymentRoutes);
+  console.log('✅ Loaded route: /api/payments');
+} catch (err) {
+  console.log('⚠️ Failed to load payment routes:', err.message);
+}
 
 app.get('/api/health', (req, res) => {
   res.json({ 
@@ -112,6 +162,16 @@ app.get('/api/health', (req, res) => {
     cors: 'enabled',
     environment: process.env.NODE_ENV || 'development'
   });
+});
+
+// Test route to verify routing is working
+app.get('/api/test', (req, res) => {
+  res.json({ message: 'Routes are working!', timestamp: new Date().toISOString() });
+});
+
+// Test auth route
+app.post('/api/test/auth', (req, res) => {
+  res.json({ message: 'Auth route test successful', body: req.body });
 });
 
 app.use(errorHandler);
