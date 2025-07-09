@@ -431,7 +431,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
           </div>
         );
 
-      case 5:
+      case 5: {
         const selectedCountry = countries.find(c => c.name === formData.countryOfResidence);
         return (
           <div className="space-y-6">
@@ -475,6 +475,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
             </div>
           </div>
         );
+      }
 
       case 6:
         return (
