@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { adminService } from '@/lib/api-client';
 import { MultiSelect } from 'react-multi-select-component';
 import ScheduledEmailList from './ScheduledEmailList';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Paperclip, X, Search } from 'lucide-react';
 
 const EmailManagement = () => {
   const { toast } = useToast();
@@ -23,6 +23,9 @@ const EmailManagement = () => {
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [scheduleDate, setScheduleDate] = useState('');
+  const [attachments, setAttachments] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [delayMinutes, setDelayMinutes] = useState(0);
 
   // State for Settings tab
   const [emailSettings, setEmailSettings] = useState({
@@ -54,6 +57,20 @@ const EmailManagement = () => {
     fetchInitialData();
   }, [fetchInitialData]);
 
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    const newAttachments = files.map((file: File) => ({
+      file,
+      name: file.name,
+      size: file.size
+    }));
+    setAttachments(prev => [...prev, ...newAttachments]);
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSendOrSchedule = async () => {
     if (!subject || !message) {
       return toast({ title: 'Error', description: 'Subject and message are required.', variant: 'destructive' });
@@ -67,22 +84,43 @@ const EmailManagement = () => {
 
     setLoading(true);
     try {
-      const payload = { subject, message, userIds, recipientType };
-      if (scheduleDate) {
-        await adminService.scheduleEmail({ ...payload, sendAt: scheduleDate });
-        toast({ title: 'Success', description: 'Email scheduled successfully.' });
-      } else {
-        await adminService.sendBulkEmail(payload);
-        toast({ title: 'Success', description: 'Email sent successfully.' });
+      const formData = new FormData();
+      formData.append('subject', subject);
+      formData.append('message', message);
+      formData.append('recipientType', recipientType);
+      formData.append('userIds', JSON.stringify(userIds));
+      
+      // Add delay if specified
+      if (delayMinutes > 0) {
+        const sendAt = new Date(Date.now() + delayMinutes * 60 * 1000);
+        formData.append('sendAt', sendAt.toISOString());
+      } else if (scheduleDate) {
+        formData.append('sendAt', scheduleDate);
       }
+
+      // Add attachments
+      attachments.forEach((attachment, index) => {
+        formData.append(`attachments`, attachment.file);
+      });
+
+      const endpoint = (scheduleDate || delayMinutes > 0) ? 'scheduleEmail' : 'sendBulkEmail';
+      await adminService[endpoint](formData);
+      
+      toast({ 
+        title: 'Success', 
+        description: `Email ${(scheduleDate || delayMinutes > 0) ? 'scheduled' : 'sent'} successfully.` 
+      });
+      
       // Reset form
       setSubject('');
       setMessage('');
       setSelectedUsers([]);
       setScheduleDate('');
+      setAttachments([]);
+      setDelayMinutes(0);
       setRefreshKey(k => k + 1);
     } catch (error) {
-      toast({ title: 'Error', description: `Failed to ${scheduleDate ? 'schedule' : 'send'} email.`, variant: 'destructive' });
+      toast({ title: 'Error', description: `Failed to ${(scheduleDate || delayMinutes > 0) ? 'schedule' : 'send'} email.`, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -141,14 +179,89 @@ const EmailManagement = () => {
                 </select>
               </div>
               {recipientType === 'specific' && (
-                <div>
+                <div className="space-y-2">
                   <Label>Select Users</Label>
-                  <MultiSelect options={users} value={selectedUsers} onChange={setSelectedUsers} labelledBy="Select Users" />
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search users by name or email..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <MultiSelect 
+                    options={users.filter(user => 
+                      user.label.toLowerCase().includes(searchTerm.toLowerCase())
+                    )} 
+                    value={selectedUsers} 
+                    onChange={setSelectedUsers} 
+                    labelledBy="Select Users"
+                    hasSelectAll={true}
+                    disableSearch={false}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    {selectedUsers.length} user(s) selected
+                  </p>
                 </div>
               )}
               <div><Label htmlFor="subject">Subject</Label><Input id="subject" value={subject} onChange={(e) => setSubject(e.target.value)} /></div>
               <div><Label htmlFor="message">Message</Label><Textarea id="message" value={message} onChange={(e) => setMessage(e.target.value)} rows={8} /></div>
-              <div><Label htmlFor="scheduleDate">Schedule Send Time (Optional)</Label><Input id="scheduleDate" type="datetime-local" value={scheduleDate} onChange={(e) => setScheduleDate(e.target.value)} /></div>
+              
+              {/* Attachments Section */}
+              <div className="space-y-2">
+                <Label>Attachments</Label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                  <input
+                    type="file"
+                    multiple
+                    accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    id="file-upload"
+                  />
+                  <label htmlFor="file-upload" className="cursor-pointer flex items-center justify-center gap-2 text-gray-600 hover:text-gray-800">
+                    <Paperclip className="h-4 w-4" />
+                    <span>Click to upload files or drag and drop</span>
+                  </label>
+                </div>
+                {attachments.length > 0 && (
+                  <div className="space-y-2">
+                    {attachments.map((attachment, index) => (
+                      <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                        <span className="text-sm">{attachment.name} ({(attachment.size / 1024).toFixed(1)} KB)</span>
+                        <Button variant="ghost" size="sm" onClick={() => removeAttachment(index)}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Scheduling Options */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="delayMinutes">Send Delay (minutes)</Label>
+                  <Input 
+                    id="delayMinutes" 
+                    type="number" 
+                    min="0" 
+                    value={delayMinutes} 
+                    onChange={(e) => setDelayMinutes(parseInt(e.target.value) || 0)}
+                    placeholder="0 = send immediately" 
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="scheduleDate">Or Schedule for Specific Time</Label>
+                  <Input 
+                    id="scheduleDate" 
+                    type="datetime-local" 
+                    value={scheduleDate} 
+                    onChange={(e) => setScheduleDate(e.target.value)} 
+                  />
+                </div>
+              </div>
               <Button onClick={handleSendOrSchedule} disabled={loading}>{loading ? 'Processing...' : (scheduleDate ? 'Schedule Email' : 'Send Email')}</Button>
             </div>
           </TabsContent>
@@ -181,13 +294,38 @@ const EmailManagement = () => {
                 </div>
               </div>
               <div>
-                <h3 className="text-lg font-semibold mb-4">Email Metrics</h3>
+                <h3 className="text-lg font-semibold mb-4">Email Metrics & Analytics</h3>
                 {emailMetrics ? (
-                  <div className="space-y-2">
-                    <div className="flex justify-between"><span>Sent Today:</span><strong>{emailMetrics.sentToday}</strong></div>
-                    <div className="flex justify-between"><span>Delivery Rate:</span><strong>{emailMetrics.deliveryRate?.toFixed(2)}%</strong></div>
-                    <div className="flex justify-between"><span>Open Rate:</span><strong>{emailMetrics.openRate?.toFixed(2)}%</strong></div>
-                    <div className="flex justify-between"><span>Bounced:</span><strong>{emailMetrics.bounced}</strong></div>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-blue-50 p-3 rounded">
+                        <h4 className="text-sm font-medium text-blue-700">Sent Today</h4>
+                        <p className="text-2xl font-bold text-blue-900">{emailMetrics.sentToday}</p>
+                      </div>
+                      <div className="bg-green-50 p-3 rounded">
+                        <h4 className="text-sm font-medium text-green-700">Delivery Rate</h4>
+                        <p className="text-2xl font-bold text-green-900">{emailMetrics.deliveryRate?.toFixed(2)}%</p>
+                      </div>
+                      <div className="bg-purple-50 p-3 rounded">
+                        <h4 className="text-sm font-medium text-purple-700">Open Rate</h4>
+                        <p className="text-2xl font-bold text-purple-900">{emailMetrics.openRate?.toFixed(2)}%</p>
+                      </div>
+                      <div className="bg-red-50 p-3 rounded">
+                        <h4 className="text-sm font-medium text-red-700">Bounce Rate</h4>
+                        <p className="text-2xl font-bold text-red-900">{emailMetrics.bounceRate?.toFixed(2)}%</p>
+                      </div>
+                    </div>
+                    <div className="border-t pt-3">
+                      <h4 className="font-medium mb-2">Additional Metrics</h4>
+                      <div className="space-y-1 text-sm">
+                        <div className="flex justify-between"><span>Total Sent (7 days):</span><strong>{emailMetrics.sentWeek || 0}</strong></div>
+                        <div className="flex justify-between"><span>Total Sent (30 days):</span><strong>{emailMetrics.sentMonth || 0}</strong></div>
+                        <div className="flex justify-between"><span>Bounced Emails:</span><strong>{emailMetrics.bounced || 0}</strong></div>
+                        <div className="flex justify-between"><span>Spam Complaints:</span><strong>{emailMetrics.spamComplaints || 0}</strong></div>
+                        <div className="flex justify-between"><span>Unsubscribes:</span><strong>{emailMetrics.unsubscribes || 0}</strong></div>
+                        <div className="flex justify-between"><span>Click Rate:</span><strong>{emailMetrics.clickRate?.toFixed(2) || 0}%</strong></div>
+                      </div>
+                    </div>
                   </div>
                 ) : <p>Metrics are not available.</p>}
               </div>

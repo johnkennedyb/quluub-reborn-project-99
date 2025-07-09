@@ -13,7 +13,6 @@ interface PricingData {
   symbol: string;
   freemium: PlanData;
   premium: PlanData;
-  pro: PlanData;
 }
 
 interface PricingToggleProps {
@@ -27,14 +26,12 @@ const PricingToggle = ({ onPlanSelect }: PricingToggleProps) => {
     GBP: {
       symbol: '£',
       freemium: { price: 0, originalPrice: null },
-      premium: { price: 2, originalPrice: 5 },
-      pro: { price: 10, originalPrice: 15 }
+      premium: { price: 2, originalPrice: 5 }
     },
     NGN: {
       symbol: '₦',
       freemium: { price: 0, originalPrice: null },
-      premium: { price: 1500, originalPrice: 3500 },
-      pro: { price: 7500, originalPrice: 11000 }
+      premium: { price: 1500, originalPrice: 3500 }
     }
   };
 
@@ -55,19 +52,10 @@ const PricingToggle = ({ onPlanSelect }: PricingToggleProps) => {
       'View unlimited profiles',
       'Ad-free experience',
       'Priority customer support'
-    ],
-    pro: [
-      'All Premium features',
-      'Advanced search filters',
-      'Profile boost (appear first)',
-      'See who liked your profile',
-      'Unlimited video calls',
-      'Dedicated relationship advisor',
-      'Priority matching algorithm'
     ]
   };
 
-  const handlePlanSelect = (plan: keyof Omit<PricingData, 'symbol'>) => {
+  const handlePlanSelect = (plan: 'freemium' | 'premium') => {
     const planData = pricingData[currency][plan];
     if (onPlanSelect) {
       onPlanSelect(plan, currency, planData.price);
@@ -99,7 +87,7 @@ const PricingToggle = ({ onPlanSelect }: PricingToggleProps) => {
       </div>
 
       {/* Pricing Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Freemium Plan */}
         <Card className="relative">
           <CardHeader className="text-center">
@@ -165,39 +153,7 @@ const PricingToggle = ({ onPlanSelect }: PricingToggleProps) => {
           </CardContent>
         </Card>
 
-        {/* Pro Plan */}
-        <Card className="relative">
-          <CardHeader className="text-center">
-            <CardTitle className="text-lg">Pro</CardTitle>
-            <div className="text-3xl font-bold">
-              {pricingData[currency].symbol}{pricingData[currency].pro.price}
-              {pricingData[currency].pro.originalPrice && (
-                <span className="text-lg text-muted-foreground ml-2">
-                  ({pricingData[currency].symbol}{pricingData[currency].pro.originalPrice})
-                </span>
-              )}
-              <span className="text-base font-normal text-muted-foreground">/month</span>
-            </div>
-            <p className="text-sm text-muted-foreground">Ultimate experience</p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <ul className="space-y-2">
-              {features.pro.map((feature, index) => (
-                <li key={index} className="flex items-start gap-2 text-sm">
-                  <Check className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span>{feature}</span>
-                </li>
-              ))}
-            </ul>
-            <Button 
-              variant="outline"
-              className="w-full"
-              onClick={() => handlePlanSelect('pro')}
-            >
-              Upgrade to Pro
-            </Button>
-          </CardContent>
-        </Card>
+
       </div>
 
       {/* Promo Notice */}

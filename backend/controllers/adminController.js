@@ -204,15 +204,17 @@ const getAllUsers = async (req, res) => {
       query.city = { $regex: city, $options: 'i' };
     }
 
-    // Fixed inactivity filtering
+    // Fixed inactivity filtering with proper date calculation
     if (inactiveFor && inactiveFor !== 'all') {
       const days = parseInt(inactiveFor, 10);
       if (!isNaN(days)) {
-        const date = new Date();
-        date.setDate(date.getDate() - days);
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - days);
+        
         query.$or = [
-          { lastSeen: { $lt: date } },
-          { lastSeen: { $exists: false } }
+          { lastSeen: { $lt: cutoffDate } },
+          { lastSeen: { $exists: false } },
+          { lastSeen: null }
         ];
       }
     }

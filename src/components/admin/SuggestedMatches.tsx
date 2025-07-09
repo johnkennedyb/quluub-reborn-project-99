@@ -54,7 +54,7 @@ const SuggestedMatches = () => {
             Manual Match Suggestions
           </CardTitle>
           <CardDescription>
-            Send curated match suggestions to VIP users to improve their experience.
+            Send curated match suggestions to Premium users to improve their experience.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
