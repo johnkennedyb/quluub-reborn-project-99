@@ -1,8 +1,25 @@
 import axios from 'axios';
 import { LoginCredentials, SignupData, User } from '@/types/user';
 
+// Environment variable or fallback to relative path in production
+const getAPIBaseURL = () => {
+  // Check if we have an environment variable set
+  const envURL = (import.meta as any).env?.VITE_API_URL;
+  if (envURL) {
+    return envURL;
+  }
+  
+  // In production (vercel/netlify/etc), use relative path
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
+    return '/api';
+  }
+  
+  // In development, use localhost
+  return 'http://localhost:5000/api';
+};
+
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: getAPIBaseURL(),
   headers: {
     'Content-Type': 'application/json',
   },
