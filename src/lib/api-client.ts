@@ -1,524 +1,339 @@
 import axios from 'axios';
-import type { LoginCredentials, SignupData, User } from '../types/user';
+import { LoginCredentials, SignupData, User } from '@/types/user';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-
-// Create axios instance with base configuration
 const apiClient = axios.create({
-  baseURL: API_URL,
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Add auth token to requests
 apiClient.interceptors.request.use(
   (config) => {
-    // Check if this is an admin request
-    if (config.url?.includes('/admin/')) {
-      const adminToken = localStorage.getItem('adminToken');
-      console.log('🔐 Admin API request:', {
-        url: config.url,
-        hasToken: !!adminToken,
-        tokenPrefix: adminToken ? adminToken.substring(0, 10) + '...' : 'none'
-      });
-      if (adminToken) {
-        config.headers.Authorization = `Bearer ${adminToken}`;
-      }
-    } else {
-      // Regular user token
-      const token = localStorage.getItem('token');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// Add response interceptor for better error handling
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    console.error('API Error:', {
-      url: error.config?.url,
-      status: error.response?.status,
-      message: error.response?.data?.message || error.message
-    });
-
     if (error.response?.status === 401) {
-      // Check if this was an admin request
-      if (error.config?.url?.includes('/admin/')) {
-        console.error('❌ Admin authentication failed, clearing admin tokens');
-        localStorage.removeItem('adminToken');
-        localStorage.removeItem('adminUser');
-        if (window.location.pathname.includes('/admin')) {
-          window.location.href = '/admin/login';
-        }
-      } else {
-        // Regular user token expired
-        console.error('❌ User authentication failed, clearing user token');
-        localStorage.removeItem('token');
-        if (!window.location.pathname.includes('/admin') && !window.location.pathname.includes('/auth')) {
-          window.location.href = '/auth';
-        }
-      }
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
     }
     return Promise.reject(error);
   }
 );
 
-// Auth service
 export const authService = {
   login: async (credentials: LoginCredentials) => {
-    try {
-      const response = await apiClient.post('/auth/login', credentials);
-      if (response.data.token) {
-        localStorage.setItem('token', response.data.token);
-      }
-      return response.data;
-    } catch (error) {
-      console.error('Auth service login error:', error);
-      throw error;
-    }
+    const response = await apiClient.post('/auth/login', credentials);
+    localStorage.setItem('token', response.data.token);
+    localStorage.setItem('user', JSON.stringify(response.data.user));
+    return response.data;
   },
-  
-  signup: async (userData: SignupData) => {
-    try {
-      const response = await apiClient.post('/auth/signup', userData);
-      if (response.data.token) {
-        localStorage.setItem('token', response.data.token);
-      }
-      return response.data;
-    } catch (error) {
-      console.error('Auth service signup error:', error);
-      throw error;
-    }
+
+  signup: async (data: SignupData) => {
+    const response = await apiClient.post('/auth/register', data);
+    return response.data;
   },
-  
-  getCurrentUser: async () => {
-    try {
-      const response = await apiClient.get('/auth/profile');
-      return response.data;
-    } catch (error) {
-      console.error('Auth service getCurrentUser error:', error);
-      throw error;
-    }
-  },
-  
-  getProfile: async () => {
-    try {
-      const response = await apiClient.get('/auth/profile');
-      return response.data;
-    } catch (error) {
-      console.error('Auth service getProfile error:', error);
-      throw error;
-    }
-  },
-  
+
   logout: () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.location.href = '/login';
   },
-  
-  changePassword: async (passwordData: { currentPassword: string; newPassword: string }) => {
-    try {
-      const response = await apiClient.put('/auth/change-password', passwordData);
-      return response.data;
-    } catch (error) {
-      console.error('Auth service changePassword error:', error);
-      throw error;
-    }
-  }
+
+  verifyEmail: async (token: string) => {
+    const response = await apiClient.get(`/auth/verify-email?token=${token}`);
+    return response.data;
+  },
+
+  resendVerificationEmail: async (email: string) => {
+    const response = await apiClient.post('/auth/resend-verification-email', { email });
+    return response.data;
+  },
+
+  forgotPassword: async (email: string) => {
+    const response = await apiClient.post('/auth/forgot-password', { email });
+    return response.data;
+  },
+
+  resetPassword: async (token: string, password: string) => {
+    const response = await apiClient.post(`/auth/reset-password?token=${token}`, { password });
+    return response.data;
+  },
 };
 
-// User service
 export const userService = {
   getProfile: async (userId: string) => {
-    const response = await apiClient.get(`/users/profile/${userId}`);
+    const response = await apiClient.get(`/users/${userId}`);
     return response.data;
   },
-  
-  updateProfile: async (userId: string, profileData: any) => {
-    const response = await apiClient.put(`/users/${userId}`, profileData);
+
+  updateProfile: async (userId: string, data: Partial<User>) => {
+    const response = await apiClient.put(`/users/${userId}`, data);
+    localStorage.setItem('user', JSON.stringify(response.data));
     return response.data;
   },
-  
-  getBrowseUsers: async (params?: any) => {
-    const response = await apiClient.get('/users/browse', { params });
+
+  updatePreferences: async (userId: string, preferences: any) => {
+    const response = await apiClient.put(`/users/${userId}/preferences`, preferences);
     return response.data;
   },
-  
-  upgradePlan: async (planData: { email: string; plan: string }) => {
-    const response = await apiClient.post('/users/upgrade-plan', planData);
+
+  getPreferences: async (userId: string) => {
+    const response = await apiClient.get(`/users/${userId}/preferences`);
     return response.data;
   },
-  
-  // Favorites
-  addToFavorites: async (userId: string) => {
-    console.log(`API: Adding user ${userId} to favorites`);
-    const response = await apiClient.post(`/users/favorites/${userId}`);
+
+  changePassword: async (userId: string, data: any) => {
+    const response = await apiClient.post(`/users/${userId}/change-password`, data);
     return response.data;
   },
-  
-  removeFromFavorites: async (userId: string) => {
-    console.log(`API: Removing user ${userId} from favorites`);
-    const response = await apiClient.delete(`/users/favorites/${userId}`);
+
+  deleteAccount: async (userId: string) => {
+    const response = await apiClient.delete(`/users/${userId}`);
     return response.data;
   },
-  
-  getFavorites: async () => {
-    console.log('API: Getting user favorites');
-    const response = await apiClient.get('/users/favorites');
+
+  uploadProfilePicture: async (userId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('profile_pic', file);
+    const response = await apiClient.post(`/users/${userId}/upload-profile-picture`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return response.data;
-  }
+  },
+
+  removeProfilePicture: async (userId: string) => {
+    const response = await apiClient.delete(`/users/${userId}/remove-profile-picture`);
+    return response.data;
+  },
+
+  getMatches: async (userId: string, params?: any) => {
+    const response = await apiClient.get(`/users/${userId}/matches`, { params });
+    return response.data;
+  },
+
+  getPotentialMatches: async (userId: string, params?: any) => {
+    const response = await apiClient.get(`/users/${userId}/potential-matches`, { params });
+    return response.data;
+  },
+
+  likeUser: async (userId: string, likedUserId: string) => {
+    const response = await apiClient.post(`/users/${userId}/like/${likedUserId}`);
+    return response.data;
+  },
+
+  passUser: async (userId: string, passedUserId: string) => {
+    const response = await apiClient.post(`/users/${userId}/pass/${passedUserId}`);
+    return response.data;
+  },
+
+  getLikes: async (userId: string) => {
+    const response = await apiClient.get(`/users/${userId}/likes`);
+    return response.data;
+  },
+
+  getPasses: async (userId: string) => {
+    const response = await apiClient.get(`/users/${userId}/passes`);
+    return response.data;
+  },
+
+  reportUser: async (userId: string, reportedUserId: string, reason: string, description: string) => {
+    const response = await apiClient.post(`/users/${userId}/report/${reportedUserId}`, { reason, description });
+    return response.data;
+  },
+
+  blockUser: async (userId: string, blockedUserId: string) => {
+    const response = await apiClient.post(`/users/${userId}/block/${blockedUserId}`);
+    return response.data;
+  },
+
+  getBlocks: async (userId: string) => {
+    const response = await apiClient.get(`/users/${userId}/blocks`);
+    return response.data;
+  },
+
+  unblockUser: async (userId: string, blockedUserId: string) => {
+    const response = await apiClient.delete(`/users/${userId}/block/${blockedUserId}`);
+    return response.data;
+  },
+
+  addToFavorites: async (userId: string, favoriteUserId: string) => {
+    const response = await apiClient.post(`/users/${userId}/favorites/${favoriteUserId}`);
+    return response.data;
+  },
+
+  removeFromFavorites: async (userId: string, favoriteUserId: string) => {
+    const response = await apiClient.delete(`/users/${userId}/favorites/${favoriteUserId}`);
+    return response.data;
+  },
+
+  getFavorites: async (userId: string) => {
+    const response = await apiClient.get(`/users/${userId}/favorites`);
+    return response.data;
+  },
+
+  getReferralStats: async (userId: string) => {
+    const response = await apiClient.get(`/users/${userId}/referral-stats`);
+    return response.data;
+  },
+
+  getVideoCallCredits: async (userId: string) => {
+    const response = await apiClient.get(`/users/${userId}/video-call-credits`);
+    return response.data;
+  },
+
+  updateVideoCallCredits: async (userId: string, credits: number) => {
+    const response = await apiClient.put(`/users/${userId}/video-call-credits`, { credits });
+    return response.data;
+  },
+
+  startVideoCall: async (userId: string, otherUserId: string) => {
+    const response = await apiClient.post(`/users/${userId}/start-video-call/${otherUserId}`);
+    return response.data;
+  },
+
+  endVideoCall: async (userId: string, callId: string) => {
+    const response = await apiClient.post(`/users/${userId}/end-video-call/${callId}`);
+    return response.data;
+  },
+
+  logActivity: async (userId: string, activityType: string, details: any) => {
+    const response = await apiClient.post(`/users/${userId}/activity`, { type: activityType, details });
+    return response.data;
+  },
+
+  getActivityFeed: async (userId: string, params?: any) => {
+    const response = await apiClient.get(`/users/${userId}/activity`, { params });
+    return response.data;
+  },
+
+  getNotifications: async (userId: string, params?: any) => {
+    const response = await apiClient.get(`/users/${userId}/notifications`, { params });
+    return response.data;
+  },
+
+  markNotificationAsRead: async (userId: string, notificationId: string) => {
+    const response = await apiClient.patch(`/users/${userId}/notifications/${notificationId}/read`);
+    return response.data;
+  },
+
+  markAllNotificationsAsRead: async (userId: string) => {
+    const response = await apiClient.patch(`/users/${userId}/notifications/read-all`);
+    return response.data;
+  },
+
+  getChatRooms: async (userId: string, params?: any) => {
+    const response = await apiClient.get(`/users/${userId}/chat-rooms`, { params });
+    return response.data;
+  },
+
+  createChatRoom: async (userId: string, otherUserId: string) => {
+    const response = await apiClient.post(`/users/${userId}/chat-rooms`, { otherUserId });
+    return response.data;
+  },
+
+  getChatMessages: async (chatRoomId: string, params?: any) => {
+    const response = await apiClient.get(`/chat-rooms/${chatRoomId}/messages`, { params });
+    return response.data;
+  },
+
+  sendMessage: async (chatRoomId: string, content: string) => {
+    const response = await apiClient.post(`/chat-rooms/${chatRoomId}/messages`, { content });
+    return response.data;
+  },
+
+  markMessagesAsRead: async (chatRoomId: string) => {
+    const response = await apiClient.patch(`/chat-rooms/${chatRoomId}/messages/read`);
+    return response.data;
+  },
+
+  getSubscriptionPlans: async () => {
+    const response = await apiClient.get('/subscriptions/plans');
+    return response.data;
+  },
+
+  subscribeToPlan: async (userId: string, planId: string, paymentMethodId: string) => {
+    const response = await apiClient.post(`/subscriptions/${planId}/subscribe`, { userId, paymentMethodId });
+    return response.data;
+  },
+
+  cancelSubscription: async (userId: string) => {
+    const response = await apiClient.post(`/subscriptions/cancel`, { userId });
+    return response.data;
+  },
+
+  getSubscriptionStatus: async (userId: string) => {
+    const response = await apiClient.get(`/subscriptions/status/${userId}`);
+    return response.data;
+  },
+
+  createPaymentIntent: async (userId: string, planId: string) => {
+    const response = await apiClient.post('/payments/create-payment-intent', { userId, planId });
+    return response.data;
+  },
+
+  confirmPayment: async (paymentIntentId: string) => {
+    const response = await apiClient.post('/payments/confirm-payment', { paymentIntentId });
+    return response.data;
+  },
+
+  getPaymentHistory: async (userId: string) => {
+    const response = await apiClient.get(`/payments/history/${userId}`);
+    return response.data;
+  },
 };
 
-// Relationship service
-export const relationshipService = {
-  sendRequest: async (followedUserId: string) => {
-    const response = await apiClient.post('/relationships/request', { followedUserId });
-    return response.data;
-  },
-  
-  respondToRequest: async (requestId: string, action: 'accept' | 'reject') => {
-    // Map frontend actions to backend status values
-    const status = action === 'accept' ? 'matched' : 'rejected';
-    const response = await apiClient.put(`/relationships/${requestId}/status`, { status });
-    return response.data;
-  },
-  
-  getReceivedRequests: async () => {
-    const response = await apiClient.get('/relationships/pending');
-    return response.data;
-  },
-  
-  getPendingRequests: async () => {
-    const response = await apiClient.get('/relationships/pending');
-    return response.data;
-  },
-  
-  getSentRequests: async () => {
-    const response = await apiClient.get('/relationships/sent');
-    return response.data;
-  },
-  
-  getMatches: async () => {
-    const response = await apiClient.get('/relationships/matches');
-    return response.data;
-  }
-};
-
-// Chat service  
-export const chatService = {
-  getConversations: async () => {
-    const response = await apiClient.get('/chats/conversations');
-    return response.data;
-  },
-  
-  getMessages: async (userId: string) => {
-    const response = await apiClient.get(`/chats/messages/${userId}`);
-    return response.data;
-  },
-  
-  sendMessage: async (receiverId: string, message: string) => {
-    const response = await apiClient.post('/chats/send', { userId: receiverId, message });
-    return response.data;
-  },
-  
-  getUnreadCount: async () => {
-    const response = await apiClient.get('/chats/unread');
-    return response.data;
-  },
-
-  // Legacy chat endpoints for compatibility
-  getChat: async (userId: string) => {
-    const response = await apiClient.get(`/chats/chat?userId=${userId}`);
-    return response.data;
-  },
-
-  addChat: async (userId: string, message: string) => {
-    const response = await apiClient.post('/chats/chat', { userId, message });
-    return response.data;
-  },
-
-  updateChat: async (ids: string[]) => {
-    const response = await apiClient.put('/chats/chat', { ids });
-    return response.data;
-  }
-};
-
-// Payment service
-export const paymentService = {
-  createPaystackPayment: async () => {
-    console.log('API: Creating Paystack payment');
-    const response = await apiClient.post('/payments/create-paystack-payment');
-    return response.data;
-  }
-};
-
-// Admin service
 export const adminService = {
-  getStats: async () => {
-    try {
-      const response = await apiClient.get('/admin/stats');
-      return response.data;
-    } catch (error) {
-      console.error('Admin stats error:', error);
-      throw error;
-    }
+  getStats: () => apiClient.get('/admin/stats').then(res => res.data),
+  getAllUsers: (params?: any) => apiClient.get('/admin/users', { params }).then(res => res.data.users),
+  getUserDetails: (userId: string) => apiClient.get(`/admin/users/${userId}`).then(res => res.data),
+  updateUserStatus: (userId: string, status: string) => apiClient.patch(`/admin/users/${userId}/status`, { status }).then(res => res.data),
+  updateUserPlan: (userId: string, plan: string) => apiClient.put(`/admin/users/${userId}/plan`, { plan }).then(res => res.data),
+  updateUser: (userId: string, data: any) => apiClient.put(`/admin/users/${userId}`, data).then(res => res.data),
+  deleteUser: (userId: string) => apiClient.delete(`/admin/users/${userId}`).then(res => res.data),
+  sendPasswordResetLink: (userId: string) => apiClient.post(`/admin/users/${userId}/reset-password`).then(res => res.data),
+  verifyUserEmail: (userId: string) => apiClient.post(`/admin/users/${userId}/verify-email`).then(res => res.data),
+  getSystemMetrics: () => apiClient.get('/admin/system').then(res => res.data),
+  getAllCalls: (params?: any) => apiClient.get('/admin/calls', { params }).then(res => res.data),
+  saveCallRecord: (data: any) => apiClient.post('/admin/calls', data).then(res => res.data),
+  uploadCallRecording: (data: any) => apiClient.post('/admin/call-recordings', data).then(res => res.data),
+  getChatReports: () => apiClient.get('/admin/chat-reports').then(res => res.data),
+  sendChatReport: (data: any) => apiClient.post('/admin/send-chat-report', data).then(res => res.data),
+  getMatchingInsights: () => apiClient.get('/admin/matching-insights').then(res => res.data),
+  getEngagementMetrics: () => apiClient.get('/admin/engagement-metrics').then(res => res.data),
+  getConversionMetrics: () => apiClient.get('/admin/conversion-metrics').then(res => res.data),
+  getChurnAnalysis: () => apiClient.get('/admin/churn-analysis').then(res => res.data),
+  getReferralAnalysis: () => apiClient.get('/admin/referral-analysis').then(res => res.data),
+  getReportedProfiles: () => apiClient.get('/admin/reported-profiles').then(res => res.data),
+  dismissReport: (reportId: string) => apiClient.patch(`/admin/reported-profiles/${reportId}/dismiss`).then(res => res.data),
+  getVipUsers: () => apiClient.get('/admin/vip-users').then(res => res.data),
+  getPotentialMatches: (userId: string) => apiClient.get(`/admin/users/${userId}/potential-matches`).then(res => res.data),
+  sendMatchSuggestions: (userId: string, suggestedUserIds: string[]) => apiClient.post(`/admin/users/${userId}/suggest-matches`, { suggestedUserIds }).then(res => res.data),
+  getScheduledEmails: () => apiClient.get('/admin/scheduled-emails').then(res => res.data),
+  cancelScheduledEmail: (id: string) => apiClient.delete(`/admin/scheduled-emails/${id}`).then(res => res.data),
+  sendAdminPushNotification: (data: any) => apiClient.post('/admin/push-notifications', data).then(res => res.data),
+  getAdminPushNotifications: () => apiClient.get('/admin/push-notifications').then(res => res.data),
+  getPaymentHistory: () => apiClient.get('/admin/payments').then(res => res.data),
+  processRefund: (id: string) => apiClient.post(`/admin/payments/${id}/refund`).then(res => res.data),
+  scheduleEmail: async (data: any) => {
+    const response = await apiClient.post('/admin/schedule-email', data);
+    return response.data;
   },
-  
-  getAllUsers: async (params?: any) => {
-    try {
-      const response = await apiClient.get('/admin/users', { params });
-      return response.data;
-    } catch (error) {
-      console.error('Admin users error:', error);
-      throw error;
-    }
-  },
-  
-  getUserDetails: async (userId: string) => {
-    try {
-      const response = await apiClient.get(`/admin/users/${userId}`);
-      return response.data;
-    } catch (error) {
-      console.error('Admin user details error:', error);
-      throw error;
-    }
-  },
-  
-  updateUserStatus: async (userId: string, status: string) => {
-    try {
-      const response = await apiClient.put(`/admin/users/${userId}/status`, { status });
-      return response.data;
-    } catch (error) {
-      console.error('Admin update user status error:', error);
-      throw error;
-    }
-  },
-  
-  getSystemMetrics: async () => {
-    try {
-      const response = await apiClient.get('/admin/system');
-      return response.data;
-    } catch (error) {
-      console.error('Admin system metrics error:', error);
-      throw error;
-    }
-  },
-
-  // Calls
-  getAllCalls: async (params?: any) => {
-    try {
-      const response = await apiClient.get('/admin/calls', { params });
-      return response.data;
-    } catch (error) {
-      console.error('Admin calls error:', error);
-      throw error;
-    }
-  },
-  
-  saveCallRecord: async (callData: any) => {
-    try {
-      const response = await apiClient.post('/admin/calls', callData);
-      return response.data;
-    } catch (error) {
-      console.error('Admin save call record error:', error);
-      throw error;
-    }
-  },
-  
-  uploadCallRecording: async (file: File, conversationId: string, duration?: number) => {
-    try {
-      const formData = new FormData();
-      formData.append('recording', file);
-      formData.append('conversationId', conversationId);
-      if (duration) {
-        formData.append('duration', duration.toString());
-      }
-      
-      const response = await apiClient.post('/admin/call-recordings', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Admin upload call recording error:', error);
-      throw error;
-    }
-  },
-
-  // Subscriptions and Payments
-  getAllSubscriptions: async () => {
-    try {
-      const response = await apiClient.get('/admin/subscriptions');
-      return response.data;
-    } catch (error) {
-      console.error('Admin subscriptions error:', error);
-      throw error;
-    }
-  },
-
-  getAllPayments: async () => {
-    try {
-      const response = await apiClient.get('/admin/payments');
-      return response.data;
-    } catch (error) {
-      console.error('Admin payments error:', error);
-      throw error;
-    }
-  },
-
-  processRefund: async (paymentId: string) => {
-    try {
-      const response = await apiClient.post(`/admin/payments/${paymentId}/refund`);
-      return response.data;
-    } catch (error) {
-      console.error('Admin process refund error:', error);
-      throw error;
-    }
-  },
-
-  // User Management
-  updateUser: async (userId: string, userData: any) => {
-    try {
-      const response = await apiClient.put(`/admin/users/${userId}`, userData);
-      return response.data;
-    } catch (error) {
-      console.error('Admin update user error:', error);
-      throw error;
-    }
-  },
-
-  deleteUser: async (userId: string) => {
-    try {
-      const response = await apiClient.delete(`/admin/users/${userId}`);
-      return response.data;
-    } catch (error) {
-      console.error('Admin delete user error:', error);
-      throw error;
-    }
-  },
-
-  resetUserPassword: async (userId: string) => {
-    try {
-      const response = await apiClient.put(`/admin/users/${userId}/reset-password`);
-      return response.data;
-    } catch (error) {
-      console.error('Admin reset password error:', error);
-      throw error;
-    }
-  },
-
-  updateUserPlan: async (userId: string, plan: string) => {
-    try {
-      const response = await apiClient.put(`/admin/users/${userId}/plan`, { plan });
-      return response.data;
-    } catch (error) {
-      console.error('Admin update user plan error:', error);
-      throw error;
-    }
-  },
-
-  // Email configuration methods
-  getEmailConfig: async () => {
-    try {
-      const response = await apiClient.get('/admin/email-config');
-      return response.data;
-    } catch (error) {
-      console.error('Admin get email config error:', error);
-      throw error;
-    }
-  },
-
-  saveEmailConfig: async (configData: any) => {
-    try {
-      const response = await apiClient.post('/admin/email-config', configData);
-      return response.data;
-    } catch (error) {
-      console.error('Admin save email config error:', error);
-      throw error;
-    }
-  },
-
-  sendBulkEmail: async (emailData: any) => {
-    try {
-      const response = await apiClient.post('/admin/bulk-email', emailData);
-      return response.data;
-    } catch (error) {
-      console.error('Admin send bulk email error:', error);
-      throw error;
-    }
-  },
-
-  sendTestEmail: async (testEmail: string) => {
-    try {
-      const response = await apiClient.post('/admin/test-email', { testEmail });
-      return response.data;
-    } catch (error) {
-      console.error('Admin send test email error:', error);
-      throw error;
-    }
-  },
-
-  getEmailMetrics: async () => {
-    try {
-      const response = await apiClient.get('/admin/email-metrics');
-      return response.data;
-    } catch (error) {
-      console.error('Admin email metrics error:', error);
-      throw error;
-    }
-  }
+  getEmailConfig: () => apiClient.get('/admin/email-config').then(res => res.data),
+  saveEmailConfig: (config: any) => apiClient.post('/admin/email-config', config).then(res => res.data),
+  getEmailMetrics: () => apiClient.get('/admin/email-metrics').then(res => res.data),
+  sendTestEmail: (email: string) => apiClient.post('/admin/test-email', { email }).then(res => res.data),
+  sendBulkEmail: (data: any) => apiClient.post('/admin/bulk-email', data).then(res => res.data),
 };
-
-// Video call service
-export const videoCallService = {
-  initiateCall: async (partnerId: string) => {
-    console.log(`API: Initiating video call with partner ${partnerId}`);
-    const response = await apiClient.post('/video-call/initiate', { partnerId });
-    return response.data;
-  },
-  
-  getCallStatus: async (partnerId: string) => {
-    console.log(`API: Getting call status for partner ${partnerId}`);
-    const response = await apiClient.get(`/video-call/status/${partnerId}`);
-    return response.data;
-  }
-};
-
-// Email service
-export const emailService = {
-  sendValidation: async (email: string) => {
-    console.log(`API: Sending validation email to ${email}`);
-    const response = await apiClient.post('/email/send-validation', { email });
-    return response.data;
-  },
-  
-  verifyEmail: async (token: string) => {
-    console.log(`API: Verifying email with token`);
-    const response = await apiClient.post('/email/verify', { token });
-    return response.data;
-  },
-  
-  resendValidationEmail: async (email: string) => {
-    console.log(`API: Resending validation email to ${email}`);
-    const response = await apiClient.post('/auth/resend-validation', { email });
-    return response.data;
-  },
-  
-  resendValidationEmail: async (email: string) => {
-    console.log(`API: Resending validation email to ${email}`);
-    const response = await apiClient.post('/auth/resend-validation', { email });
-    return response.data;
-  },
-  
-  getVerificationStatus: async () => {
-    console.log('API: Getting email verification status');
-    const response = await apiClient.get('/email/status');
-    return response.data;
-  }
-};
-
-export default apiClient;

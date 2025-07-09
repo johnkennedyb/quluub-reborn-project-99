@@ -128,10 +128,25 @@ interface AdminCall {
       fname: string;
       lname: string;
       username: string;
+      fullName?: string;
     };
     joinedAt: Date;
     leftAt?: Date;
   }>;
+  caller?: {
+    _id: string;
+    fname: string;
+    lname: string;
+    username: string;
+    fullName: string;
+  };
+  receiver?: {
+    _id: string;
+    fname: string;
+    lname: string;
+    username: string;
+    fullName: string;
+  };
   status: 'started' | 'ended' | 'failed';
   duration: number;
   startTime: Date;

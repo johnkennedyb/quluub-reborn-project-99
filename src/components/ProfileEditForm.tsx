@@ -69,7 +69,7 @@ const ProfileEditForm = ({ user, onSaved }: ProfileEditFormProps) => {
       appearance: user.appearance || "",
       maritalStatus: user.maritalStatus || "",
       noOfChildren: user.noOfChildren || "",
-      ethnicity: user.ethnicity || "",
+      ethnicity: Array.isArray(user.ethnicity) ? user.ethnicity.join(", ") : (user.ethnicity || ""),
       patternOfSalaah: user.patternOfSalaah || "",
       genotype: user.genotype || "",
       summary: user.summary || "",
@@ -99,7 +99,7 @@ const ProfileEditForm = ({ user, onSaved }: ProfileEditFormProps) => {
       appearance: user.appearance || "",
       maritalStatus: user.maritalStatus || "",
       noOfChildren: user.noOfChildren || "",
-      ethnicity: user.ethnicity || "",
+      ethnicity: Array.isArray(user.ethnicity) ? user.ethnicity.join(", ") : (user.ethnicity || ""),
       patternOfSalaah: user.patternOfSalaah || "",
       genotype: user.genotype || "",
       summary: user.summary || "",
@@ -125,7 +125,7 @@ const ProfileEditForm = ({ user, onSaved }: ProfileEditFormProps) => {
         otherNumber: values.waliOtherNumber,
       });
       
-      // Remove wali detail fields
+      // Remove wali detail fields and convert ethnicity to array
       const { 
         waliName, waliEmail, waliWhatsapp, waliTelegram, waliOtherNumber,
         ...otherValues 
@@ -134,6 +134,7 @@ const ProfileEditForm = ({ user, onSaved }: ProfileEditFormProps) => {
       const updateData = {
         ...otherValues,
         waliDetails,
+        ethnicity: values.ethnicity ? values.ethnicity.split(", ").map(e => e.trim()) : [],
       };
       
       console.log("Updating profile with values:", updateData);
@@ -484,7 +485,7 @@ const ProfileEditForm = ({ user, onSaved }: ProfileEditFormProps) => {
                 <FormItem>
                   <FormLabel>Ethnicity</FormLabel>
                   <FormControl>
-                    <Input placeholder="Your ethnicity" {...field} />
+                    <Input placeholder="Your ethnicity (comma separated)" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

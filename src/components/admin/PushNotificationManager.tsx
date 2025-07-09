@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -23,22 +24,21 @@ const formSchema = z.object({
 const PushNotificationManager = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { sendPushNotification, fetchPushNotifications } = useAdminData();
-
-  const { data: notifications, isLoading } = useQuery({
-    queryKey: ['pushNotifications'],
-    queryFn: fetchPushNotifications,
-  });
+  const { sendPushNotification, pushNotifications } = useAdminData();
 
   const mutation = useMutation({
-    mutationFn: sendPushNotification,
+    mutationFn: (values: z.infer<typeof formSchema>) => sendPushNotification({
+      title: values.title,
+      message: values.message,
+      target: values.target
+    }),
     onSuccess: () => {
       toast({ title: 'Success', description: 'Push notification sent successfully!' });
       queryClient.invalidateQueries({ queryKey: ['pushNotifications'] });
       form.reset();
     },
-    onError: (error) => {
-      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    onError: (error: any) => {
+      toast({ title: 'Error', description: error.message || 'Failed to send notification', variant: 'destructive' });
     },
   });
 
@@ -137,12 +137,8 @@ const PushNotificationManager = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center">Loading history...</TableCell>
-                </TableRow>
-              ) : (
-                notifications?.map((notification: any) => (
+              {pushNotifications && pushNotifications.length > 0 ? (
+                pushNotifications.map((notification: any) => (
                   <TableRow key={notification._id}>
                     <TableCell>{notification.title}</TableCell>
                     <TableCell>{notification.target}</TableCell>
@@ -152,6 +148,10 @@ const PushNotificationManager = () => {
                     <TableCell>{notification.failedCount}</TableCell>
                   </TableRow>
                 ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center">No notification history found.</TableCell>
+                </TableRow>
               )}
             </TableBody>
           </Table>
@@ -162,4 +162,3 @@ const PushNotificationManager = () => {
 };
 
 export default PushNotificationManager;
-

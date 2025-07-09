@@ -535,7 +535,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
             
             <div className="space-y-2">
               <Label htmlFor="gender">I am a</Label>
-              <Select 
+              <UiSelect 
                 value={formData.gender} 
                 onValueChange={(value) => handleSelectChange("gender", value)}
               >
@@ -546,7 +546,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                   <SelectItem value="male">Man</SelectItem>
                   <SelectItem value="female">Woman</SelectItem>
                 </SelectContent>
-              </Select>
+              </UiSelect>
             </div>
             
             <div className="flex justify-between">
