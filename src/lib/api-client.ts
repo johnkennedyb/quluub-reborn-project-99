@@ -179,18 +179,18 @@ export const userService = {
     return response.data;
   },
 
-  addToFavorites: async (userId: string, favoriteUserId: string) => {
-    const response = await apiClient.post(`/users/${userId}/favorites/${favoriteUserId}`);
+  addToFavorites: async (favoriteUserId: string) => {
+    const response = await apiClient.post('/users/favorites', { favoriteUserId });
     return response.data;
   },
 
-  removeFromFavorites: async (userId: string, favoriteUserId: string) => {
-    const response = await apiClient.delete(`/users/${userId}/favorites/${favoriteUserId}`);
+  removeFromFavorites: async (favoriteUserId: string) => {
+    const response = await apiClient.delete(`/users/favorites/${favoriteUserId}`);
     return response.data;
   },
 
-  getFavorites: async (userId: string) => {
-    const response = await apiClient.get(`/users/${userId}/favorites`);
+  getFavorites: async () => {
+    const response = await apiClient.get('/users/favorites');
     return response.data;
   },
 
@@ -336,13 +336,13 @@ export const relationshipService = {
     return response.data;
   },
 
-  likeUser: async (currentUserId: string, userId: string) => {
-    const response = await apiClient.post(`/relationships/like/${userId}`, { currentUserId });
+  likeUser: async (userId: string) => {
+    const response = await apiClient.post(`/relationships/like/${userId}`);
     return response.data;
   },
 
-  passUser: async (currentUserId: string, userId: string) => {
-    const response = await apiClient.post(`/relationships/pass/${userId}`, { currentUserId });
+  passUser: async (userId: string) => {
+    const response = await apiClient.post(`/relationships/pass/${userId}`);
     return response.data;
   },
 };
