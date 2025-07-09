@@ -5,6 +5,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Check } from 'lucide-react';
 
+interface PlanData {
+  price: number;
+  originalPrice: number | null;
+}
+
+interface PricingData {
+  symbol: string;
+  freemium: PlanData;
+  premium: PlanData;
+  pro: PlanData;
+}
+
 interface PricingToggleProps {
   onPlanSelect?: (plan: string, currency: string, amount: number) => void;
 }
@@ -12,7 +24,7 @@ interface PricingToggleProps {
 const PricingToggle = ({ onPlanSelect }: PricingToggleProps) => {
   const [currency, setCurrency] = useState<'GBP' | 'NGN'>('GBP');
 
-  const pricingData = {
+  const pricingData: Record<'GBP' | 'NGN', PricingData> = {
     GBP: {
       symbol: '£',
       freemium: { price: 0, originalPrice: null },
@@ -39,9 +51,9 @@ const PricingToggle = ({ onPlanSelect }: PricingToggleProps) => {
       'Unlimited connection requests',
       'Unlimited messages',
       'Enhanced profile visibility',
+      'Video calling: Yes',
       'View unlimited profiles',
       'Ad-free experience',
-      'Video calling (pay-as-you-go)',
       'Priority customer support'
     ],
     pro: [
@@ -55,8 +67,8 @@ const PricingToggle = ({ onPlanSelect }: PricingToggleProps) => {
     ]
   };
 
-  const handlePlanSelect = (plan: string) => {
-    const planData = pricingData[currency][plan as keyof typeof pricingData.GBP];
+  const handlePlanSelect = (plan: keyof PricingData) => {
+    const planData = pricingData[currency][plan];
     if (onPlanSelect) {
       onPlanSelect(plan, currency, planData.price);
     }
@@ -128,7 +140,7 @@ const PricingToggle = ({ onPlanSelect }: PricingToggleProps) => {
               {pricingData[currency].symbol}{pricingData[currency].premium.price}
               {pricingData[currency].premium.originalPrice && (
                 <span className="text-lg line-through text-muted-foreground ml-2">
-                  {pricingData[currency].symbol}{pricingData[currency].premium.originalPrice}
+                  ({pricingData[currency].symbol}{pricingData[currency].premium.originalPrice})
                 </span>
               )}
               <span className="text-base font-normal text-muted-foreground">/month</span>
@@ -161,7 +173,7 @@ const PricingToggle = ({ onPlanSelect }: PricingToggleProps) => {
               {pricingData[currency].symbol}{pricingData[currency].pro.price}
               {pricingData[currency].pro.originalPrice && (
                 <span className="text-lg line-through text-muted-foreground ml-2">
-                  {pricingData[currency].symbol}{pricingData[currency].pro.originalPrice}
+                  ({pricingData[currency].symbol}{pricingData[currency].pro.originalPrice})
                 </span>
               )}
               <span className="text-base font-normal text-muted-foreground">/month</span>
