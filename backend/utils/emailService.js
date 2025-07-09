@@ -1,4 +1,6 @@
 const nodemailer = require('nodemailer');
+const crypto = require('crypto');
+const EmailAnalytics = require('../models/EmailAnalytics');
 
 // Import email templates
 const welcomeEmail = require('./emailTemplates/welcome');
@@ -58,21 +60,53 @@ const verifyTransporter = () => {
 // Initial verification
 verifyTransporter();
 
-// Generic email sending function
+// Enhanced generic email sending function with tracking
 const sendEmail = async (to, templateFunction, ...args) => {
   try {
+    const messageId = crypto.randomBytes(16).toString('hex');
     const { subject, html } = templateFunction(...args);
+    
+    // Add tracking pixel to email
+    const trackingPixel = `<img src="${process.env.BACKEND_URL || 'http://localhost:5000'}/api/email-analytics/track/open/${messageId}" width="1" height="1" style="display:none;" />`;
+    const htmlWithTracking = html + trackingPixel;
+    
     const mailOptions = {
       from: `"${emailSettings.fromName}" <${emailSettings.fromEmail}>`,
       to,
       subject,
-      html,
+      html: htmlWithTracking,
       replyTo: emailSettings.replyTo,
+      messageId: messageId
     };
-    await transporter.sendMail(mailOptions);
-    console.log(`Email sent to ${to} with subject: ${subject}`);
+
+    const info = await transporter.sendMail(mailOptions);
+    
+    // Save email analytics record
+    await EmailAnalytics.create({
+      messageId: messageId,
+      recipientEmail: to,
+      subject: subject,
+      status: 'sent'
+    });
+
+    console.log(`Email sent to ${to} with subject: ${subject}, MessageId: ${messageId}`);
+    return { success: true, messageId: messageId };
   } catch (error) {
     console.error(`Error sending email to ${to}:`, error);
+    
+    // Record failed email
+    try {
+      await EmailAnalytics.create({
+        messageId: messageId || 'unknown',
+        recipientEmail: to,
+        subject: args[0] || 'Unknown',
+        status: 'failed'
+      });
+    } catch (analyticsError) {
+      console.error('Error recording failed email analytics:', analyticsError);
+    }
+    
+    return { success: false, error: error.message };
   }
 };
 
@@ -171,50 +205,80 @@ const sendValidationEmail = (email, recipientName, validationToken) => {
     sendEmail(email, validateEmailTemplate, recipientName, validationUrl);
 };
 
-// New function to send bulk emails
+// Enhanced bulk email function with tracking
 const sendBulkEmail = async (users, subject, message, attachments = []) => {
   let successCount = 0;
   let failedCount = 0;
+  const results = [];
 
   for (const user of users) {
+    const messageId = crypto.randomBytes(16).toString('hex');
+    
+    // Add tracking pixel
+    const trackingPixel = `<img src="${process.env.BACKEND_URL || 'http://localhost:5000'}/api/email-analytics/track/open/${messageId}" width="1" height="1" style="display:none;" />`;
+    
+    const htmlContent = `
+      <div style="max-width: 600px; margin: 0 auto; padding: 20px; font-family: Arial, sans-serif; background-color: #f9f9f9;">
+        <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #075e54; margin: 0;">Quluub</h1>
+            <p style="color: #666; font-size: 16px; margin-top: 10px;">Islamic Marriage Platform</p>
+          </div>
+          
+          <p style="color: #333; line-height: 1.6; font-size: 16px;">
+            Assalamu Alaikum ${user.fname || 'Dear Member'},
+          </p>
+          
+          <div style="color: #666; line-height: 1.6; margin: 20px 0;">
+            ${message.replace(/\n/g, '<br>')}
+          </div>
+          
+          <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee;">
+            <p style="color: #999; font-size: 12px; text-align: center;">
+              Best regards,<br>
+              The Quluub Team<br>
+              <a href="${process.env.FRONTEND_URL}" style="color: #075e54;">quluub.com</a>
+            </p>
+          </div>
+        </div>
+      </div>
+      ${trackingPixel}
+    `;
+
     const mailOptions = {
       from: `"${emailSettings.fromName}" <${emailSettings.fromEmail}>`,
       to: user.email,
       subject: subject,
-      html: `
-        <div style="max-width: 600px; margin: 0 auto; padding: 20px; font-family: Arial, sans-serif; background-color: #f9f9f9;">
-          <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-            <div style="text-align: center; margin-bottom: 30px;">
-              <h1 style="color: #075e54; margin: 0;">Quluub</h1>
-              <p style="color: #666; font-size: 16px; margin-top: 10px;">Islamic Marriage Platform</p>
-            </div>
-            
-            <p style="color: #333; line-height: 1.6; font-size: 16px;">
-              Assalamu Alaikum ${user.fname || 'Dear Member'},
-            </p>
-            
-            <div style="color: #666; line-height: 1.6; margin: 20px 0;">
-              ${message.replace(/\n/g, '<br>')}
-            </div>
-            
-            <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee;">
-              <p style="color: #999; font-size: 12px; text-align: center;">
-                Best regards,<br>
-                The Quluub Team<br>
-                <a href="${process.env.FRONTEND_URL}" style="color: #075e54;">quluub.com</a>
-              </p>
-            </div>
-          </div>
-        </div>
-      `
+      html: htmlContent,
+      messageId: messageId
     };
 
     try {
       await transporter.sendMail(mailOptions);
       successCount++;
+      
+      // Record analytics
+      await EmailAnalytics.create({
+        messageId: messageId,
+        recipientEmail: user.email,
+        subject: subject,
+        status: 'sent'
+      });
+      
+      results.push({ email: user.email, status: 'sent', messageId });
       console.log(`Bulk email sent to: ${user.email}`);
     } catch (error) {
       failedCount++;
+      
+      // Record failed email
+      await EmailAnalytics.create({
+        messageId: messageId,
+        recipientEmail: user.email,
+        subject: subject,
+        status: 'failed'
+      });
+      
+      results.push({ email: user.email, status: 'failed', error: error.message });
       console.error(`Failed to send bulk email to ${user.email}:`, error);
     }
   }
@@ -223,7 +287,7 @@ const sendBulkEmail = async (users, subject, message, attachments = []) => {
     throw new Error(`${failedCount} out of ${successCount + failedCount} emails failed to send.`);
   }
 
-  return { successCount, failedCount };
+  return { successCount, failedCount, results };
 };
 
 // New function to send test emails
