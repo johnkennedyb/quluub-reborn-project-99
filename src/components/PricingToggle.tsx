@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -67,7 +66,7 @@ const PricingToggle = ({ onPlanSelect }: PricingToggleProps) => {
     ]
   };
 
-  const handlePlanSelect = (plan: keyof PricingData) => {
+  const handlePlanSelect = (plan: keyof Omit<PricingData, 'symbol'>) => {
     const planData = pricingData[currency][plan];
     if (onPlanSelect) {
       onPlanSelect(plan, currency, planData.price);
