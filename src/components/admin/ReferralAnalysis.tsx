@@ -1,120 +1,206 @@
 
-import { useAdminData } from '@/hooks/useAdminData';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Users, TrendingUp, Gift } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { Users, Gift, TrendingUp, Award } from 'lucide-react';
+
+interface ReferralData {
+  userId: string;
+  userName: string;
+  referralCode: string;
+  totalReferrals: number;
+  completedReferrals: number;
+  premiumMonthsEarned: number;
+  referralStatus: string;
+}
 
 const ReferralAnalysis = () => {
-  const { stats, loading } = useAdminData();
+  const [referralData, setReferralData] = useState<ReferralData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
-  if (loading) return <div>Loading referral data...</div>;
+  useEffect(() => {
+    fetchReferralData();
+  }, []);
+
+  const fetchReferralData = async () => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/admin/referrals', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
+        },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setReferralData(data.referrals || []);
+      } else {
+        throw new Error(data.message || 'Failed to fetch referral data');
+      }
+    } catch (error) {
+      console.error('Error fetching referral data:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load referral data',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const calculatePremiumMonths = (completedReferrals: number) => {
+    return Math.floor(completedReferrals / 5); // 5 referrals = 1 month premium
+  };
+
+  const getTotalStats = () => {
+    return referralData.reduce(
+      (acc, user) => ({
+        totalUsers: acc.totalUsers + 1,
+        totalReferrals: acc.totalReferrals + user.totalReferrals,
+        completedReferrals: acc.completedReferrals + user.completedReferrals,
+        premiumMonthsEarned: acc.premiumMonthsEarned + calculatePremiumMonths(user.completedReferrals),
+      }),
+      { totalUsers: 0, totalReferrals: 0, completedReferrals: 0, premiumMonthsEarned: 0 }
+    );
+  };
+
+  const stats = getTotalStats();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Statistics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Referrals</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.totalReferrals || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              All-time referrals
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Referrers</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.topReferrers?.length || 0}</div>
-            <p className="text-xs text-muted-foreground">
-              Users with active referrals
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Conversion Rate</CardTitle>
-            <Gift className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {stats?.freeToProConversions || 0}%
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <Users className="h-4 w-4 text-blue-500" />
+              <div>
+                <p className="text-sm font-medium">Active Referrers</p>
+                <p className="text-2xl font-bold">{stats.totalUsers}</p>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Referral to premium conversion
-            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <TrendingUp className="h-4 w-4 text-green-500" />
+              <div>
+                <p className="text-sm font-medium">Total Referrals</p>
+                <p className="text-2xl font-bold">{stats.totalReferrals}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <Award className="h-4 w-4 text-purple-500" />
+              <div>
+                <p className="text-sm font-medium">Completed Referrals</p>
+                <p className="text-2xl font-bold">{stats.completedReferrals}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <Gift className="h-4 w-4 text-orange-500" />
+              <div>
+                <p className="text-sm font-medium">Premium Months Earned</p>
+                <p className="text-2xl font-bold">{stats.premiumMonthsEarned}</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Top Referrers Table */}
+      {/* Referral Details */}
       <Card>
         <CardHeader>
-          <CardTitle>Top Referrers</CardTitle>
-          <CardDescription>Users with the most successful referrals and bonuses earned.</CardDescription>
+          <CardTitle>Referral Details</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Users earn 1 month of premium for every 5 successful referrals
+          </p>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Total Referrals</TableHead>
-                <TableHead>Active Referrals</TableHead>
-                <TableHead>Conversion Rate</TableHead>
-                <TableHead>Bonus Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {stats?.topReferrers && stats.topReferrers.length > 0 ? (
-                stats.topReferrers.map((referrer: any) => (
-                  <TableRow key={referrer._id}>
-                    <TableCell>
-                      <div className="font-medium">{referrer.fname} {referrer.lname}</div>
-                      <div className="text-sm text-muted-foreground">@{referrer.username}</div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{referrer.totalReferrals}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="default">{referrer.activeReferrals}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      {referrer.totalReferrals > 0 
-                        ? Math.round((referrer.activeReferrals / referrer.totalReferrals) * 100)
-                        : 0}%
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={referrer.activeReferrals >= 5 ? 'default' : 'secondary'}>
-                        {referrer.activeReferrals >= 5 ? 'Bonus Eligible' : 'No Bonus'}
+          <div className="space-y-4">
+            {referralData.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                No referral data available
+              </p>
+            ) : (
+              referralData.map((user) => {
+                const premiumMonths = calculatePremiumMonths(user.completedReferrals);
+                const progressToNext = user.completedReferrals % 5;
+                const neededForNext = 5 - progressToNext;
+                
+                return (
+                  <div key={user.userId} className="border rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <h3 className="font-semibold">{user.userName}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Code: {user.referralCode}
+                        </p>
+                      </div>
+                      <Badge variant={premiumMonths > 0 ? "default" : "secondary"}>
+                        {premiumMonths} months earned
                       </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center">
-                    No referral data found.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">Total Referrals</p>
+                        <p className="font-medium">{user.totalReferrals}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Completed</p>
+                        <p className="font-medium">{user.completedReferrals}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Next Premium</p>
+                        <p className="font-medium">
+                          {progressToNext === 0 && user.completedReferrals > 0 
+                            ? "Eligible now!" 
+                            : `${neededForNext} more needed`}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Progress bar for next premium month */}
+                    <div className="mt-3">
+                      <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                        <span>Progress to next premium month</span>
+                        <span>{progressToNext}/5</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-primary h-2 rounded-full transition-all duration-300" 
+                          style={{ width: `${(progressToNext / 5) * 100}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

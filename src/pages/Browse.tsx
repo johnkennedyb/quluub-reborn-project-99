@@ -37,6 +37,8 @@ const Browse = () => {
   const [processingAction, setProcessingAction] = useState(false);
   const [pendingConnections, setPendingConnections] = useState<string[]>([]);
   const [countryFilter, setCountryFilter] = useState("");
+  const [hijabFilter, setHijabFilter] = useState("");
+  const [beardFilter, setBeardFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [favoriteUsers, setFavoriteUsers] = useState<string[]>([]);
   const { toast } = useToast();
@@ -45,16 +47,28 @@ const Browse = () => {
 
   useEffect(() => {
     const fetchUsers = async () => {
+      if (!user) return;
+      
       try {
         setLoading(true);
         const fetchedUsers = await userService.getBrowseUsers();
         console.log("Browse users:", fetchedUsers);
+        
         if (fetchedUsers && fetchedUsers.length > 0) {
-          setUsers(fetchedUsers);
-          setFilteredUsers(fetchedUsers);
-          setTotalPages(Math.ceil(fetchedUsers.length / usersPerPage));
+          // Filter users based on current user's gender (men see women, women see men)
+          const oppositeGenderUsers = fetchedUsers.filter((u: User) => {
+            if (user.gender === 'male') {
+              return u.gender === 'female';
+            } else if (user.gender === 'female') {
+              return u.gender === 'male';
+            }
+            return true; // fallback for other genders
+          });
+          
+          setUsers(oppositeGenderUsers);
+          setFilteredUsers(oppositeGenderUsers);
+          setTotalPages(Math.ceil(oppositeGenderUsers.length / usersPerPage));
         } else {
-          // If no users found, show toast
           toast({
             title: "No users found",
             description: "No potential matches were found at this time.",
@@ -75,7 +89,6 @@ const Browse = () => {
 
     fetchUsers();
 
-    // Fetch favorites
     const fetchFavorites = async () => {
       try {
         const favoritesData = await userService.getFavorites();
@@ -90,7 +103,6 @@ const Browse = () => {
 
     fetchFavorites();
 
-    // Fetch pending connections to highlight already requested users
     const fetchPendingRequests = async () => {
       try {
         const response = await relationshipService.getPendingRequests();
@@ -104,14 +116,22 @@ const Browse = () => {
     };
     
     fetchPendingRequests();
-  }, [toast, usersPerPage]);
+  }, [toast, usersPerPage, user]);
 
-  // Filter users based on search and country filter
+  // Filter users based on search, country, hijab, and beard filters
   useEffect(() => {
     let result = [...users];
     
     if (countryFilter) {
       result = result.filter(user => user.country === countryFilter);
+    }
+    
+    if (hijabFilter && user?.gender === 'male') {
+      result = result.filter(user => user.hijab === hijabFilter);
+    }
+    
+    if (beardFilter && user?.gender === 'female') {
+      result = result.filter(user => user.beard === beardFilter);
     }
     
     if (searchQuery) {
@@ -126,8 +146,8 @@ const Browse = () => {
     
     setFilteredUsers(result);
     setTotalPages(Math.ceil(result.length / usersPerPage));
-    setCurrentPage(1); // Reset to first page when filters change
-  }, [countryFilter, searchQuery, users, usersPerPage]);
+    setCurrentPage(1);
+  }, [countryFilter, hijabFilter, beardFilter, searchQuery, users, usersPerPage, user]);
 
   const handleLike = async (userId: string) => {
     if (processingAction) return;
@@ -156,7 +176,6 @@ const Browse = () => {
   };
 
   const handleSkip = (userId: string) => {
-    // In a real app, you might want to track skipped users
     toast({
       title: "Skipped",
       description: "You've skipped this profile",
@@ -219,10 +238,28 @@ const Browse = () => {
   // Get unique countries for the filter
   const uniqueCountries = [...new Set(users.filter(user => user.country).map(user => user.country))];
 
-  // Get current users
+  // Get current users for the page
   const indexOfLastUser = currentPage * usersPerPage;
   const indexOfFirstUser = indexOfLastUser - usersPerPage;
   const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
+
+  // Create array with ads inserted every 5 users
+  const createUsersWithAds = (users: User[]) => {
+    const result: (User | { type: 'ad', id: string })[] = [];
+    
+    users.forEach((user, index) => {
+      result.push(user);
+      
+      // Add ad after every 5 users (but not after the last user)
+      if ((index + 1) % 5 === 0 && index < users.length - 1 && user?.plan !== 'premium') {
+        result.push({ type: 'ad', id: `ad-${index}` });
+      }
+    });
+    
+    return result;
+  };
+
+  const usersWithAds = createUsersWithAds(currentUsers);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -255,6 +292,34 @@ const Browse = () => {
                 ))}
               </SelectContent>
             </Select>
+            
+            {/* Hijab filter for men viewing women */}
+            {user?.gender === 'male' && (
+              <Select value={hijabFilter} onValueChange={setHijabFilter}>
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue placeholder="Hijab" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Any</SelectItem>
+                  <SelectItem value="Yes">Yes</SelectItem>
+                  <SelectItem value="No">No</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+            
+            {/* Beard filter for women viewing men */}
+            {user?.gender === 'female' && (
+              <Select value={beardFilter} onValueChange={setBeardFilter}>
+                <SelectTrigger className="w-[120px]">
+                  <SelectValue placeholder="Beard" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Any</SelectItem>
+                  <SelectItem value="Yes">Yes</SelectItem>
+                  <SelectItem value="No">No</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </div>
         
@@ -265,8 +330,17 @@ const Browse = () => {
         ) : filteredUsers.length > 0 ? (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-              {currentUsers.reduce((acc, user, index) => {
-                acc.push(
+              {usersWithAds.map((item, index) => {
+                if ('type' in item && item.type === 'ad') {
+                  return (
+                    <div key={item.id} className="sm:col-span-2 lg:col-span-4 my-4">
+                      <AdComponent />
+                    </div>
+                  );
+                }
+                
+                const user = item as User;
+                return (
                   <div key={user._id || user.id} className="flex flex-col h-full">
                     <UserProfileCard
                       user={user}
@@ -318,65 +392,63 @@ const Browse = () => {
                     </div>
                   </div>
                 );
-
-                if (user?.plan !== 'premium' && (index + 1) % 5 === 0 && (index + 1) < currentUsers.length) {
-                  acc.push(
-                    <div key={`ad-${index}`} className="sm:col-span-2 lg:col-span-4 my-4">
-                      <AdComponent />
-                    </div>
-                  );
-                }
-
-                return acc;
-              }, [] as JSX.Element[])}
+              })}
             </div>
             
-            <Pagination className="mt-6">
-              <PaginationContent>
-                <PaginationItem>
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
-                    onClick={goToPrevPage} 
-                    disabled={currentPage === 1}
-                    className="cursor-pointer"
-                  >
-                    <PaginationPrevious />
-                  </Button>
-                </PaginationItem>
-                <PaginationItem className="flex items-center px-4">
-                  Page {currentPage} of {totalPages}
-                </PaginationItem>
+            {/* Pagination at bottom */}
+            <div className="flex justify-center mt-8">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={goToPrevPage} 
+                      disabled={currentPage === 1}
+                      className="cursor-pointer"
+                    >
+                      <PaginationPrevious />
+                    </Button>
+                  </PaginationItem>
+                  
+                  <PaginationItem className="flex items-center px-4">
+                    <span className="text-sm font-medium">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                  </PaginationItem>
 
-                <PaginationItem>
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
-                    onClick={goToNextPage} 
-                    disabled={currentPage === totalPages}
-                    className="cursor-pointer"
-                  >
-                    <PaginationNext />
-                  </Button>
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
+                  <PaginationItem>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={goToNextPage} 
+                      disabled={currentPage === totalPages}
+                      className="cursor-pointer"
+                    >
+                      <PaginationNext />
+                    </Button>
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
           </>
         ) : (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <p className="text-lg text-center text-muted-foreground">
-                {searchQuery || countryFilter ? 
+                {searchQuery || countryFilter || hijabFilter || beardFilter ? 
                   "No users match your search criteria." :
                   "No more profiles to browse. Check back later!"}
               </p>
-              {(searchQuery || countryFilter) && (
+              {(searchQuery || countryFilter || hijabFilter || beardFilter) && (
                 <Button 
                   variant="outline" 
                   className="mt-4"
                   onClick={() => {
                     setSearchQuery("");
                     setCountryFilter("");
+                    setHijabFilter("");
+                    setBeardFilter("");
                   }}
                 >
                   Clear Filters
