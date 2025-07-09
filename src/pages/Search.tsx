@@ -308,13 +308,23 @@ const Search = () => {
                     <SelectContent>
                       <SelectItem value="anywhere">Anywhere</SelectItem>
                       <SelectItem value="Nigeria">Nigeria</SelectItem>
-                      <SelectItem value="Ghana">Ghana</SelectItem>
-                      <SelectItem value="Saudi Arabia">Saudi Arabia</SelectItem>
-                      <SelectItem value="United States">United States</SelectItem>
                       <SelectItem value="United Kingdom">United Kingdom</SelectItem>
+                      <SelectItem value="United States">United States</SelectItem>
                       <SelectItem value="Canada">Canada</SelectItem>
                       <SelectItem value="Australia">Australia</SelectItem>
+                      <SelectItem value="Saudi Arabia">Saudi Arabia</SelectItem>
+                      <SelectItem value="United Arab Emirates">United Arab Emirates</SelectItem>
                       <SelectItem value="South Africa">South Africa</SelectItem>
+                      <SelectItem value="Ghana">Ghana</SelectItem>
+                      <SelectItem value="Kenya">Kenya</SelectItem>
+                      <SelectItem value="Pakistan">Pakistan</SelectItem>
+                      <SelectItem value="India">India</SelectItem>
+                      <SelectItem value="Bangladesh">Bangladesh</SelectItem>
+                      <SelectItem value="Malaysia">Malaysia</SelectItem>
+                      <SelectItem value="Indonesia">Indonesia</SelectItem>
+                      <SelectItem value="Turkey">Turkey</SelectItem>
+                      <SelectItem value="Egypt">Egypt</SelectItem>
+                      <SelectItem value="Morocco">Morocco</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

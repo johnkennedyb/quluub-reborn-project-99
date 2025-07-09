@@ -62,8 +62,12 @@ exports.applyReferralCode = async (req, res) => {
     currentUser.referralStatus = 'Verified';
     await currentUser.save();
     
-    // Check if the referrer has earned a premium reward
-    if (referrer.referralStats.completedReferrals > 0 && referrer.referralStats.completedReferrals % 5 === 0) {
+    // Update referrer stats
+    referrer.referralStats.totalReferrals += 1;
+    referrer.referralStats.completedReferrals += 1;
+    
+    // Check if the referrer has earned a premium reward (every 5 successful referrals)
+    if (referrer.referralStats.completedReferrals % 5 === 0) {
       referrer.plan = 'premium';
       
       const now = new Date();

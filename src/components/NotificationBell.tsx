@@ -78,7 +78,7 @@ const NotificationBell = () => {
           {unreadCount > 0 && (
             <Badge 
               variant="destructive" 
-              className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs bg-red-500 hover:bg-red-600 border-red-500"
+              className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs bg-red-400 hover:bg-red-500 border-red-400"
             >
               {unreadCount}
             </Badge>
@@ -112,14 +112,14 @@ const NotificationBell = () => {
               <DropdownMenuItem
                 key={notification.id}
                 className={`p-3 cursor-pointer border-b last:border-b-0 flex-col items-start ${
-                  !notification.read ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-gray-50'
+                  !notification.read ? 'bg-blue-25 hover:bg-blue-50' : 'hover:bg-gray-50'
                 }`}
                 onClick={() => markAsRead(notification.id)}
               >
                 <div className="flex items-start justify-between w-full mb-1">
                   <h4 className="font-medium text-xs">{notification.title}</h4>
                   {!notification.read && (
-                    <div className="w-2 h-2 bg-blue-500 rounded-full ml-2 flex-shrink-0 mt-1" />
+                    <div className="w-2 h-2 bg-blue-400 rounded-full ml-2 flex-shrink-0 mt-1" />
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mb-1 text-left">

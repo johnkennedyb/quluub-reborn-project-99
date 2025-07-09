@@ -44,7 +44,8 @@ const PricingToggle = ({ onPlanSelect }: PricingToggleProps) => {
       '10 messages per day',
       'Basic profile visibility',
       'View 30 profiles per day',
-      'Ads included'
+      'Ads included',
+      'Video calling: No'
     ],
     premium: [
       'Unlimited connection requests',
@@ -138,7 +139,7 @@ const PricingToggle = ({ onPlanSelect }: PricingToggleProps) => {
             <div className="text-3xl font-bold">
               {pricingData[currency].symbol}{pricingData[currency].premium.price}
               {pricingData[currency].premium.originalPrice && (
-                <span className="text-lg line-through text-muted-foreground ml-2">
+                <span className="text-lg text-muted-foreground ml-2">
                   ({pricingData[currency].symbol}{pricingData[currency].premium.originalPrice})
                 </span>
               )}
@@ -171,7 +172,7 @@ const PricingToggle = ({ onPlanSelect }: PricingToggleProps) => {
             <div className="text-3xl font-bold">
               {pricingData[currency].symbol}{pricingData[currency].pro.price}
               {pricingData[currency].pro.originalPrice && (
-                <span className="text-lg line-through text-muted-foreground ml-2">
+                <span className="text-lg text-muted-foreground ml-2">
                   ({pricingData[currency].symbol}{pricingData[currency].pro.originalPrice})
                 </span>
               )}

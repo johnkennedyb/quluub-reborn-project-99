@@ -115,6 +115,7 @@ const userSchema = new mongoose.Schema(
     nationality: { type: String },
     country: { type: String },
     region: { type: String },
+    city: { type: String },
     build: { type: String },
     appearance: { type: String },
     hijab: { type: String, enum: ['Yes', 'No'], default: 'No' },
