@@ -47,7 +47,7 @@ const Browse = () => {
     const fetchUsers = async () => {
       try {
         setLoading(true);
-        const fetchedUsers = await userService.getBrowseUsers({ showAll: true });
+        const fetchedUsers = await userService.getBrowseUsers();
         console.log("Browse users:", fetchedUsers);
         if (fetchedUsers && fetchedUsers.length > 0) {
           setUsers(fetchedUsers);

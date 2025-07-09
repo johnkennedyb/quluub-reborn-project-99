@@ -1,7 +1,7 @@
 
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import LoginForm from '@/components/LoginForm';
 import SignupForm from '@/components/SignupForm';
 import { useToast } from '@/hooks/use-toast';
@@ -15,9 +15,9 @@ const Auth = () => {
     return <Navigate to="/dashboard" replace />;
   }
 
-  const handleLogin = async (credentials: { username: string; password: string }) => {
+  const handleLogin = async (username: string, password: string) => {
     try {
-      await login(credentials);
+      await login({ username, password });
       toast({ title: 'Success', description: 'Logged in successfully!' });
     } catch (error: any) {
       toast({ 
