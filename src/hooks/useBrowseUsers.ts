@@ -27,7 +27,9 @@ export const useBrowseUsers = (params: UseBrowseUsersParams = {}) => {
     const fetchUsers = async () => {
       setIsLoading(true);
       try {
-        const response = await userService.getBrowseUsers(params);
+        // Default to 30 users per page
+        const searchParams = { ...params, limit: 30 };
+        const response = await userService.getBrowseUsers(searchParams);
         setData(response);
         setError(null);
       } catch (err: any) {

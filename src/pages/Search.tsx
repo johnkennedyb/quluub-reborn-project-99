@@ -456,14 +456,17 @@ const Search = () => {
               </Card>
             ) : sortedUsers.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {sortedUsers.map((user) => {
+                {sortedUsers.map((user, index) => {
                   const age = calculateAge(user.dob) || 0;
                   
                   if (age < ageRange[0] || age > ageRange[1]) {
                     return null;
                   }
+
+                  const elements = [];
                   
-                  return (
+                  // Add the user card
+                  elements.push(
                     <MatchCard 
                       key={user._id}
                       name={`${user.fname} ${user.lname}`}
@@ -484,6 +487,17 @@ const Search = () => {
                       onPass={() => handlePass(user._id!)}
                     />
                   );
+
+                  // Add ad every 5 people (for non-premium users)
+                  if ((index + 1) % 5 === 0 && currentUser?.plan !== 'premium') {
+                    elements.push(
+                      <div key={`ad-${index}`} className="md:col-span-1">
+                        <AdComponent />
+                      </div>
+                    );
+                  }
+                  
+                  return elements;
                 })}
               </div>
             ) : (
@@ -496,32 +510,48 @@ const Search = () => {
 
             {/* Pagination Controls */}
             {pages && pages > 1 && (
-              <div className="flex justify-center mt-6 items-center space-x-2">
-                <Button 
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={page <= 1 || isLoading}
-                  variant="outline"
-                >
-                  Previous
-                </Button>
-                {Array.from({ length: pages }, (_, i) => i + 1).map(pageNumber => (
+              <div className="mt-6 space-y-4">
+                <div className="flex justify-center items-center space-x-2">
                   <Button 
-                    key={pageNumber} 
-                    onClick={() => setCurrentPage(pageNumber)}
-                    disabled={isLoading}
-                    variant={pageNumber === page ? 'default' : 'outline'}
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={page <= 1 || isLoading}
+                    variant="outline"
                   >
-                    {pageNumber}
+                    Previous
                   </Button>
-                ))}
-                {currentUser?.plan !== 'premium' && <AdComponent />}
-                <Button 
-                  onClick={() => setCurrentPage(prev => prev + 1)}
-                  disabled={page >= pages || isLoading}
-                  variant="outline"
-                >
-                  Next
-                </Button>
+                  {Array.from({ length: Math.min(pages, 10) }, (_, i) => {
+                    let pageNumber;
+                    if (pages <= 10) {
+                      pageNumber = i + 1;
+                    } else {
+                      const start = Math.max(1, page - 5);
+                      const end = Math.min(pages, start + 9);
+                      pageNumber = start + i;
+                      if (pageNumber > end) return null;
+                    }
+                    return (
+                      <Button 
+                        key={pageNumber} 
+                        onClick={() => setCurrentPage(pageNumber)}
+                        disabled={isLoading}
+                        variant={pageNumber === page ? 'default' : 'outline'}
+                        size="sm"
+                      >
+                        {pageNumber}
+                      </Button>
+                    );
+                  })}
+                  <Button 
+                    onClick={() => setCurrentPage(prev => prev + 1)}
+                    disabled={page >= pages || isLoading}
+                    variant="outline"
+                  >
+                    Next
+                  </Button>
+                </div>
+                <div className="text-center text-sm text-muted-foreground">
+                  Page {page} of {pages} • Showing 30 profiles per page
+                </div>
               </div>
             )}
           </div>

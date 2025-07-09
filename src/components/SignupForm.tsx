@@ -6,6 +6,7 @@ import { Select as UiSelect, SelectContent, SelectItem, SelectTrigger, SelectVal
 import { DatePicker } from "@/components/ui/date-picker";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import EthnicityMultiSelect from "@/components/EthnicityMultiSelect";
 import { 
   Card, 
   CardContent, 
@@ -77,9 +78,18 @@ const ethnicities = [
 ];
 
 const countries = [
-  { name: "Nigeria", cities: ["Lagos", "Abuja", "Kano"] },
-  { name: "United Kingdom", cities: ["London", "Manchester", "Birmingham"] },
-  { name: "United States", cities: ["New York", "Los Angeles", "Chicago"] },
+  { name: "Nigeria", cities: ["Lagos", "Abuja", "Kano", "Ibadan", "Kaduna", "Port Harcourt", "Benin City", "Maiduguri", "Zaria", "Aba", "Jos", "Ilorin", "Oyo", "Enugu", "Abeokuta"] },
+  { name: "Ghana", cities: ["Accra", "Kumasi", "Tamale", "Sekondi-Takoradi", "Ashaiman", "Sunyani", "Cape Coast", "Obuasi", "Teshi Old Town", "Tema"] },
+  { name: "Saudi Arabia", cities: ["Riyadh", "Jeddah", "Mecca", "Medina", "Dammam", "Khobar", "Tabuk", "Buraidah", "Khamis Mushait", "Hofuf"] },
+  { name: "United States", cities: ["New York", "Los Angeles", "Chicago", "Houston", "Phoenix", "Philadelphia", "San Antonio", "San Diego", "Dallas", "San Jose"] },
+  { name: "United Kingdom", cities: ["London", "Birmingham", "Manchester", "Glasgow", "Liverpool", "Bristol", "Sheffield", "Leeds", "Edinburgh", "Leicester"] },
+  { name: "Canada", cities: ["Toronto", "Montreal", "Vancouver", "Calgary", "Edmonton", "Ottawa", "Mississauga", "Winnipeg", "Quebec City", "Hamilton"] },
+  { name: "Australia", cities: ["Sydney", "Melbourne", "Brisbane", "Perth", "Adelaide", "Gold Coast", "Newcastle", "Canberra", "Sunshine Coast", "Wollongong"] },
+  { name: "Egypt", cities: ["Cairo", "Alexandria", "Giza", "Shubra El Kheima", "Port Said", "Suez", "Luxor", "Mansoura", "El Mahalla El Kubra", "Tanta"] },
+  { name: "Pakistan", cities: ["Karachi", "Lahore", "Faisalabad", "Rawalpindi", "Multan", "Hyderabad", "Gujranwala", "Peshawar", "Quetta", "Islamabad"] },
+  { name: "India", cities: ["Mumbai", "Delhi", "Bangalore", "Hyderabad", "Chennai", "Kolkata", "Pune", "Ahmedabad", "Jaipur", "Surat"] },
+  { name: "Turkey", cities: ["Istanbul", "Ankara", "Izmir", "Bursa", "Antalya", "Gaziantep", "Konya", "Mersin", "Diyarbakir", "Kayseri"] },
+  { name: "South Africa", cities: ["Johannesburg", "Cape Town", "Durban", "Pretoria", "Port Elizabeth", "Bloemfontein", "East London", "Pietermaritzburg", "Nelspruit", "Kimberley"] }
 ];
 
 const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
@@ -337,20 +347,15 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
           <div className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="ethnicity">Ethnicity (not nationality)</Label>
-              <Select
-                isMulti
-                name="ethnicity"
-                options={formData.ethnicity.length >= 2 ? [] : ethnicities}
-                className="basic-multi-select"
-                classNamePrefix="select"
-                onChange={(selectedOptions) => {
-                  if (selectedOptions.length <= 2) {
-                    handleSelectChange("ethnicity", selectedOptions.map(option => option.value));
-                  }
-                }}
-                value={ethnicities.filter(option => formData.ethnicity.includes(option.value))}
-                placeholder="Select up to 2 ethnicities"
+              <EthnicityMultiSelect
+                value={formData.ethnicity}
+                onChange={(values) => handleSelectChange("ethnicity", values)}
+                placeholder="Search and select up to 2 ethnicities..."
+                maxSelections={2}
               />
+              <p className="text-xs text-muted-foreground">
+                You can select multiple ethnicities if you have mixed heritage (e.g., Nigerian and British)
+              </p>
             </div>
 
             <div className="flex justify-between">

@@ -11,9 +11,10 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Bell, CreditCard, Lock, User, Shield, Trash2, LogOut, Crown } from "lucide-react";
+import { Bell, CreditCard, Lock, User, Shield, Trash2, LogOut, Crown, Gift } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { paymentService, userService } from "@/lib/api-client";
+import ReferralSystem from "@/components/ReferralSystem";
 
 const Settings = () => {
   const { user, logout, updateUser } = useAuth();
@@ -274,6 +275,19 @@ const Settings = () => {
                 onCheckedChange={(value) => handlePrivacyChange('readReceipts', value)}
               />
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Referral System */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Gift className="h-5 w-5" />
+              Invite Friends
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ReferralSystem />
           </CardContent>
         </Card>
 
