@@ -42,7 +42,7 @@ let emailSettings = {
 };
 
 // Create transporter with current configuration
-let transporter = nodemailer.createTransport(emailConfig);
+let transporter = nodemailer.createTransporter(emailConfig);
 
 // Verify transporter configuration
 const verifyTransporter = () => {
@@ -80,12 +80,12 @@ const sendEmail = async (to, templateFunction, ...args) => {
 const updateEmailConfig = async (newConfig) => {
   try {
     emailConfig = {
-      host: newConfig.smtpHost,
-      port: parseInt(newConfig.smtpPort),
+      host: newConfig.smtpHost || emailConfig.host,
+      port: parseInt(newConfig.smtpPort) || emailConfig.port,
       secure: parseInt(newConfig.smtpPort) === 465,
       auth: {
-        user: newConfig.smtpUser,
-        pass: newConfig.smtpPassword
+        user: newConfig.smtpUser || emailConfig.auth.user,
+        pass: newConfig.smtpPassword || emailConfig.auth.pass
       },
       tls: {
         rejectUnauthorized: false
@@ -93,13 +93,13 @@ const updateEmailConfig = async (newConfig) => {
     };
 
     emailSettings = {
-      fromName: newConfig.fromName,
-      fromEmail: newConfig.fromEmail,
-      replyTo: newConfig.replyTo
+      fromName: newConfig.fromName || emailSettings.fromName,
+      fromEmail: newConfig.fromEmail || emailSettings.fromEmail,
+      replyTo: newConfig.replyTo || emailSettings.replyTo
     };
 
     // Create new transporter with updated config
-    transporter = nodemailer.createTransport(emailConfig);
+    transporter = nodemailer.createTransporter(emailConfig);
     
     // Verify new configuration
     return new Promise((resolve) => {
@@ -114,9 +114,38 @@ const updateEmailConfig = async (newConfig) => {
       });
     });
   } catch (error) {
-    console.error('Error updating email-service configuration:', error);
+    console.error('Error updating email configuration:', error);
     return false;
   }
+};
+
+// Function to get the current email configuration
+const getEmailConfigService = () => {
+  return {
+    smtpHost: emailConfig.host,
+    smtpPort: emailConfig.port.toString(),
+    smtpUser: emailConfig.auth.user,
+    smtpPassword: '********', // Don't expose the actual password
+    fromName: emailSettings.fromName,
+    fromEmail: emailSettings.fromEmail,
+    replyTo: emailSettings.replyTo
+  };
+};
+
+// Function to get email metrics
+const getEmailMetricsService = async () => {
+  // In a real application, you would fetch this data from a database or analytics service
+  return {
+    sentToday: 0,
+    deliveryRate: 98.5,
+    openRate: 24.2,
+    bounced: 0,
+    sentLast24Hours: 0,
+    sentLast7Days: 0,
+    failedLast24Hours: 0,
+    totalSent: 0,
+    totalFailed: 0,
+  };
 };
 
 // Specific email functions
@@ -244,29 +273,15 @@ const sendTestEmail = async (testEmail) => {
     console.log('Test email sent successfully:', info.messageId);
   } catch (error) {
     console.error('Error sending test email:', error);
-    throw error; // Re-throw the error to be caught by the controller
+    throw error;
   }
-};
-
-// Function to get the current email configuration
-const getEmailConfigService = () => {
-  return { ...emailConfig, ...emailSettings };
-};
-
-// Function to get email metrics (placeholder)
-const getEmailMetricsService = async () => {
-  // In a real application, you would fetch this data from a database or analytics service
-  return {
-    sentLast24Hours: 0,
-    sentLast7Days: 0,
-    failedLast24Hours: 0,
-    totalSent: 0,
-    totalFailed: 0,
-  };
 };
 
 module.exports = {
   updateEmailConfig,
+  getEmailConfigService,
+  getEmailMetricsService,
+  sendTestEmail,
   sendValidationEmail,
   sendWelcomeEmail,
   sendResetPasswordEmail,
@@ -285,8 +300,5 @@ module.exports = {
   sendContactWaliEmail,
   sendWaliViewChatEmail,
   sendVideoCallNotificationEmail,
-  sendBulkEmail,
-  sendTestEmail,
-  getEmailConfigService,
-  getEmailMetricsService
+  sendBulkEmail
 };

@@ -498,9 +498,44 @@ const sendBulkEmail = async (req, res) => {
 const sendTestEmail = async (req, res) => {
   try {
     const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: 'Email address is required' });
+    }
+    
     await sendTestEmailService(email);
     res.json({ message: 'Test email sent successfully' });
   } catch (error) {
+    console.error('Error sending test email:', error);
+    res.status(500).json({ message: 'Failed to send test email' });
+  }
+};
+
+// @desc    Get email config
+// @route   GET /api/admin/email-config
+// @access  Private/Admin
+const getEmailConfig = async (req, res) => {
+  try {
+    const config = await getEmailConfigService();
+    res.json(config);
+  } catch (error) {
+    console.error('Error fetching email config:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Save email config
+// @route   POST /api/admin/email-config
+// @access  Private/Admin
+const saveEmailConfig = async (req, res) => {
+  try {
+    const success = await updateEmailConfig(req.body);
+    if (success) {
+      res.json({ message: 'Email config updated successfully' });
+    } else {
+      res.status(400).json({ message: 'Failed to update email config' });
+    }
+  } catch (error) {
+    console.error('Error saving email config:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -513,415 +548,10 @@ const getEmailMetrics = async (req, res) => {
     const metrics = await getEmailMetricsService();
     res.json(metrics);
   } catch (error) {
+    console.error('Error fetching email metrics:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
-
-// @desc    Save email config
-// @route   POST /api/admin/email-config
-// @access  Private/Admin
-const saveEmailConfig = async (req, res) => {
-  try {
-    await updateEmailConfig(req.body);
-    res.json({ message: 'Email config updated successfully' });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// @desc    Get email config
-// @route   GET /api/admin/email-config
-// @access  Private/Admin
-const getEmailConfig = async (req, res) => {
-  try {
-    const config = await getEmailConfigService();
-    res.json(config);
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-const getMatchingInsights = async (req, res) => {
-  try {
-    const totalMatches = await Match.countDocuments({ status: 'accepted' });
-    const totalRequests = await Match.countDocuments();
-    const successRate = totalRequests > 0 ? (totalMatches / totalRequests) * 100 : 0;
-    const totalUsers = await User.countDocuments();
-    const avgMatchesPerUser = totalUsers > 0 ? totalMatches / totalUsers : 0;
-
-    res.json({
-      totalMatches,
-      totalRequests,
-      successRate: successRate.toFixed(2),
-      avgMatchesPerUser: avgMatchesPerUser.toFixed(2),
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-const getEngagementMetrics = async (req, res) => {
-  try {
-    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const activeThisWeek = await User.countDocuments({ lastSeen: { $gte: oneWeekAgo } });
-    const totalUsers = await User.countDocuments();
-    const engagementRate = totalUsers > 0 ? (activeThisWeek / totalUsers) * 100 : 0;
-
-    res.json({
-      activeThisWeek,
-      engagementRate: engagementRate.toFixed(2),
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-const getConversionMetrics = async (req, res) => {
-  try {
-    const premiumUsers = await User.countDocuments({ plan: { $in: ['premium', 'pro'] } });
-    const totalUsers = await User.countDocuments();
-    const conversionRate = totalUsers > 0 ? (premiumUsers / totalUsers) * 100 : 0;
-
-    res.json({
-      premiumUsers,
-      conversionRate: conversionRate.toFixed(2),
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-const getChurnAnalysis = async (req, res) => {
-  try {
-    // This is a simplified churn calculation.
-    // A more accurate calculation would track subscription renewals over time.
-    const oneMonthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const churnedUsers = await Subscription.countDocuments({
-      status: 'cancelled',
-      endDate: { $gte: oneMonthAgo },
-    });
-    const totalSubscriptions = await Subscription.countDocuments();
-    const churnRate = totalSubscriptions > 0 ? (churnedUsers / totalSubscriptions) * 100 : 0;
-
-    res.json({
-      churnedUsers,
-      churnRate: churnRate.toFixed(2),
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-const getReferralAnalysis = async (req, res) => {
-  try {
-    const referrals = await User.aggregate([
-      { $match: { referredBy: { $exists: true } } },
-      { $group: { _id: '$referredBy', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 10 },
-      {
-        $lookup: {
-          from: 'users',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'referrer',
-        },
-      },
-      { $unwind: '$referrer' },
-      {
-        $project: {
-          _id: '$referrer._id',
-          username: '$referrer.username',
-          fname: '$referrer.fname',
-          lname: '$referrer.lname',
-          count: '$count',
-        },
-      },
-    ]);
-
-    res.json({ referrals });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-const getChatReports = (req, res) => res.json({ message: 'Not implemented' });
-const sendChatReport = (req, res) => res.json({ message: 'Not implemented' });
-const getVipUsers = (req, res) => res.json({ message: 'Not implemented' });
-const getPaymentHistory = async (req, res) => {
-  try {
-    const payments = await Payment.find()
-      .populate('user', 'fname lname username email')
-      .sort({ createdAt: -1 });
-    res.json({ payments });
-  } catch (error) {
-    console.error('Error fetching payment history:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-const processRefund = async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const payment = await Payment.findById(id).populate('user');
-
-    if (!payment) {
-      return res.status(404).json({ message: 'Payment not found' });
-    }
-
-    if (payment.status !== 'succeeded') {
-      return res.status(400).json({ message: 'Only successful payments can be refunded.' });
-    }
-
-    // In a real application, you would integrate with your payment gateway (e.g., Stripe) here
-    // const refund = await stripe.refunds.create({ payment_intent: payment.transactionId });
-
-    // For now, we'll just update our internal status
-    payment.status = 'refunded';
-    await payment.save();
-
-    // Downgrade the user's plan
-    const user = await User.findById(payment.user._id);
-    if (user) {
-      user.plan = 'freemium';
-      await user.save();
-    }
-
-    res.json({ message: 'Refund processed successfully', payment });
-
-  } catch (error) {
-    console.error('Error processing refund:', error);
-    res.status(500).json({ message: 'Server error while processing refund.' });
-  }
-};
-
-const getPotentialMatches = async (req, res) => {
-  try {
-    const vipUserId = req.params.id;
-    const vipUser = await User.findById(vipUserId);
-
-    if (!vipUser) {
-      return res.status(404).json({ message: 'VIP user not found' });
-    }
-
-    // Determine the target gender for matches
-    const targetGender = vipUser.gender === 'male' ? 'female' : 'male';
-
-    // Find users the VIP has already interacted with
-    const existingRelationships = await Relationship.find({
-      $or: [
-        { follower_user_id: vipUserId },
-        { followed_user_id: vipUserId },
-      ],
-    });
-
-    const interactedUserIds = existingRelationships.flatMap(rel => [
-      rel.follower_user_id,
-      rel.followed_user_id,
-    ]);
-    const uniqueInteractedIds = [...new Set(interactedUserIds)];
-
-    // Find potential matches
-    const potentialMatches = await User.find({
-      _id: { $ne: vipUserId, $nin: uniqueInteractedIds },
-      gender: targetGender,
-      status: 'active',
-    })
-      .select('fname lname email gender age country city summary plan')
-      .limit(50);
-
-    res.json({ matches: potentialMatches });
-  } catch (error) {
-    console.error('Error fetching potential matches:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-const sendMatchSuggestions = async (req, res) => {
-  try {
-    const vipUserId = req.params.id;
-    const { suggestedUserIds } = req.body;
-
-    if (!suggestedUserIds || !Array.isArray(suggestedUserIds) || suggestedUserIds.length === 0) {
-      return res.status(400).json({ message: 'No suggested user IDs provided.' });
-    }
-
-    const suggestions = suggestedUserIds.map(suggestedId => ({
-      follower_user_id: vipUserId,
-      followed_user_id: suggestedId,
-      status: 'pending', // Admin-initiated suggestions are pending
-    }));
-
-    await Relationship.insertMany(suggestions);
-
-    res.status(201).json({ message: 'Match suggestions sent successfully.' });
-  } catch (error) {
-    console.error('Error sending match suggestions:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-const getReportDetails = (req, res) => res.json({ message: 'Not implemented' });
-const resolveReport = (req, res) => res.json({ message: 'Not implemented' });
-const getSystemSettings = (req, res) => res.json({ message: 'Not implemented' });
-
-// @desc    Send push notification
-// @route   POST /api/admin/push-notifications
-// @access  Private/Admin
-const sendAdminPushNotification = async (req, res) => {
-  const { title, message, target, targetUsers } = req.body;
-
-  try {
-    let query = {};
-
-    switch (target) {
-      case 'all':
-        query = { pushToken: { $exists: true, $ne: null } };
-        break;
-      case 'premium':
-        query = { plan: 'premium', pushToken: { $exists: true, $ne: null } };
-        break;
-      case 'free':
-        query = { plan: 'freemium', pushToken: { $exists: true, $ne: null } };
-        break;
-      case 'specific':
-        if (!targetUsers || !Array.isArray(targetUsers) || targetUsers.length === 0) {
-          return res.status(400).json({ message: 'Please select at least one user.' });
-        }
-        query = { _id: { $in: targetUsers }, pushToken: { $exists: true, $ne: null } };
-        break;
-      default:
-        return res.status(400).json({ message: 'Invalid target specified.' });
-    }
-
-    const usersToNotify = await User.find(query).select('pushToken');
-
-    if (usersToNotify.length === 0) {
-      return res.status(404).json({ message: 'No users found with push tokens for the selected target.' });
-    }
-
-    const tokens = usersToNotify.map(user => user.pushToken).filter(Boolean);
-
-    // This is where you would integrate with a push notification service like Firebase Cloud Messaging (FCM)
-    // For now, we will simulate the sending process.
-    console.log(`Simulating sending push notification to ${tokens.length} tokens.`);
-
-    const newNotification = new PushNotification({
-      title,
-      message,
-      target,
-      sentTo: usersToNotify.length,
-      sentAt: new Date(),
-    });
-
-    await newNotification.save();
-
-    res.json({ message: `Push notification successfully sent to ${usersToNotify.length} users.` });
-
-  } catch (error) {
-    console.error('Error sending push notification:', error);
-    res.status(500).json({ message: 'Failed to send push notification.' });
-  }
-};
-
-const getAdminPushNotifications = async (req, res) => {
-  try {
-    const notifications = await PushNotification.find().sort({ sentAt: -1 });
-    res.json({ notifications });
-  } catch (error) {
-    console.error('Error fetching push notifications:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// @desc    Schedule an email
-// @route   POST /api/admin/schedule-email
-// @access  Private/Admin
-const scheduleEmail = async (req, res) => {
-  try {
-    const { userIds, subject, message, sendToAll, sendAt } = req.body;
-    let users = [];
-
-    if (sendToAll === 'true' || sendToAll === true) {
-      users = await User.find({}, '_id');
-    } else {
-      if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
-        return res.status(400).json({ message: 'Please select at least one user.' });
-      }
-      users = await User.find({ '_id': { $in: userIds } }, '_id');
-    }
-
-    if (users.length === 0) {
-      return res.status(404).json({ message: 'No users found to schedule email for.' });
-    }
-    
-    if (!sendAt) {
-        return res.status(400).json({ message: 'Please provide a scheduled time.' });
-    }
-
-    let attachments = [];
-    if (req.files) {
-      attachments = req.files.map(file => ({
-        filename: file.originalname,
-        content: file.buffer.toString('base64'), // Store as base64
-        contentType: file.mimetype,
-      }));
-    }
-
-    const newScheduledEmail = new ScheduledEmail({
-      recipients: users.map(u => u._id),
-      subject,
-      message,
-      attachments,
-      sendTime: new Date(sendAt),
-      status: 'pending',
-    });
-
-    await newScheduledEmail.save();
-
-    res.status(201).json({ message: `Email scheduled successfully for ${users.length} users.` });
-  } catch (error) {
-    console.error('Error scheduling email:', error);
-    res.status(500).json({ message: 'Failed to schedule email.' });
-  }
-};
-
-// @desc    Get all scheduled emails
-// @route   GET /api/admin/scheduled-emails
-// @access  Private/Admin
-const getScheduledEmails = async (req, res) => {
-  try {
-    const scheduledEmails = await ScheduledEmail.find({ status: 'pending' }).populate('recipients', 'fname lname email');
-    res.json(scheduledEmails);
-  } catch (error) {
-    console.error('Error getting scheduled emails:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// @desc    Cancel a scheduled email
-// @route   DELETE /api/admin/scheduled-emails/:id
-// @access  Private/Admin
-const cancelScheduledEmail = async (req, res) => {
-  try {
-    const email = await ScheduledEmail.findById(req.params.id);
-
-    if (!email) {
-      return res.status(404).json({ message: 'Scheduled email not found' });
-    }
-
-    if (email.status !== 'pending') {
-      return res.status(400).json({ message: 'Cannot cancel an email that is not pending' });
-    }
-
-    await ScheduledEmail.deleteOne({ _id: req.params.id });
-
-    res.json({ message: 'Scheduled email cancelled successfully' });
-  } catch (error) {
-    console.error('Error cancelling scheduled email:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-const sendAdminNotification = (req, res) => res.json({ message: 'Not implemented' });
-const getAdminNotifications = (req, res) => res.json({ message: 'Not implemented' });
-const markNotificationAsRead = (req, res) => res.json({ message: 'Not implemented' });
-
 
 module.exports = {
   getReportedProfiles,
@@ -969,5 +599,8 @@ module.exports = {
   getAdminNotifications,
   markNotificationAsRead,
   sendAdminPushNotification,
-  getAdminPushNotifications
+  getAdminPushNotifications,
+  getEmailConfig,
+  saveEmailConfig,
+  getEmailMetrics
 };

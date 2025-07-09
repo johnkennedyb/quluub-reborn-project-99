@@ -1,3 +1,4 @@
+
 const express = require('express');
 const {
   getStats,
@@ -98,7 +99,6 @@ router.post('/users/:id/reset-password', sendPasswordResetLink);
 router.post('/users/:id/verify-email', verifyUserEmail);
 router.post('/users/:id/suggest-matches', sendMatchSuggestions);
 
-// Push Notification routes
 // System routes
 router.get('/system', getSystemMetrics);
 
@@ -126,8 +126,6 @@ router.route('/push-notifications').get(getAdminPushNotifications).post(sendAdmi
 router.get('/reported-profiles', getReportedProfiles);
 router.patch('/reported-profiles/:id/dismiss', dismissReport);
 
-
-
 // Analytics routes
 router.get('/matching-insights', getMatchingInsights);
 router.get('/engagement-metrics', getEngagementMetrics);
@@ -141,6 +139,6 @@ router.get('/vip-users', getVipUsers);
 // Subscription and Payment routes
 router.get('/subscriptions', getAllSubscriptions);
 router.get('/payments', getPaymentHistory);
-router.post('/payments/:id/refund', protect, isAdmin, processRefund);
+router.post('/payments/:id/refund', processRefund);
 
 module.exports = router;
