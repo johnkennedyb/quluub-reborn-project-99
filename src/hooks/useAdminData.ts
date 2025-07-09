@@ -252,9 +252,7 @@ export const useAdminData = (filters: UserFilters = defaultUserFilters, callFilt
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [pushNotifications, setPushNotifications] = useState<any[]>([]);
-  const [vipUsers, setVipUsers] = useState<AdminUser[]>([]);
   const [potentialMatches, setPotentialMatches] = useState<AdminUser[]>([]);
-  const [loadingVips, setLoadingVips] = useState(false);
   const [loadingMatches, setLoadingMatches] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [callStats, setCallStats] = useState<CallStatistics>({
@@ -354,18 +352,7 @@ export const useAdminData = (filters: UserFilters = defaultUserFilters, callFilt
     }
   }, [apiClient, toast]);
 
-  const fetchVipUsers = useCallback(async () => {
-    setLoadingVips(true);
-    try {
-      const response = await apiClient.get('/admin/vip-users');
-      setVipUsers(response.data.vips || []);
-    } catch (error) {
-      console.error('❌ Failed to fetch VIP users:', error);
-      toast({ title: 'Error', description: 'Could not fetch VIP users.', variant: 'destructive' });
-    } finally {
-      setLoadingVips(false);
-    }
-  }, [apiClient, toast]);
+  // Removed VIP functionality - using premium users instead
 
   const fetchPotentialMatches = useCallback(async (userId: string) => {
     setLoadingMatches(true);
@@ -399,7 +386,6 @@ export const useAdminData = (filters: UserFilters = defaultUserFilters, callFilt
         fetchSubscriptions(),
         fetchPayments(),
         fetchPushNotifications(),
-        fetchVipUsers(),
       ]);
     } catch (err: any) {
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
@@ -419,8 +405,7 @@ export const useAdminData = (filters: UserFilters = defaultUserFilters, callFilt
     fetchReportedProfiles, 
     fetchSubscriptions, 
     fetchPayments, 
-    fetchPushNotifications, 
-    fetchVipUsers
+    fetchPushNotifications
   ]);
 
   useEffect(() => {
@@ -543,9 +528,7 @@ export const useAdminData = (filters: UserFilters = defaultUserFilters, callFilt
     subscriptions,
     payments,
     pushNotifications,
-    vipUsers,
     potentialMatches,
-    loadingVips,
     loadingMatches,
     isSubmitting,
     callStats,

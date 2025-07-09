@@ -33,14 +33,13 @@ const SubscriptionOverview = () => {
 
   const getPlanVariant = (plan: string): 'default' | 'secondary' | 'outline' => {
     switch (plan) {
-      case 'pro':
-        return 'default';
       case 'premium':
-        return 'secondary';
+        return 'default';
       case 'freemium':
+      case 'free':
         return 'outline';
       default:
-        return 'outline';
+        return 'secondary';
     }
   };
 

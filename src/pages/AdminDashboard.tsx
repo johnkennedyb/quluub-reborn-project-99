@@ -87,9 +87,9 @@ const AdminDashboard = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8">
+          <div className="flex justify-between items-center py-3 sm:py-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               {isMobile && (
                 <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
                   <SheetTrigger asChild>
@@ -108,27 +108,27 @@ const AdminDashboard = () => {
                 </Sheet>
               )}
               <div>
-                <h1 className="text-xl md:text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-                <p className="text-xs md:text-sm text-gray-600">Welcome back, {adminUser?.fname} {adminUser?.lname}</p>
+                <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+                <p className="text-xs sm:text-sm text-gray-600">Welcome back, {adminUser?.fname} {adminUser?.lname}</p>
               </div>
             </div>
             <Button variant="outline" size={isMobile ? "sm" : "default"} onClick={adminLogout}>
-              Logout
+              <span className={isMobile ? 'text-xs' : ''}>Logout</span>
             </Button>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-3 sm:py-4 md:py-8">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
           {/* Desktop Navigation */}
           {!isMobile && (
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-10 gap-1">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-10 gap-1">
               {tabItems.map(({ value, label, icon: Icon }) => (
-                <TabsTrigger key={value} value={value} className="flex items-center space-x-1 text-xs lg:text-sm">
+                <TabsTrigger key={value} value={value} className="flex items-center space-x-1 text-xs lg:text-sm p-1 sm:p-2">
                   <Icon className="h-3 w-3 lg:h-4 lg:w-4" />
-                  <span className="hidden sm:inline">{label}</span>
+                  <span className="hidden sm:inline truncate">{label}</span>
                 </TabsTrigger>
               ))}
             </TabsList>
@@ -136,14 +136,14 @@ const AdminDashboard = () => {
 
           {/* Overview Tab */}
           <TabsContent value="overview">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Members</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-xs sm:text-sm font-medium">Total Members</CardTitle>
+                  <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stats?.totalMembers || 0}</div>
+                <CardContent className="pb-2 sm:pb-4">
+                  <div className="text-lg sm:text-2xl font-bold">{stats?.totalMembers || 0}</div>
                   <p className="text-xs text-muted-foreground">
                     +{stats?.recentRegistrations || 0} this week
                   </p>
@@ -152,11 +152,11 @@ const AdminDashboard = () => {
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Inactive Users</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-xs sm:text-sm font-medium">Inactive Users</CardTitle>
+                  <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stats?.inactiveUsers || 0}</div>
+                <CardContent className="pb-2 sm:pb-4">
+                  <div className="text-lg sm:text-2xl font-bold">{stats?.inactiveUsers || 0}</div>
                   <p className="text-xs text-muted-foreground">
                     {stats?.inactiveSixMonths || 0} inactive 6+ months
                   </p>
@@ -165,11 +165,11 @@ const AdminDashboard = () => {
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Premium Members</CardTitle>
-                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-xs sm:text-sm font-medium">Premium Members</CardTitle>
+                  <Users className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stats?.premiumMembers || 0}</div>
+                <CardContent className="pb-2 sm:pb-4">
+                  <div className="text-lg sm:text-2xl font-bold">{stats?.premiumMembers || 0}</div>
                   <p className="text-xs text-muted-foreground">
                     {stats?.conversionRate || 0}% conversion rate
                   </p>
@@ -178,11 +178,11 @@ const AdminDashboard = () => {
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Messages Exchanged</CardTitle>
-                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <CardTitle className="text-xs sm:text-sm font-medium">Messages Exchanged</CardTitle>
+                  <Mail className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
                 </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{stats?.messagesExchanged || 0}</div>
+                <CardContent className="pb-2 sm:pb-4">
+                  <div className="text-lg sm:text-2xl font-bold">{stats?.messagesExchanged || 0}</div>
                   <p className="text-xs text-muted-foreground">
                     +{stats?.messagesThisWeek || 0} this week
                   </p>
@@ -191,26 +191,26 @@ const AdminDashboard = () => {
             </div>
 
             {/* Additional Metrics */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 mt-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6 mt-4 sm:mt-6">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Inactive User Analysis</CardTitle>
+                  <CardTitle className="text-sm sm:text-lg">Inactive User Analysis</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-sm">1 Month Inactive:</span>
+                  <div className="flex justify-between text-xs sm:text-sm">
+                    <span>1 Month Inactive:</span>
                     <span className="font-semibold">{stats?.inactiveUsers || 0}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm">3 Months Inactive:</span>
+                  <div className="flex justify-between text-xs sm:text-sm">
+                    <span>3 Months Inactive:</span>
                     <span className="font-semibold">{stats?.inactiveQuarter || 0}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm">6 Months Inactive:</span>
+                  <div className="flex justify-between text-xs sm:text-sm">
+                    <span>6 Months Inactive:</span>
                     <span className="font-semibold">{stats?.inactiveSixMonths || 0}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm">1 Year Inactive:</span>
+                  <div className="flex justify-between text-xs sm:text-sm">
+                    <span>1 Year Inactive:</span>
                     <span className="font-semibold">{stats?.inactiveYear || 0}</span>
                   </div>
                 </CardContent>
@@ -218,19 +218,19 @@ const AdminDashboard = () => {
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Match Statistics</CardTitle>
+                  <CardTitle className="text-sm sm:text-lg">Match Statistics</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-sm">Total Matches:</span>
+                  <div className="flex justify-between text-xs sm:text-sm">
+                    <span>Total Matches:</span>
                     <span className="font-semibold">{stats?.totalMatches || 0}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm">Success Rate:</span>
+                  <div className="flex justify-between text-xs sm:text-sm">
+                    <span>Success Rate:</span>
                     <span className="font-semibold">{stats?.successRate || 0}%</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm">Avg per User:</span>
+                  <div className="flex justify-between text-xs sm:text-sm">
+                    <span>Avg per User:</span>
                     <span className="font-semibold">{stats?.avgMatchesPerUser || 0}</span>
                   </div>
                 </CardContent>
@@ -238,19 +238,19 @@ const AdminDashboard = () => {
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Growth Metrics</CardTitle>
+                  <CardTitle className="text-sm sm:text-lg">Growth Metrics</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-sm">Growth Rate:</span>
+                  <div className="flex justify-between text-xs sm:text-sm">
+                    <span>Growth Rate:</span>
                     <span className="font-semibold">{stats?.growthRate || 0}%</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm">Churn Rate:</span>
+                  <div className="flex justify-between text-xs sm:text-sm">
+                    <span>Churn Rate:</span>
                     <span className="font-semibold">{stats?.churnRate || 0}%</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm">Engagement Rate:</span>
+                  <div className="flex justify-between text-xs sm:text-sm">
+                    <span>Engagement Rate:</span>
                     <span className="font-semibold">{stats?.engagementRate || 0}%</span>
                   </div>
                 </CardContent>
@@ -258,34 +258,34 @@ const AdminDashboard = () => {
             </div>
 
             {/* Quick Actions */}
-            <Card className="mt-6">
+            <Card className="mt-4 sm:mt-6">
               <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
+                <CardTitle className="text-sm sm:text-lg">Quick Actions</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                   <Button 
                     onClick={() => setActiveTab('members')}
-                    className="h-16 md:h-20 flex flex-col items-center justify-center"
+                    className="h-14 sm:h-16 md:h-20 flex flex-col items-center justify-center text-xs sm:text-sm"
                   >
-                    <Users className="h-5 w-5 md:h-6 md:w-6 mb-1 md:mb-2" />
-                    <span className="text-sm">Manage Members</span>
+                    <Users className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 mb-1 md:mb-2" />
+                    <span>Manage Members</span>
                   </Button>
                   <Button 
                     variant="outline"
                     onClick={() => setActiveTab('insights')}
-                    className="h-16 md:h-20 flex flex-col items-center justify-center"
+                    className="h-14 sm:h-16 md:h-20 flex flex-col items-center justify-center text-xs sm:text-sm"
                   >
-                    <BarChart3 className="h-5 w-5 md:h-6 md:w-6 mb-1 md:mb-2" />
-                    <span className="text-sm">View Insights</span>
+                    <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 mb-1 md:mb-2" />
+                    <span>View Insights</span>
                   </Button>
                   <Button 
                     variant="outline"
                     onClick={() => setActiveTab('suggestions')}
-                    className="h-16 md:h-20 flex flex-col items-center justify-center"
+                    className="h-14 sm:h-16 md:h-20 flex flex-col items-center justify-center text-xs sm:text-sm"
                   >
-                    <Heart className="h-5 w-5 md:h-6 md:w-6 mb-1 md:mb-2" />
-                    <span className="text-sm">Match Suggestions</span>
+                    <Heart className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 mb-1 md:mb-2" />
+                    <span>Match Suggestions</span>
                   </Button>
                 </div>
               </CardContent>

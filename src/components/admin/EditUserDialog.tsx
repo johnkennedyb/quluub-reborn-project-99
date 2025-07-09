@@ -68,6 +68,29 @@ const EditUserDialog = ({ user, isOpen, onOpenChange, onUserUpdate, sendPassword
   }, [user, form]);
 
   const handleSaveChanges = async (values: z.infer<typeof formSchema>) => {
+    const currentStatus = user.status;
+    const newStatus = values.status;
+    const currentPlan = user.plan;
+    const newPlan = values.plan;
+
+    // Check for status change warnings
+    if (currentStatus !== newStatus) {
+      const statusChangeMessage = newStatus === 'active' 
+        ? '⚠️ WARNING: Are you sure you want to activate this user? They will be able to access the platform and interact with other members.'
+        : '⚠️ WARNING: Are you sure you want to change this user\'s status? This will affect their ability to use the platform.';
+      
+      if (!confirm(statusChangeMessage)) {
+        return;
+      }
+    }
+
+    // Check for premium upgrade warning
+    if (currentPlan !== 'premium' && newPlan === 'premium') {
+      if (!confirm('⚠️ WARNING: Are you sure you want to upgrade this user to premium? This action will grant them premium access immediately.')) {
+        return;
+      }
+    }
+
     try {
       await onUserUpdate(user._id, values);
       toast({ title: 'Success', description: 'User details updated successfully.' });
