@@ -3,57 +3,44 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 
-const UserProfileCard = ({ user }) => {
-  if (!user) return null;
-
-  const getInitials = (fname, lname) => {
-    return `${fname?.charAt(0) || ''}${lname?.charAt(0) || ''}`.toUpperCase();
+const UserProfileCard = ({ user, onEdit, onDelete, onViewProfile }: UserProfileCardProps) => {
+  const getPlanBadgeVariant = (plan: string) => {
+    switch (plan) {
+      case 'premium':
+      case 'pro':
+        return 'default';
+      case 'freemium':
+        return 'secondary';
+      default:
+        return 'outline';
+    }
   };
 
   return (
-    <Card className="w-full max-w-lg mx-auto">
-      <CardHeader>
-        <div className="flex items-center space-x-4">
-          <Avatar className="h-16 w-16">
-            <AvatarImage src={user.profilePicture} alt={`${user.fname} ${user.lname}`} />
-            <AvatarFallback>{getInitials(user.fname, user.lname)}</AvatarFallback>
-          </Avatar>
+    <Card className="mb-4">
+      <CardContent className="p-4">
+        <div className="flex justify-between items-start mb-2">
           <div>
-            <CardTitle className="text-2xl">{`${user.fname} ${user.lname}`}</CardTitle>
-            <p className="text-sm text-muted-foreground">@{user.username}</p>
+            <h3 className="font-semibold">{user.fullName}</h3>
+            <p className="text-sm text-gray-600">@{user.username}</p>
+          </div>
+          <div className="flex gap-2">
+            <Badge variant={getPlanBadgeVariant(user.plan)}>{user.plan}</Badge>
+            <Badge variant={user.status === 'active' ? 'default' : 'secondary'}>{user.status}</Badge>
           </div>
         </div>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <h3 className="font-semibold">Status</h3>
-            <Badge variant={user.status === 'active' ? 'default' : 'destructive'}>{user.status}</Badge>
-          </div>
-          <div>
-            <h3 className="font-semibold">Plan</h3>
-            <Badge variant={user.plan === 'premium' ? 'premium' : 'secondary'}>{user.plan}</Badge>
-          </div>
-          <div>
-            <h3 className="font-semibold">Email</h3>
-            <p>{user.email}</p>
-          </div>
-          <div>
-            <h3 className="font-semibold">Gender</h3>
-            <p>{user.gender}</p>
-          </div>
-          <div>
-            <h3 className="font-semibold">Location</h3>
-            <p>{`${user.city || 'N/A'}, ${user.country || 'N/A'}`}</p>
-          </div>
-          <div>
-            <h3 className="font-semibold">Joined</h3>
-            <p>{new Date(user.createdAt).toLocaleDateString()}</p>
-          </div>
-          <div>
-            <h3 className="font-semibold">Last Seen</h3>
-            <p>{new Date(user.lastSeen).toLocaleDateString()}</p>
-          </div>
+        
+        <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+          <div><strong>Age:</strong> {user.age || 'N/A'}</div>
+          <div><strong>Country:</strong> {user.country}</div>
+          <div><strong>Joined:</strong> {user.joinedAgo ? `${user.joinedAgo} days ago` : 'N/A'}</div>
+          <div><strong>Last Seen:</strong> {user.lastSeenAgo ? `${user.lastSeenAgo} days ago` : 'N/A'}</div>
+        </div>
+
+        <div className="flex gap-2">
+          <Button size="sm" onClick={() => onViewProfile(user._id)}>View</Button>
+          <Button size="sm" variant="outline" onClick={() => onEdit(user)}>Edit</Button>
+          <Button size="sm" variant="destructive" onClick={() => onDelete(user._id)}>Delete</Button>
         </div>
       </CardContent>
     </Card>

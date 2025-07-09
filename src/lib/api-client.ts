@@ -1,3 +1,4 @@
+
 import axios from 'axios';
 import { LoginCredentials, SignupData, User } from '@/types/user';
 
@@ -48,6 +49,11 @@ export const authService = {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     window.location.href = '/login';
+  },
+
+  getCurrentUser: async () => {
+    const response = await apiClient.get('/auth/me');
+    return response.data;
   },
 
   verifyEmail: async (token: string) => {
@@ -126,6 +132,11 @@ export const userService = {
 
   getPotentialMatches: async (userId: string, params?: any) => {
     const response = await apiClient.get(`/users/${userId}/potential-matches`, { params });
+    return response.data;
+  },
+
+  getBrowseUsers: async (params?: any) => {
+    const response = await apiClient.get('/users/browse', { params });
     return response.data;
   },
 
@@ -295,6 +306,109 @@ export const userService = {
   },
 };
 
+export const relationshipService = {
+  getMatches: async () => {
+    const response = await apiClient.get('/relationships/matches');
+    return response.data;
+  },
+
+  getPendingRequests: async () => {
+    const response = await apiClient.get('/relationships/pending');
+    return response.data;
+  },
+
+  sendRequest: async (userId: string) => {
+    const response = await apiClient.post(`/relationships/request/${userId}`);
+    return response.data;
+  },
+
+  respondToRequest: async (relationshipId: string, action: 'accept' | 'reject') => {
+    const response = await apiClient.post(`/relationships/${relationshipId}/${action}`);
+    return response.data;
+  },
+
+  getSentRequests: async () => {
+    const response = await apiClient.get('/relationships/sent');
+    return response.data;
+  },
+
+  getReceivedRequests: async () => {
+    const response = await apiClient.get('/relationships/received');
+    return response.data;
+  },
+
+  likeUser: async (userId: string) => {
+    const response = await apiClient.post(`/relationships/like/${userId}`);
+    return response.data;
+  },
+
+  passUser: async (userId: string) => {
+    const response = await apiClient.post(`/relationships/pass/${userId}`);
+    return response.data;
+  },
+};
+
+export const chatService = {
+  getUnreadCount: async () => {
+    const response = await apiClient.get('/chat/unread-count');
+    return response.data;
+  },
+
+  getChatRooms: async () => {
+    const response = await apiClient.get('/chat/rooms');
+    return response.data;
+  },
+
+  getMessages: async (roomId: string) => {
+    const response = await apiClient.get(`/chat/rooms/${roomId}/messages`);
+    return response.data;
+  },
+
+  sendMessage: async (roomId: string, message: string) => {
+    const response = await apiClient.post(`/chat/rooms/${roomId}/messages`, { message });
+    return response.data;
+  },
+
+  markAsRead: async (roomId: string) => {
+    const response = await apiClient.post(`/chat/rooms/${roomId}/read`);
+    return response.data;
+  },
+};
+
+export const paymentService = {
+  getPlans: async () => {
+    const response = await apiClient.get('/payments/plans');
+    return response.data;
+  },
+
+  createPaymentIntent: async (planId: string) => {
+    const response = await apiClient.post('/payments/create-intent', { planId });
+    return response.data;
+  },
+
+  confirmPayment: async (paymentIntentId: string) => {
+    const response = await apiClient.post('/payments/confirm', { paymentIntentId });
+    return response.data;
+  },
+
+  getPaymentHistory: async () => {
+    const response = await apiClient.get('/payments/history');
+    return response.data;
+  },
+};
+
+export const emailService = {
+  sendEmail: async (data: any) => {
+    const response = await apiClient.post('/email/send', data);
+    return response.data;
+  },
+
+  getEmailTemplates: async () => {
+    const response = await apiClient.get('/email/templates');
+    return response.data;
+  },
+};
+
 export const adminService = {
   getStats: () => apiClient.get('/admin/stats').then(res => res.data),
   getAllUsers: (params?: any) => apiClient.get('/admin/users', { params }).then(res => res.data.users),
@@ -337,3 +451,7 @@ export const adminService = {
   sendTestEmail: (email: string) => apiClient.post('/admin/test-email', { email }).then(res => res.data),
   sendBulkEmail: (data: any) => apiClient.post('/admin/bulk-email', data).then(res => res.data),
 };
+
+// Default export for backwards compatibility
+const apiClientDefault = apiClient;
+export default apiClientDefault;

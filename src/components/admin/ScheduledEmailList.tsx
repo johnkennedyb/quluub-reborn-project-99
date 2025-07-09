@@ -9,9 +9,10 @@ import { Trash2 } from 'lucide-react';
 
 export interface ScheduledEmailListProps {
   refreshKey: number;
+  setRefreshKey?: React.Dispatch<React.SetStateAction<number>>;
 }
 
-const ScheduledEmailList = ({ refreshKey }: ScheduledEmailListProps) => {
+const ScheduledEmailList = ({ refreshKey, setRefreshKey }: ScheduledEmailListProps) => {
   const [scheduledEmails, setScheduledEmails] = useState([]);
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -37,6 +38,9 @@ const ScheduledEmailList = ({ refreshKey }: ScheduledEmailListProps) => {
       await adminService.cancelScheduledEmail(emailId);
       toast({ title: 'Success', description: 'Scheduled email cancelled.' });
       fetchScheduledEmails();
+      if (setRefreshKey) {
+        setRefreshKey(prev => prev + 1);
+      }
     } catch (error) {
       toast({ title: 'Error', description: 'Failed to cancel email.', variant: 'destructive' });
     }
