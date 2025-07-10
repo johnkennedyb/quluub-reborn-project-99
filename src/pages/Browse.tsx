@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
@@ -5,7 +6,7 @@ import { Heart, X, Send, UserPlus, Search, Filter, Star } from "lucide-react";
 import AdComponent from '@/components/AdComponent';
 import { useAuth } from '@/contexts/AuthContext';
 import { userService, relationshipService } from "@/lib/api-client";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { User } from "@/types/user";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
@@ -216,18 +217,6 @@ const Browse = () => {
     }
   };
 
-  const goToNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
-  };
-
-  const goToPrevPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  };
-
   // Get unique countries for the filter
   const uniqueCountries = [...new Set(users.filter(user => user.country).map(user => user.country))];
 
@@ -388,7 +377,7 @@ const Browse = () => {
               })}
             </div>
             
-            {/* Pagination at bottom */}
+            {/* Pagination */}
             <div className="flex justify-center items-center space-x-4 mt-8">
               <Button 
                 variant="outline" 

@@ -1,41 +1,25 @@
 
-// Jitsi Meet API configuration and utilities
+export interface JitsiConfig {
+  roomName: string;
+  displayName?: string;
+  userEmail?: string;
+  userAvatarUrl?: string;
+}
+
+export interface JitsiAPI {
+  executeCommand: (command: string, ...args: any[]) => void;
+  addEventListener: (event: string, callback: Function) => void;
+  removeEventListener: (event: string, callback: Function) => void;
+  dispose: () => void;
+  isVideoMuted: () => boolean;
+  isAudioMuted: () => boolean;
+  getParticipantsInfo: () => any[];
+}
+
 declare global {
   interface Window {
     JitsiMeetExternalAPI: any;
   }
-}
-
-export interface JitsiMeetConfig {
-  roomName: string;
-  parentNode: HTMLElement;
-  configOverwrite?: {
-    startWithAudioMuted?: boolean;
-    startWithVideoMuted?: boolean;
-    enableWelcomePage?: boolean;
-    prejoinPageEnabled?: boolean;
-    disableModeratorIndicator?: boolean;
-    startScreenSharing?: boolean;
-    enableEmailInStats?: boolean;
-    requireDisplayName?: boolean;
-    disableProfile?: boolean;
-    hideDisplayName?: boolean;
-    enableUserRolesBasedOnToken?: boolean;
-    callStatsThreshold?: number;
-  };
-  interfaceConfigOverwrite?: {
-    DISABLE_JOIN_LEAVE_NOTIFICATIONS?: boolean;
-    DISABLE_PRESENCE_STATUS?: boolean;
-    SHOW_JITSI_WATERMARK?: boolean;
-    SHOW_WATERMARK_FOR_GUESTS?: boolean;
-    TOOLBAR_BUTTONS?: string[];
-    HIDE_INVITE_MORE_HEADER?: boolean;
-    SHOW_CHROME_EXTENSION_BANNER?: boolean;
-  };
-  userInfo?: {
-    displayName?: string;
-    email?: string;
-  };
 }
 
 export const loadJitsiScript = (): Promise<void> => {
@@ -49,52 +33,91 @@ export const loadJitsiScript = (): Promise<void> => {
     script.src = 'https://meet.jit.si/external_api.js';
     script.async = true;
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Failed to load Jitsi Meet API'));
+    script.onerror = () => reject(new Error('Failed to load Jitsi script'));
     document.head.appendChild(script);
   });
 };
 
-export const createJitsiMeeting = (config: JitsiMeetConfig) => {
-  const defaultConfig = {
-    height: '100%',
-    width: '100%',
-    parentNode: config.parentNode,
+export const initializeJitsi = async (
+  containerId: string,
+  config: JitsiConfig
+): Promise<JitsiAPI> => {
+  await loadJitsiScript();
+
+  const domain = 'meet.jit.si';
+  const options = {
     roomName: config.roomName,
+    width: '100%',
+    height: '100%',
+    parentNode: document.getElementById(containerId),
     configOverwrite: {
       startWithAudioMuted: false,
       startWithVideoMuted: false,
       enableWelcomePage: false,
       prejoinPageEnabled: false,
-      disableModeratorIndicator: true,
-      startScreenSharing: false,
-      enableEmailInStats: false,
-      requireDisplayName: false,
-      disableProfile: true,
-      hideDisplayName: false,
-      enableUserRolesBasedOnToken: false,
       disableDeepLinking: true,
-      disableInviteFunctions: true,
-      // Enhanced call time limit for premium users only
-      callStatsThreshold: 300, // 5 minutes for free users
-      ...config.configOverwrite,
     },
     interfaceConfigOverwrite: {
-      DISABLE_JOIN_LEAVE_NOTIFICATIONS: true,
-      DISABLE_PRESENCE_STATUS: true,
+      TOOLBAR_BUTTONS: [
+        'microphone',
+        'camera',
+        'closedcaptions',
+        'desktop',
+        'fullscreen',
+        'fodeviceselection',
+        'hangup',
+        'profile',
+        'info',
+        'chat',
+        'recording',
+        'livestreaming',
+        'etherpad',
+        'sharedvideo',
+        'settings',
+        'raisehand',
+        'videoquality',
+        'filmstrip',
+        'invite',
+        'feedback',
+        'stats',
+        'shortcuts',
+        'tileview',
+        'videobackgroundblur',
+        'download',
+        'help',
+        'mute-everyone',
+        'security'
+      ],
+      SETTINGS_SECTIONS: ['devices', 'language', 'moderator', 'profile', 'calendar'],
       SHOW_JITSI_WATERMARK: false,
       SHOW_WATERMARK_FOR_GUESTS: false,
-      HIDE_INVITE_MORE_HEADER: true,
-      SHOW_CHROME_EXTENSION_BANNER: false,
-      TOOLBAR_BUTTONS: [
-        'microphone', 'camera', 'hangup', 'settings', 'filmstrip'
-      ],
-      ...config.interfaceConfigOverwrite,
+      SHOW_POWERED_BY: false,
+      MOBILE_APP_PROMO: false,
     },
     userInfo: {
-      displayName: config.userInfo?.displayName || `Guest-${Math.floor(Math.random() * 1000)}`,
-      ...config.userInfo,
-    },
+      displayName: config.displayName || 'Anonymous',
+      email: config.userEmail || '',
+      avatarUrl: config.userAvatarUrl || ''
+    }
   };
 
-  return new window.JitsiMeetExternalAPI('meet.jit.si', defaultConfig);
+  const api = new window.JitsiMeetExternalAPI(domain, options);
+  
+  return api;
+};
+
+export const cleanupJitsi = (api: JitsiAPI | null) => {
+  if (api) {
+    try {
+      api.dispose();
+    } catch (error) {
+      console.error('Error disposing Jitsi API:', error);
+    }
+  }
+};
+
+export const generateRoomId = (userId1: string, userId2: string): string => {
+  // Create a consistent room ID based on user IDs
+  const sortedIds = [userId1, userId2].sort();
+  return `quluub-${sortedIds[0]}-${sortedIds[1]}-${Date.now()}`;
 };

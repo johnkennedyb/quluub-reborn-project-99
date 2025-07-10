@@ -1,334 +1,167 @@
 
-const asyncHandler = require('express-async-handler');
-const { v4: uuidv4 } = require('uuid');
 const Call = require('../models/Call');
-const Notification = require('../models/Notification');
 const User = require('../models/User');
-const Chat = require('../models/Chat');
-const { sendVideoCallNotificationEmail } = require('../utils/emailService');
+const { sendNotification } = require('./notificationController');
 
-// @desc    Initiate a video call using Jitsi
-// @route   POST /api/video-call/initiate
-// @access  Private
-exports.initiateCall = asyncHandler(async (req, res) => {
-  const { recipientId } = req.body;
-  const callerId = req.user._id;
+// Initiate a call
+const initiateCall = async (req, res) => {
+  try {
+    const { calleeId, platform = 'jitsi' } = req.body;
+    const callerId = req.user.id;
 
-  console.log('Jitsi video call initiation request:', { recipientId, callerId });
+    // Check if callee exists
+    const callee = await User.findById(calleeId);
+    if (!callee) {
+      return res.status(404).json({ message: 'User not found' });
+    }
 
-  if (!recipientId) {
-    res.status(400);
-    throw new Error('Recipient ID is required');
-  }
-
-  // Check if recipient exists
-  const recipient = await User.findById(recipientId);
-  if (!recipient) {
-    res.status(404);
-    throw new Error('Recipient not found');
-  }
-
-  const caller = await User.findById(callerId);
-  if (!caller) {
-    res.status(404);
-    throw new Error('Caller not found');
-  }
-
-  // Video calls are only available for premium users
-  if (caller.plan !== 'premium') {
-    res.status(403);
-    throw new Error('Video calls are only available for premium members');
-  }
-
-  // Check for existing active call between these users
-  let existingCall = await Call.findOne({
-    $or: [
-      { caller: callerId, recipient: recipientId, status: { $in: ['ringing', 'ongoing'] } },
-      { caller: recipientId, recipient: callerId, status: { $in: ['ringing', 'ongoing'] } }
-    ]
-  });
-
-  let roomId, call;
-
-  if (existingCall) {
-    roomId = existingCall.roomId;
-    call = existingCall;
-    console.log('Reusing existing Jitsi call:', call._id);
-  } else {
     // Generate a unique room ID for Jitsi
-    roomId = `quluub-${uuidv4()}`;
+    const roomId = `quluub-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    try {
-      call = await Call.create({
-        caller: callerId,
-        recipient: recipientId,
-        roomId,
-        status: 'ringing',
-        platform: 'jitsi'
-      });
-      console.log('New Jitsi call record created:', call._id);
-    } catch (error) {
-      console.error('Error creating call:', error);
-      res.status(500);
-      throw new Error(`Failed to create call: ${error.message}`);
-    }
-  }
-
-  // Create Jitsi room URL
-  const jitsiRoomUrl = `https://meet.jit.si/${roomId}`;
-  const callUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/video-call?room=${roomId}`;
-  
-  // Send chat message with video call link
-  const chatMessage = `📹 Video call invitation: Join me at ${jitsiRoomUrl}`;
-  
-  try {
-    const chat = new Chat({
-      senderId: callerId,
-      receiverId: recipientId,
-      message: chatMessage,
-      status: "UNREAD"
-    });
-    await chat.save();
-    console.log('Jitsi video call link sent in chat');
-  } catch (chatError) {
-    console.error('Error sending chat message:', chatError);
-  }
-
-  try {
-    const notification = await Notification.create({
-      user: recipientId,
-      type: 'video_call',
-      message: `Incoming video call from ${caller.fname} ${caller.lname}`,
-      relatedId: roomId,
-    });
-
-    console.log('Notification created:', notification._id);
-
-    // Get the global io instance
-    const io = global.io;
-    let recipientNotified = false;
-    let notificationMethods = [];
-
-    if (io) {
-      console.log(`Attempting to notify recipient ${recipientId} about incoming Jitsi call from ${caller.fname} ${caller.lname}`);
-      console.log('Total connected sockets:', io.sockets.sockets.size);
-
-      // Multiple notification strategies to ensure delivery
-      try {
-        const recipientRoomSize = io.adapter?.rooms?.get(recipientId.toString())?.size || 0;
-        console.log(`Recipient room ${recipientId} has ${recipientRoomSize} connections`);
-        
-        if (recipientRoomSize > 0) {
-          io.to(recipientId.toString()).emit('video-call-incoming', {
-            from: `${caller.fname} ${caller.lname}`,
-            fromId: callerId,
-            roomId: roomId,
-            callUrl: callUrl,
-            jitsiRoomUrl: jitsiRoomUrl,
-            callerImage: caller.profilePicture || '',
-            platform: 'jitsi'
-          });
-          
-          io.to(recipientId.toString()).emit('newNotification', {
-            _id: notification._id,
-            type: 'video_call',
-            message: `Incoming video call from ${caller.fname} ${caller.lname}`,
-            relatedId: roomId,
-            createdAt: notification.createdAt,
-          });
-          
-          recipientNotified = true;
-          notificationMethods.push('room-broadcast');
-          console.log(`Jitsi notification sent to recipient room: ${recipientId}`);
-        }
-      } catch (error) {
-        console.error('Error sending room notification:', error);
-      }
-
-      // Method 2: Find recipient socket by userId property
-      if (!recipientNotified) {
-        try {
-          const recipientSocket = Array.from(io.sockets.sockets.values())
-            .find(socket => socket.userId === recipientId.toString());
-
-          if (recipientSocket) {
-            recipientSocket.emit('video-call-incoming', {
-              from: `${caller.fname} ${caller.lname}`,
-              fromId: callerId,
-              roomId: roomId,
-              callUrl: callUrl,
-              jitsiRoomUrl: jitsiRoomUrl,
-              callerImage: caller.profilePicture || '',
-              platform: 'jitsi'
-            });
-
-            recipientSocket.emit('newNotification', {
-              _id: notification._id,
-              type: 'video_call',
-              message: `Incoming video call from ${caller.fname} ${caller.lname}`,
-              relatedId: roomId,
-              createdAt: notification.createdAt,
-            });
-            
-            recipientNotified = true;
-            notificationMethods.push('direct-socket');
-            console.log(`Direct Jitsi notification sent to socket: ${recipientSocket.id}`);
-          }
-        } catch (error) {
-          console.error('Error sending direct socket notification:', error);
-        }
-      }
-
-      // Method 3: Broadcast to all sockets (as fallback)
-      if (!recipientNotified) {
-        try {
-          io.emit('video-call-notification-broadcast', {
-            targetUserId: recipientId.toString(),
-            from: `${caller.fname} ${caller.lname}`,
-            fromId: callerId,
-            roomId: roomId,
-            callUrl: callUrl,
-            jitsiRoomUrl: jitsiRoomUrl,
-            callerImage: caller.profilePicture || '',
-            platform: 'jitsi'
-          });
-          notificationMethods.push('broadcast');
-          console.log('Fallback broadcast notification sent for Jitsi call');
-        } catch (error) {
-          console.error('Error sending broadcast notification:', error);
-        }
-      }
-    }
-
-    console.log(`Jitsi video call initiated from ${caller.fname} ${caller.lname} to ${recipient.fname} ${recipient.lname} - Room: ${roomId}`);
-    console.log('Notification methods used:', notificationMethods);
-
-    // Send email notification to parent/guardian
-    let emailSent = false;
-    if (recipient.parentGuardianEmail) {
-      try {
-        await sendVideoCallNotificationEmail(
-          recipient.parentGuardianEmail,
-          recipient.parentGuardianName || 'Guardian',
-          `${recipient.fname} ${recipient.lname}`,
-          `${caller.fname} ${caller.lname}`,
-          jitsiRoomUrl
-        );
-        emailSent = true;
-        console.log('Email notification sent to parent/guardian for Jitsi call');
-      } catch (error) {
-        console.error('Error sending email notification:', error);
-      }
-    }
-
-    res.status(201).json({ 
-      roomId,
-      callUrl,
-      jitsiRoomUrl,
-      message: 'Jitsi call initiated successfully',
-      recipientNotified: recipientNotified || notificationMethods.length > 0,
+    // Create call record
+    const call = new Call({
+      caller: callerId,
+      callee: calleeId,
       platform: 'jitsi',
-      callId: call._id,
-      debug: {
-        notificationMethods,
-        totalConnectedSockets: io ? io.sockets.sockets.size : 0,
-        recipientRoomExists: io ? !!io.adapter?.rooms?.get(recipientId.toString()) : false,
-        emailSent,
-        jitsiRoomCreated: true,
-        existingCall: !!existingCall
+      roomId: roomId,
+      status: 'initiated',
+      startTime: new Date()
+    });
+
+    await call.save();
+
+    // Populate caller and callee information
+    const populatedCall = await Call.findById(call._id)
+      .populate('caller', 'fname lname')
+      .populate('callee', 'fname lname');
+
+    // Send notification to callee
+    const callerName = `${req.user.fname} ${req.user.lname}`;
+    await sendNotification(calleeId, {
+      type: 'video_call',
+      title: 'Incoming Video Call',
+      message: `${callerName} is calling you`,
+      data: {
+        callId: call._id,
+        callerId: callerId,
+        callerName: callerName,
+        platform: 'jitsi',
+        roomId: roomId
       }
+    });
+
+    // Emit socket event for real-time notification
+    if (global.io) {
+      global.io.to(calleeId).emit('incoming-call', {
+        callId: call._id,
+        callerId: callerId,
+        callerName: callerName,
+        platform: 'jitsi',
+        roomId: roomId
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      call: populatedCall,
+      roomId: roomId,
+      platform: 'jitsi'
     });
 
   } catch (error) {
-    console.error('Error in initiateCall:', error);
-    res.status(500);
-    throw new Error(`Failed to initiate call: ${error.message}`);
+    console.error('Error initiating call:', error);
+    res.status(500).json({ message: 'Server error' });
   }
-});
+};
 
-// @desc    Update call status
-// @route   PUT /api/video-call/status
-// @access  Private
-exports.updateCallStatus = asyncHandler(async (req, res) => {
-  const { roomId, status } = req.body;
+// Update call status
+const updateCallStatus = async (req, res) => {
+  try {
+    const { callId, status } = req.body;
+    const userId = req.user.id;
 
-  if (!roomId || !status) {
-    res.status(400);
-    throw new Error('Room ID and status are required');
-  }
-
-  const call = await Call.findOne({ roomId });
-
-  if (!call) {
-    res.status(404);
-    throw new Error('Call not found');
-  }
-
-  call.status = status;
-  if (status === 'ongoing') {
-    call.startedAt = new Date();
-  } else if (['completed', 'missed', 'declined'].includes(status)) {
-    call.endedAt = new Date();
-    if (call.startedAt) {
-      call.duration = Math.floor((call.endedAt - call.startedAt) / 1000);
+    const call = await Call.findById(callId);
+    if (!call) {
+      return res.status(404).json({ message: 'Call not found' });
     }
-  }
 
-  await call.save();
-
-  // Get the global io instance
-  const io = global.io;
-
-  if (io) {
-    // Notify participants of status change
-    io.to(call.caller.toString()).emit('callStatusUpdate', { roomId, status });
-    io.to(call.recipient.toString()).emit('callStatusUpdate', { roomId, status });
-  }
-
-  res.status(200).json({ 
-    message: 'Call status updated',
-    call: {
-      roomId: call.roomId,
-      status: call.status,
-      duration: call.duration,
-      platform: 'jitsi'
+    // Check if user is part of this call
+    if (call.caller.toString() !== userId && call.callee.toString() !== userId) {
+      return res.status(403).json({ message: 'Unauthorized' });
     }
-  });
-});
 
-// @desc    Get call by room ID
-// @route   GET /api/video-call/room/:roomId
-// @access  Private
-exports.getCallByRoom = asyncHandler(async (req, res) => {
-  const { roomId } = req.params;
-  const userId = req.user._id;
+    // Update call status
+    const updateData = { status };
+    
+    if (status === 'accepted') {
+      updateData.answeredAt = new Date();
+    } else if (status === 'ended') {
+      updateData.endTime = new Date();
+      if (!call.answeredAt) {
+        updateData.answeredAt = new Date(); // In case it wasn't set
+      }
+    }
 
-  const call = await Call.findOne({ roomId })
-    .populate('caller', 'fname lname username')
-    .populate('recipient', 'fname lname username');
+    const updatedCall = await Call.findByIdAndUpdate(
+      callId,
+      updateData,
+      { new: true }
+    ).populate('caller', 'fname lname').populate('callee', 'fname lname');
 
-  if (!call) {
-    res.status(404);
-    throw new Error('Call not found');
+    // Notify the other party about status change
+    const otherPartyId = call.caller.toString() === userId ? call.callee : call.caller;
+    
+    if (global.io) {
+      global.io.to(otherPartyId.toString()).emit('call-status-update', {
+        callId: callId,
+        status: status,
+        roomId: call.roomId
+      });
+    }
+
+    res.json({
+      success: true,
+      call: updatedCall
+    });
+
+  } catch (error) {
+    console.error('Error updating call status:', error);
+    res.status(500).json({ message: 'Server error' });
   }
+};
 
-  // Check if user is authorized to access this call
-  const isAuthorized = call.caller._id.toString() === userId.toString() || 
-                      call.recipient._id.toString() === userId.toString();
+// Get call by room ID
+const getCallByRoom = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const userId = req.user.id;
 
-  if (!isAuthorized) {
-    res.status(403);
-    throw new Error('Not authorized to access this call');
+    const call = await Call.findOne({ roomId })
+      .populate('caller', 'fname lname')
+      .populate('callee', 'fname lname');
+
+    if (!call) {
+      return res.status(404).json({ message: 'Call not found' });
+    }
+
+    // Check if user is part of this call
+    if (call.caller._id.toString() !== userId && call.callee._id.toString() !== userId) {
+      return res.status(403).json({ message: 'Unauthorized' });
+    }
+
+    res.json({
+      success: true,
+      call: call
+    });
+
+  } catch (error) {
+    console.error('Error getting call by room:', error);
+    res.status(500).json({ message: 'Server error' });
   }
+};
 
-  res.json({
-    roomId: call.roomId,
-    status: call.status,
-    caller: call.caller,
-    recipient: call.recipient,
-    startedAt: call.startedAt,
-    endedAt: call.endedAt,
-    duration: call.duration,
-    platform: 'jitsi'
-  });
-});
+module.exports = {
+  initiateCall,
+  updateCallStatus,
+  getCallByRoom
+};
