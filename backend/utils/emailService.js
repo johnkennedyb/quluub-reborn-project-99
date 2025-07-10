@@ -1,6 +1,4 @@
 const nodemailer = require('nodemailer');
-const crypto = require('crypto');
-const EmailAnalytics = require('../models/EmailAnalytics');
 
 // Import email templates
 const welcomeEmail = require('./emailTemplates/welcome');
@@ -60,53 +58,21 @@ const verifyTransporter = () => {
 // Initial verification
 verifyTransporter();
 
-// Enhanced generic email sending function with tracking
+// Generic email sending function
 const sendEmail = async (to, templateFunction, ...args) => {
   try {
-    const messageId = crypto.randomBytes(16).toString('hex');
     const { subject, html } = templateFunction(...args);
-    
-    // Add tracking pixel to email
-    const trackingPixel = `<img src="${process.env.BACKEND_URL || 'http://localhost:5000'}/api/email-analytics/track/open/${messageId}" width="1" height="1" style="display:none;" />`;
-    const htmlWithTracking = html + trackingPixel;
-    
     const mailOptions = {
       from: `"${emailSettings.fromName}" <${emailSettings.fromEmail}>`,
       to,
       subject,
-      html: htmlWithTracking,
+      html,
       replyTo: emailSettings.replyTo,
-      messageId: messageId
     };
-
-    const info = await transporter.sendMail(mailOptions);
-    
-    // Save email analytics record
-    await EmailAnalytics.create({
-      messageId: messageId,
-      recipientEmail: to,
-      subject: subject,
-      status: 'sent'
-    });
-
-    console.log(`Email sent to ${to} with subject: ${subject}, MessageId: ${messageId}`);
-    return { success: true, messageId: messageId };
+    await transporter.sendMail(mailOptions);
+    console.log(`Email sent to ${to} with subject: ${subject}`);
   } catch (error) {
     console.error(`Error sending email to ${to}:`, error);
-    
-    // Record failed email
-    try {
-      await EmailAnalytics.create({
-        messageId: messageId || 'unknown',
-        recipientEmail: to,
-        subject: args[0] || 'Unknown',
-        status: 'failed'
-      });
-    } catch (analyticsError) {
-      console.error('Error recording failed email analytics:', analyticsError);
-    }
-    
-    return { success: false, error: error.message };
   }
 };
 
@@ -114,12 +80,12 @@ const sendEmail = async (to, templateFunction, ...args) => {
 const updateEmailConfig = async (newConfig) => {
   try {
     emailConfig = {
-      host: newConfig.smtpHost || emailConfig.host,
-      port: parseInt(newConfig.smtpPort) || emailConfig.port,
+      host: newConfig.smtpHost,
+      port: parseInt(newConfig.smtpPort),
       secure: parseInt(newConfig.smtpPort) === 465,
       auth: {
-        user: newConfig.smtpUser || emailConfig.auth.user,
-        pass: newConfig.smtpPassword || emailConfig.auth.pass
+        user: newConfig.smtpUser,
+        pass: newConfig.smtpPassword
       },
       tls: {
         rejectUnauthorized: false
@@ -127,9 +93,9 @@ const updateEmailConfig = async (newConfig) => {
     };
 
     emailSettings = {
-      fromName: newConfig.fromName || emailSettings.fromName,
-      fromEmail: newConfig.fromEmail || emailSettings.fromEmail,
-      replyTo: newConfig.replyTo || emailSettings.replyTo
+      fromName: newConfig.fromName,
+      fromEmail: newConfig.fromEmail,
+      replyTo: newConfig.replyTo
     };
 
     // Create new transporter with updated config
@@ -148,38 +114,9 @@ const updateEmailConfig = async (newConfig) => {
       });
     });
   } catch (error) {
-    console.error('Error updating email configuration:', error);
+    console.error('Error updating email-service configuration:', error);
     return false;
   }
-};
-
-// Function to get the current email configuration
-const getEmailConfigService = () => {
-  return {
-    smtpHost: emailConfig.host,
-    smtpPort: emailConfig.port.toString(),
-    smtpUser: emailConfig.auth.user,
-    smtpPassword: '********', // Don't expose the actual password
-    fromName: emailSettings.fromName,
-    fromEmail: emailSettings.fromEmail,
-    replyTo: emailSettings.replyTo
-  };
-};
-
-// Function to get email metrics
-const getEmailMetricsService = async () => {
-  // In a real application, you would fetch this data from a database or analytics service
-  return {
-    sentToday: 0,
-    deliveryRate: 98.5,
-    openRate: 24.2,
-    bounced: 0,
-    sentLast24Hours: 0,
-    sentLast7Days: 0,
-    failedLast24Hours: 0,
-    totalSent: 0,
-    totalFailed: 0,
-  };
 };
 
 // Specific email functions
@@ -205,80 +142,50 @@ const sendValidationEmail = (email, recipientName, validationToken) => {
     sendEmail(email, validateEmailTemplate, recipientName, validationUrl);
 };
 
-// Enhanced bulk email function with tracking
+// New function to send bulk emails
 const sendBulkEmail = async (users, subject, message, attachments = []) => {
   let successCount = 0;
   let failedCount = 0;
-  const results = [];
 
   for (const user of users) {
-    const messageId = crypto.randomBytes(16).toString('hex');
-    
-    // Add tracking pixel
-    const trackingPixel = `<img src="${process.env.BACKEND_URL || 'http://localhost:5000'}/api/email-analytics/track/open/${messageId}" width="1" height="1" style="display:none;" />`;
-    
-    const htmlContent = `
-      <div style="max-width: 600px; margin: 0 auto; padding: 20px; font-family: Arial, sans-serif; background-color: #f9f9f9;">
-        <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-          <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #075e54; margin: 0;">Quluub</h1>
-            <p style="color: #666; font-size: 16px; margin-top: 10px;">Islamic Marriage Platform</p>
-          </div>
-          
-          <p style="color: #333; line-height: 1.6; font-size: 16px;">
-            Assalamu Alaikum ${user.fname || 'Dear Member'},
-          </p>
-          
-          <div style="color: #666; line-height: 1.6; margin: 20px 0;">
-            ${message.replace(/\n/g, '<br>')}
-          </div>
-          
-          <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee;">
-            <p style="color: #999; font-size: 12px; text-align: center;">
-              Best regards,<br>
-              The Quluub Team<br>
-              <a href="${process.env.FRONTEND_URL}" style="color: #075e54;">quluub.com</a>
-            </p>
-          </div>
-        </div>
-      </div>
-      ${trackingPixel}
-    `;
-
     const mailOptions = {
       from: `"${emailSettings.fromName}" <${emailSettings.fromEmail}>`,
       to: user.email,
       subject: subject,
-      html: htmlContent,
-      messageId: messageId
+      html: `
+        <div style="max-width: 600px; margin: 0 auto; padding: 20px; font-family: Arial, sans-serif; background-color: #f9f9f9;">
+          <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            <div style="text-align: center; margin-bottom: 30px;">
+              <h1 style="color: #075e54; margin: 0;">Quluub</h1>
+              <p style="color: #666; font-size: 16px; margin-top: 10px;">Islamic Marriage Platform</p>
+            </div>
+            
+            <p style="color: #333; line-height: 1.6; font-size: 16px;">
+              Assalamu Alaikum ${user.fname || 'Dear Member'},
+            </p>
+            
+            <div style="color: #666; line-height: 1.6; margin: 20px 0;">
+              ${message.replace(/\n/g, '<br>')}
+            </div>
+            
+            <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee;">
+              <p style="color: #999; font-size: 12px; text-align: center;">
+                Best regards,<br>
+                The Quluub Team<br>
+                <a href="${process.env.FRONTEND_URL}" style="color: #075e54;">quluub.com</a>
+              </p>
+            </div>
+          </div>
+        </div>
+      `
     };
 
     try {
       await transporter.sendMail(mailOptions);
       successCount++;
-      
-      // Record analytics
-      await EmailAnalytics.create({
-        messageId: messageId,
-        recipientEmail: user.email,
-        subject: subject,
-        status: 'sent'
-      });
-      
-      results.push({ email: user.email, status: 'sent', messageId });
       console.log(`Bulk email sent to: ${user.email}`);
     } catch (error) {
       failedCount++;
-      
-      // Record failed email
-      await EmailAnalytics.create({
-        messageId: messageId,
-        recipientEmail: user.email,
-        subject: subject,
-        status: 'failed'
-      });
-      
-      results.push({ email: user.email, status: 'failed', error: error.message });
       console.error(`Failed to send bulk email to ${user.email}:`, error);
     }
   }
@@ -287,7 +194,7 @@ const sendBulkEmail = async (users, subject, message, attachments = []) => {
     throw new Error(`${failedCount} out of ${successCount + failedCount} emails failed to send.`);
   }
 
-  return { successCount, failedCount, results };
+  return { successCount, failedCount };
 };
 
 // New function to send test emails
@@ -337,15 +244,29 @@ const sendTestEmail = async (testEmail) => {
     console.log('Test email sent successfully:', info.messageId);
   } catch (error) {
     console.error('Error sending test email:', error);
-    throw error;
+    throw error; // Re-throw the error to be caught by the controller
   }
+};
+
+// Function to get the current email configuration
+const getEmailConfigService = () => {
+  return { ...emailConfig, ...emailSettings };
+};
+
+// Function to get email metrics (placeholder)
+const getEmailMetricsService = async () => {
+  // In a real application, you would fetch this data from a database or analytics service
+  return {
+    sentLast24Hours: 0,
+    sentLast7Days: 0,
+    failedLast24Hours: 0,
+    totalSent: 0,
+    totalFailed: 0,
+  };
 };
 
 module.exports = {
   updateEmailConfig,
-  getEmailConfigService,
-  getEmailMetricsService,
-  sendTestEmail,
   sendValidationEmail,
   sendWelcomeEmail,
   sendResetPasswordEmail,
@@ -364,5 +285,8 @@ module.exports = {
   sendContactWaliEmail,
   sendWaliViewChatEmail,
   sendVideoCallNotificationEmail,
-  sendBulkEmail
+  sendBulkEmail,
+  sendTestEmail,
+  getEmailConfigService,
+  getEmailMetricsService
 };

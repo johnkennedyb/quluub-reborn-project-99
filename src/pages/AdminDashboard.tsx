@@ -124,16 +124,14 @@ const AdminDashboard = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           {/* Desktop Navigation */}
           {!isMobile && (
-            <div className="overflow-x-auto">
-              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-11 gap-1 min-w-max">
-                {tabItems.map(({ value, label, icon: Icon }) => (
-                  <TabsTrigger key={value} value={value} className="flex items-center space-x-1 text-xs lg:text-sm whitespace-nowrap">
-                    <Icon className="h-3 w-3 lg:h-4 lg:w-4" />
-                    <span className="hidden sm:inline">{label}</span>
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </div>
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-10 gap-1">
+              {tabItems.map(({ value, label, icon: Icon }) => (
+                <TabsTrigger key={value} value={value} className="flex items-center space-x-1 text-xs lg:text-sm">
+                  <Icon className="h-3 w-3 lg:h-4 lg:w-4" />
+                  <span className="hidden sm:inline">{label}</span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
           )}
 
           {/* Overview Tab */}
@@ -154,7 +152,7 @@ const AdminDashboard = () => {
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Inactive Users (1 month+)</CardTitle>
+                  <CardTitle className="text-sm font-medium">Inactive Users</CardTitle>
                   <Users className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
@@ -186,7 +184,7 @@ const AdminDashboard = () => {
                 <CardContent>
                   <div className="text-2xl font-bold">{stats?.messagesExchanged || 0}</div>
                   <p className="text-xs text-muted-foreground">
-                    Total messages sent between users
+                    +{stats?.messagesThisWeek || 0} this week
                   </p>
                 </CardContent>
               </Card>
@@ -230,9 +228,6 @@ const AdminDashboard = () => {
                   <div className="flex justify-between">
                     <span className="text-sm">Success Rate:</span>
                     <span className="font-semibold">{stats?.successRate || 0}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm text-xs">Success Rate = Matches ÷ (Matches + Rejections)</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm">Avg per User:</span>
@@ -297,6 +292,7 @@ const AdminDashboard = () => {
             </Card>
           </TabsContent>
 
+          {/* Members Tab */}
           <TabsContent value="members">
             <MemberManagement stats={stats} />
           </TabsContent>
@@ -304,6 +300,7 @@ const AdminDashboard = () => {
           <TabsContent value="insights">
             <DashboardInsights stats={stats} />
           </TabsContent>
+
 
           <TabsContent value="calls">
             <VideoCallManagement />
@@ -328,11 +325,9 @@ const AdminDashboard = () => {
           <TabsContent value="referrals">
             <ReferralAnalysis />
           </TabsContent>
-
           <TabsContent value="email">
             <EmailManagement />
           </TabsContent>
-
           <TabsContent value="notifications">
             <PushNotificationManagement />
           </TabsContent>

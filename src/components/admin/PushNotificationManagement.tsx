@@ -1,9 +1,7 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -11,9 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
+// This hook will be updated later to include push notification functions
 import { useAdminData } from '@/hooks/useAdminData';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { format } from 'date-fns';
 
 const formSchema = z.object({
   title: z.string().min(5, 'Title must be at least 5 characters long.'),
@@ -22,25 +19,8 @@ const formSchema = z.object({
 });
 
 const PushNotificationManagement = () => {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const { sendPushNotification, pushNotifications } = useAdminData();
-
-  const mutation = useMutation({
-    mutationFn: (values: z.infer<typeof formSchema>) => sendPushNotification({
-      title: values.title,
-      message: values.message,
-      target: values.target
-    }),
-    onSuccess: () => {
-      toast({ title: 'Success', description: 'Push notification sent successfully!' });
-      queryClient.invalidateQueries({ queryKey: ['pushNotifications'] });
-      form.reset();
-    },
-    onError: (error: any) => {
-      toast({ title: 'Error', description: error.message || 'Failed to send notification', variant: 'destructive' });
-    },
-  });
+    const { toast } = useToast();
+  const { sendPushNotification, pushNotifications, loading } = useAdminData();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -51,8 +31,14 @@ const PushNotificationManagement = () => {
     },
   });
 
-  const handleSubmit = (values: z.infer<typeof formSchema>) => {
-    mutation.mutate(values);
+  const handleSubmit = async (values: z.infer<typeof formSchema>) => {
+    try {
+      await sendPushNotification(values);
+      toast({ title: 'Success', description: 'Push notification sent successfully!' });
+      form.reset();
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to send push notification.', variant: 'destructive' });
+    }
   };
 
   return (
@@ -104,7 +90,7 @@ const PushNotificationManagement = () => {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="all">All Users</SelectItem>
-                        <SelectItem value="premium">Premium & Pro Users</SelectItem>
+                        <SelectItem value="premium">Premium Users</SelectItem>
                         <SelectItem value="free">Freemium Users</SelectItem>
                       </SelectContent>
                     </Select>
@@ -112,9 +98,7 @@ const PushNotificationManagement = () => {
                   </FormItem>
                 )}
               />
-              <Button type="submit" disabled={mutation.isPending}>
-                {mutation.isPending ? 'Sending...' : 'Send Notification'}
-              </Button>
+              <Button type="submit">Send Notification</Button>
             </form>
           </Form>
         </CardContent>
@@ -125,36 +109,25 @@ const PushNotificationManagement = () => {
           <CardTitle>Notification History</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Title</TableHead>
-                <TableHead>Target</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Sent At</TableHead>
-                <TableHead>Sent</TableHead>
-                <TableHead>Failed</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {pushNotifications && Array.isArray(pushNotifications) && pushNotifications.length > 0 ? (
-                pushNotifications.map((notification: any) => (
-                  <TableRow key={notification._id}>
-                    <TableCell>{notification.title}</TableCell>
-                    <TableCell>{notification.target}</TableCell>
-                    <TableCell>{notification.status}</TableCell>
-                    <TableCell>{format(new Date(notification.sentAt), 'PPP p')}</TableCell>
-                    <TableCell>{notification.sentCount}</TableCell>
-                    <TableCell>{notification.failedCount}</TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center">No notification history found.</TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+          <div className="space-y-4">
+            {loading && <p>Loading history...</p>}
+            {pushNotifications && pushNotifications.length > 0 ? (
+              <ul className="space-y-2">
+                {pushNotifications.map((notification) => (
+                  <li key={notification._id} className="p-3 bg-gray-50 rounded-md border">
+                    <p className="font-semibold">{notification.title}</p>
+                    <p className="text-sm text-gray-600">{notification.message}</p>
+                    <div className="text-xs text-gray-400 mt-2 flex justify-between">
+                      <span>Target: {notification.target}</span>
+                      <span>Sent: {new Date(notification.sentAt).toLocaleString()}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>No notification history found.</p>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

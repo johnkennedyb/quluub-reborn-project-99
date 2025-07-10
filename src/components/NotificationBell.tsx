@@ -1,139 +1,160 @@
 
-import { useState, useEffect } from "react";
-import { Bell } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useState, useEffect, useContext } from 'react';
+import { Button } from '@/components/ui/button';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Bell, Phone } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
+import apiClient from '@/lib/api-client';
+import { timeAgo } from '@/utils/dataUtils';
+import { AuthContext } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { io } from 'socket.io-client';
 
 interface Notification {
-  id: string;
-  title: string;
+  _id: string;
+  type: 'connection_request' | 'connection_accepted' | 'message' | 'video_call';
   message: string;
-  type: 'info' | 'success' | 'warning' | 'error';
-  timestamp: Date;
+  createdAt: string;
   read: boolean;
+  relatedId?: string;
 }
 
 const NotificationBell = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
+  const { user } = useContext(AuthContext);
+  const navigate = useNavigate();
 
   useEffect(() => {
-    // Mock notifications for demo
-    const mockNotifications: Notification[] = [
-      {
-        id: '1',
-        title: 'New Connection Request',
-        message: 'Someone has expressed interest in your profile',
-        type: 'info',
-        timestamp: new Date(),
-        read: false
-      },
-      {
-        id: '2',
-        title: 'Profile Viewed',
-        message: 'Your profile was viewed by a potential match',
-        type: 'success',
-        timestamp: new Date(Date.now() - 1000 * 60 * 30),
-        read: false
+    const fetchNotifications = async () => {
+      try {
+        const response = await apiClient.get('/notifications');
+        setNotifications(response.data);
+        setUnreadCount(response.data.filter((n: Notification) => !n.read).length);
+      } catch (error) {
+        console.error('Failed to fetch notifications:', error);
       }
-    ];
-    
-    setNotifications(mockNotifications);
-    setUnreadCount(mockNotifications.filter(n => !n.read).length);
-  }, []);
+    };
 
-  const markAsRead = (id: string) => {
-    setNotifications(prev => 
-      prev.map(notification => 
-        notification.id === id 
-          ? { ...notification, read: true }
-          : notification
-      )
-    );
-    setUnreadCount(prev => Math.max(0, prev - 1));
+    if (user) {
+      fetchNotifications();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const socketUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+    const socket = io(socketUrl);
+    socket.emit('joinNotifications', user._id);
+
+    socket.on('newNotification', (notification: Notification) => {
+      setNotifications((prev) => [notification, ...prev]);
+      setUnreadCount((prev) => prev + 1);
+      toast({
+        title: 'New Notification',
+        description: notification.message,
+      });
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [user, toast]);
+
+  const handleOpen = async (open: boolean) => {
+    setIsOpen(open);
+    if (open && unreadCount > 0) {
+      const unreadIds = notifications.filter(n => !n.read).map(n => n._id);
+      try {
+        await Promise.all(unreadIds.map(id => apiClient.put(`/notifications/${id}/read`)));
+        setNotifications(notifications.map(n => ({ ...n, read: true })));
+        setUnreadCount(0);
+      } catch (error) {
+        console.error('Failed to mark notifications as read:', error);
+      }
+    }
   };
 
-  const clearAll = () => {
-    setNotifications([]);
-    setUnreadCount(0);
-    toast({
-      title: "Notifications cleared",
-      description: "All notifications have been cleared",
-    });
+  const handleJoinCall = (roomId: string) => {
+    navigate(`/video-call?room=${roomId}`);
+    setIsOpen(false);
+  };
+
+  const handleDismiss = (notificationId: string) => {
+    setNotifications(prev => prev.filter(n => n._id !== notificationId));
   };
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
+    <Popover open={isOpen} onOpenChange={handleOpen}>
+      <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
             <Badge 
-              variant="destructive" 
-              className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs bg-red-500 hover:bg-red-600 border-red-500"
+              className="absolute -top-1 -right-1 px-1.5 py-0.5 min-w-[1rem] h-[1rem] flex items-center justify-center"
+              variant="destructive"
             >
               {unreadCount}
             </Badge>
           )}
         </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80 max-h-96 overflow-y-auto bg-white border shadow-lg z-50">
-        <div className="p-4 border-b">
-          <div className="flex items-center justify-between">
-            <h3 className="font-medium text-sm">Notifications</h3>
-            {notifications.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={clearAll}
-                className="text-xs h-6 px-2 text-muted-foreground hover:text-foreground"
-              >
-                Clear all
-              </Button>
-            )}
-          </div>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-0" align="end">
+        <div className="p-3 border-b">
+          <h3 className="font-medium">Notifications</h3>
         </div>
         
-        {notifications.length === 0 ? (
-          <div className="p-4 text-center text-muted-foreground text-sm">
-            No notifications
-          </div>
-        ) : (
-          <div className="max-h-64 overflow-y-auto">
-            {notifications.map((notification) => (
-              <DropdownMenuItem
-                key={notification.id}
-                className={`p-3 cursor-pointer border-b last:border-b-0 flex-col items-start ${
-                  !notification.read ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-gray-50'
-                }`}
-                onClick={() => markAsRead(notification.id)}
-              >
-                <div className="flex items-start justify-between w-full mb-1">
-                  <h4 className="font-medium text-xs">{notification.title}</h4>
-                  {!notification.read && (
-                    <div className="w-2 h-2 bg-blue-500 rounded-full ml-2 flex-shrink-0 mt-1" />
+        <div className="max-h-80 overflow-y-auto">
+          {notifications.length === 0 ? (
+            <div className="p-4 text-center text-muted-foreground">
+              No new notifications
+            </div>
+          ) : (
+            notifications.map(notification => (
+              <Card key={notification._id} className="m-2 shadow-none border">
+                <CardContent className="p-3">
+                  <div className="text-sm mb-1">{notification.message}</div>
+                  <div className="text-xs text-muted-foreground mb-2">
+                    {timeAgo(new Date(notification.createdAt))}
+                  </div>
+                  
+                  {notification.type === 'video_call' && notification.relatedId && (
+                    <div className="flex gap-2 mt-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => handleDismiss(notification._id)}
+                      >
+                        Dismiss
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        className="w-full bg-green-600 hover:bg-green-700"
+                        onClick={() => handleJoinCall(notification.relatedId!)}
+                      >
+                        <Phone className="mr-2 h-4 w-4" />
+                        Join Call
+                      </Button>
+                    </div>
                   )}
-                </div>
-                <p className="text-xs text-muted-foreground mb-1 text-left">
-                  {notification.message}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {notification.timestamp.toLocaleTimeString()}
-                </p>
-              </DropdownMenuItem>
-            ))}
-          </div>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 };
 

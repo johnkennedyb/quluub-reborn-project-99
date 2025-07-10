@@ -20,8 +20,8 @@ const app = express();
 
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
-    ? ['https://quluub-reborn-project-33.vercel.app', 'https://quluub-reborn-project-33.onrender.com', 'http://localhost:8080', 'https://preview--quluub-reborn-project-99.lovable.app', 'https://www.your-domain.com', 'https://81fb5b4b-cd23-4400-a887-9cdd2eefba81.lovableproject.com']
-    : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:8080', 'http://localhost:8083', 'https://81fb5b4b-cd23-4400-a887-9cdd2eefba81.lovableproject.com'],
+    ? ['https://quluub-reborn-project-33.vercel.app', 'https://quluub-reborn-project-33.onrender.com', 'http://localhost:8080', 'https://preview--quluub-reborn-project-99.lovable.app', 'https://www.your-domain.com']
+    : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:8080', 'http://localhost:8083'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],

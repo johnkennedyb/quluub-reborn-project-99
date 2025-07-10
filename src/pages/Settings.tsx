@@ -1,352 +1,597 @@
-
 import { useState, useEffect } from "react";
-import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
-import TopNavbar from "@/components/TopNavbar";
-import Navbar from "@/components/Navbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Bell, CreditCard, Lock, User, Shield, Trash2, LogOut, Crown } from "lucide-react";
+import Navbar from "@/components/Navbar";
+import { Check, CheckCircle, BadgeDollarSign, Eye, EyeOff, Mail, HelpCircle, Copy, Gift } from "lucide-react";
+import { Lock } from "@/components/Icons";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { paymentService, userService } from "@/lib/api-client";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useAuth } from "@/contexts/AuthContext";
+import { userService } from "@/lib/api-client";
+import { paymentService } from "@/lib/api-client";
 
 const Settings = () => {
-  const { user, logout, updateUser } = useAuth();
-  const navigate = useNavigate();
+  const { user, updateUser } = useAuth();
+  const [isPro, setIsPro] = useState(user?.plan === 'premium');
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [referralCode, setReferralCode] = useState("");
+  const [referralStats, setReferralStats] = useState({
+    totalReferrals: 0,
+    activeReferrals: 0,
+    completedReferrals: 0
+  });
+  const [applyReferralCode, setApplyReferralCode] = useState("");
+  const [isLoadingPayment, setIsLoadingPayment] = useState(false);
+  const [isUpgrading, setIsUpgrading] = useState(false);
   const { toast } = useToast();
-  
-  const [notifications, setNotifications] = useState({
-    email: true,
-    push: true,
-    matches: true,
-    messages: true,
-  });
-  
-  const [privacy, setPrivacy] = useState({
-    profileVisible: true,
-    onlineStatus: true,
-    readReceipts: true,
-  });
-  
-  const [loading, setLoading] = useState(false);
-  const [subscription, setSubscription] = useState<any>(null);
-  const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
+  const [currency, setCurrency] = useState<'GBP' | 'NGN'>('GBP');
+
+  const pricing = {
+    GBP: {
+      premium: '2',
+      original: '5',
+      symbol: '£',
+    },
+    NGN: {
+      premium: '3000',
+      original: '7500',
+      symbol: '₦',
+    },
+  };
 
   useEffect(() => {
-    // Load user preferences and subscription info
-    const loadUserData = async () => {
-      if (user) {
-        try {
-          // Load subscription details if premium user
-          if (user.plan === 'premium') {
-            // Load subscription info
-            // const subData = await paymentService.getSubscription();
-            // setSubscription(subData);
-          }
-          
-          // Load payment history
-          const paymentData = await paymentService.getPaymentHistory();
-          setPaymentHistory(paymentData.payments || []);
-        } catch (error) {
-          console.error('Failed to load user data:', error);
-        }
-      }
-    };
-    
-    loadUserData();
-  }, [user]);
+    fetchReferralStats();
+  }, []);
 
-  const handleNotificationChange = (key: string, value: boolean) => {
-    setNotifications(prev => ({ ...prev, [key]: value }));
-    toast({
-      title: "Settings Updated",
-      description: "Your notification preferences have been saved.",
-    });
-  };
-
-  const handlePrivacyChange = (key: string, value: boolean) => {
-    setPrivacy(prev => ({ ...prev, [key]: value }));
-    toast({
-      title: "Settings Updated", 
-      description: "Your privacy settings have been saved.",
-    });
-  };
-
-  const handleUpgradeToPremium = async () => {
-    setLoading(true);
+  const fetchReferralStats = async () => {
     try {
-      const paymentUrl = await paymentService.createPaystackPayment('premium');
-      window.location.href = paymentUrl;
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/referrals/stats`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setReferralCode(data.referralCode || '');
+        setReferralStats(data.referralStats || {
+          totalReferrals: 0,
+          activeReferrals: 0,
+          completedReferrals: 0
+        });
+      }
     } catch (error) {
+      console.error('Error fetching referral stats:', error);
+    }
+  };
+
+  const generateReferralCode = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/referrals/generate`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setReferralCode(data.referralCode);
+        toast({
+          title: "Referral code generated",
+          description: "Your referral code has been created successfully.",
+          variant: "success",
+        });
+      }
+    } catch (error) {
+      console.error('Error generating referral code:', error);
       toast({
         title: "Error",
-        description: "Failed to initiate payment. Please try again.",
+        description: "Failed to generate referral code.",
         variant: "destructive",
       });
     }
-    setLoading(false);
   };
 
-  const handleDeleteAccount = () => {
-    // Implement account deletion logic
+  const handleApplyReferral = async () => {
+    if (!applyReferralCode.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a referral code.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/referrals/apply`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ referralCode: applyReferralCode })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        toast({
+          title: "Referral applied",
+          description: "Referral code applied successfully!",
+          variant: "success",
+        });
+        setApplyReferralCode("");
+        fetchReferralStats();
+      } else {
+        toast({
+          title: "Error",
+          description: data.message || "Failed to apply referral code.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error applying referral code:', error);
+      toast({
+        title: "Error",
+        description: "Failed to apply referral code.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const copyReferralCode = () => {
+    navigator.clipboard.writeText(referralCode);
     toast({
-      title: "Account Deletion",
-      description: "This feature is not yet available. Please contact support.",
-      variant: "destructive",
+      title: "Copied!",
+      description: "Referral code copied to clipboard.",
     });
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
+    const handleUpgrade = async () => {
+    setIsUpgrading(true);
+    try {
+      if (currency === 'GBP') {
+        // Use the new Stripe backend endpoint
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/payments/create-checkout-session`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+          body: JSON.stringify({ priceId: 'price_1Q5CNeBbkcQFdkf0i8BryMoN' }), // Premium discounted price
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to create Stripe checkout session');
+        }
+
+        const session = await response.json();
+        window.location.href = session.url;
+      } else {
+        // Use the existing Paystack service for NGN
+        const { authorization_url } = await paymentService.createPaystackPayment();
+        window.location.href = authorization_url;
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
+      toast({
+        title: "Payment Error",
+        description: (error as Error).message || "Failed to initiate payment. Please try again.",
+        variant: "destructive",
+      });
+      setIsUpgrading(false);
+    }
+    // No finally block needed as we only want to stop loading on error. On success, the page redirects.
   };
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
-          <p className="text-muted-foreground">Please log in to access settings.</p>
-        </div>
-      </div>
-    );
-  }
+  const handlePasswordChange = async () => {
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: "Error",
+        description: "New passwords do not match.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 8 characters long.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/change-password`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          currentPassword,
+          newPassword
+        })
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Password changed",
+          description: "Your password has been changed successfully.",
+          variant: "success",
+        });
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+      } else {
+        const data = await response.json();
+        toast({
+          title: "Error",
+          description: data.message || "Failed to change password.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('Error changing password:', error);
+      toast({
+        title: "Error",
+        description: "Failed to change password.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleContactSupport = () => {
+    window.location.href = 'mailto:support@quluub.com';
+  };
+
+  const handleHideProfile = async () => {
+    try {
+      await userService.updateProfile(user?._id || '', { hidden: !user?.hidden });
+      updateUser({ hidden: !user?.hidden });
+      toast({
+        title: user?.hidden ? "Profile shown" : "Profile hidden",
+        description: user?.hidden ? "Your profile is now visible to others." : "Your profile is now hidden from others.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update profile visibility.",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 pt-16 pb-20">
-      <TopNavbar />
-      <div className="container py-6 max-w-4xl">
-        <h1 className="text-3xl font-bold mb-8">Settings</h1>
+    <div className="min-h-screen bg-gray-50 pb-20">
+      <div className="container py-6">
+        {/* Email validation banner */}
+        <Alert className="mb-6 bg-yellow-50 border-yellow-200">
+          <AlertDescription className="flex items-center gap-2">
+            <span className="bg-yellow-400 text-white p-1 rounded-full">!</span>
+            Please validate your email address to continue
+            <Button variant="outline" size="sm" className="ml-auto bg-blue-600 text-white hover:bg-blue-700">
+              Resend validation mail
+            </Button>
+          </AlertDescription>
+        </Alert>
         
-        {/* Account Settings */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Account Settings
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-medium">Profile Status</h3>
-                <p className="text-sm text-muted-foreground">
-                  Current Plan: {user.plan === 'premium' ? 'Premium' : 'Free'}
-                </p>
-              </div>
-              <Badge variant={user.plan === 'premium' ? 'default' : 'secondary'}>
-                {user.plan === 'premium' ? (
-                  <>
-                    <Crown className="h-3 w-3 mr-1" />
-                    Premium
-                  </>
-                ) : (
-                  'Free'
-                )}
-              </Badge>
-            </div>
-            
-            {user.plan !== 'premium' && (
-              <>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-medium">Upgrade to Premium</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Unlock unlimited matches, messaging, and advanced features
-                    </p>
-                  </div>
-                  <Button onClick={handleUpgradeToPremium} disabled={loading}>
-                    <Crown className="h-4 w-4 mr-2" />
-                    {loading ? 'Processing...' : 'Upgrade'}
-                  </Button>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Notification Settings */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Bell className="h-5 w-5" />
-              Notifications
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="email-notifications">Email Notifications</Label>
-                <p className="text-sm text-muted-foreground">Receive updates via email</p>
-              </div>
-              <Switch
-                id="email-notifications"
-                checked={notifications.email}
-                onCheckedChange={(value) => handleNotificationChange('email', value)}
-              />
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="push-notifications">Push Notifications</Label>
-                <p className="text-sm text-muted-foreground">Receive push notifications</p>
-              </div>
-              <Switch
-                id="push-notifications"
-                checked={notifications.push}
-                onCheckedChange={(value) => handleNotificationChange('push', value)}
-              />
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="match-notifications">New Match Alerts</Label>
-                <p className="text-sm text-muted-foreground">Get notified of new matches</p>
-              </div>
-              <Switch
-                id="match-notifications"
-                checked={notifications.matches}
-                onCheckedChange={(value) => handleNotificationChange('matches', value)}
-              />
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="message-notifications">Message Notifications</Label>
-                <p className="text-sm text-muted-foreground">Get notified of new messages</p>
-              </div>
-              <Switch
-                id="message-notifications"
-                checked={notifications.messages}
-                onCheckedChange={(value) => handleNotificationChange('messages', value)}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Privacy Settings */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
-              Privacy & Security
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="profile-visible">Profile Visibility</Label>
-                <p className="text-sm text-muted-foreground">Make your profile visible to others</p>
-              </div>
-              <Switch
-                id="profile-visible"
-                checked={privacy.profileVisible}
-                onCheckedChange={(value) => handlePrivacyChange('profileVisible', value)}
-              />
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="online-status">Show Online Status</Label>
-                <p className="text-sm text-muted-foreground">Let others see when you're online</p>
-              </div>
-              <Switch
-                id="online-status"
-                checked={privacy.onlineStatus}
-                onCheckedChange={(value) => handlePrivacyChange('onlineStatus', value)}
-              />
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="read-receipts">Read Receipts</Label>
-                <p className="text-sm text-muted-foreground">Let others know when you've read their messages</p>
-              </div>
-              <Switch
-                id="read-receipts"
-                checked={privacy.readReceipts}
-                onCheckedChange={(value) => handlePrivacyChange('readReceipts', value)}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Payment History */}
-        {paymentHistory.length > 0 && (
-          <Card className="mb-6">
+        <h1 className="text-2xl font-bold mb-6">Settings</h1>
+        
+        <div className="space-y-6">
+          {/* Referral System */}
+          <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                Payment History
+                <Gift className="h-5 w-5" />
+                Referral System
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {paymentHistory.map((payment, index) => (
-                  <div key={index} className="flex justify-between items-center py-2 border-b last:border-b-0">
-                    <div>
-                      <p className="font-medium">{payment.plan} Plan</p>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(payment.date).toLocaleDateString()}
-                      </p>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="font-medium mb-2">Your Referral Code</h3>
+                  {referralCode ? (
+                    <div className="flex items-center gap-2">
+                      <Input value={referralCode} readOnly />
+                      <Button onClick={copyReferralCode} size="sm">
+                        <Copy className="h-4 w-4" />
+                      </Button>
                     </div>
-                    <div className="text-right">
-                      <p className="font-medium">₦{payment.amount}</p>
-                      <Badge variant={payment.status === 'completed' ? 'default' : 'secondary'}>
-                        {payment.status}
-                      </Badge>
-                    </div>
+                  ) : (
+                    <Button onClick={generateReferralCode}>Generate Code</Button>
+                  )}
+                  <div className="mt-2 text-sm text-muted-foreground">
+                    Successful Referrals: <strong>{referralStats.completedReferrals}</strong>
                   </div>
-                ))}
+                  <p className="mt-1 text-sm text-green-600">
+                    You get 1 month of Premium for every 5 successful referrals!
+                  </p>
+                  {referralStats.completedReferrals > 0 && (
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      You are <strong>{5 - (referralStats.completedReferrals % 5)}</strong> referrals away from your next reward.
+                    </p>
+                  )}
+                </div>
+                
+                <div>
+                  <h3 className="font-medium mb-2">Apply Referral Code</h3>
+                  <div className="flex items-center gap-2">
+                    <Input 
+                      placeholder="Enter referral code"
+                      value={applyReferralCode}
+                      onChange={(e) => setApplyReferralCode(e.target.value)}
+                    />
+                    <Button onClick={handleApplyReferral} size="sm">
+                      Apply
+                    </Button>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
-        )}
 
-        {/* Danger Zone */}
-        <Card className="border-red-200">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-red-700">
-              <Trash2 className="h-5 w-5" />
-              Danger Zone
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-medium text-red-700">Delete Account</h3>
-                <p className="text-sm text-muted-foreground">
-                  Permanently delete your account and all associated data
-                </p>
+          {/* Plan Management */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <BadgeDollarSign className="h-5 w-5" />
+                  Manage My Plan
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant={currency === 'GBP' ? 'default' : 'outline'} size="sm" onClick={() => setCurrency('GBP')}>GBP</Button>
+                  <Button variant={currency === 'NGN' ? 'default' : 'outline'} size="sm" onClick={() => setCurrency('NGN')}>NGN</Button>
+                </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Free Plan */}
+                <Card className={`border ${!isPro ? 'border-primary shadow-md' : ''}`}>
+                  <CardHeader>
+                    <CardTitle className="flex justify-between items-center">
+                      <span>Freemium</span>
+                      {!isPro && <Badge className="bg-green-500">Active</Badge>}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="text-3xl font-bold text-center">{pricing[currency].symbol}0<span className="text-base font-normal text-muted-foreground">/month</span></div>
+                    <ul className="space-y-2">
+                      <li className="flex items-center justify-between">
+                        <span>Requests Sent Per Month:</span>
+                        <span className="font-medium">2</span>
+                      </li>
+                      <li className="flex items-center justify-between">
+                        <span>Requests Received Per Month:</span>
+                        <span className="font-medium">Unlimited</span>
+                      </li>
+                      <li className="flex items-center justify-between">
+                        <span>Message Allowance:</span>
+                        <span className="font-medium">10</span>
+                      </li>
+                      <li className="flex items-center justify-between">
+                        <span>Word Count Per Message:</span>
+                        <span className="font-medium">20</span>
+                      </li>
+                      <li className="flex items-center justify-between">
+                        <span>Ad-free Browsing:</span>
+                        <span className="font-medium">No</span>
+                      </li>
+                      <li className="flex items-center justify-between">
+                        <span>Video Calling:</span>
+                        <span className="font-medium">No</span>
+                      </li>
+                    </ul>
+                    {!isPro && (
+                      <Button 
+                        className="w-full" 
+                        variant="outline" 
+                        disabled
+                      >
+                        Current Plan
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+                
+                {/* Pro Plan */}
+                <Card className={`border ${isPro ? 'border-primary shadow-md' : ''}`}>
+                  <CardHeader>
+                    <CardTitle className="flex justify-between items-center">
+                      <span>Premium</span>
+                      {isPro && <Badge className="bg-green-500">Active</Badge>}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="text-3xl font-bold text-center">
+                      {pricing[currency].symbol}{pricing[currency].premium} <span className="text-lg font-normal text-muted-foreground line-through">{pricing[currency].symbol}{pricing[currency].original}</span>
+                      <span className="text-base font-normal text-muted-foreground">/month</span>
+                    </div>
+                    <ul className="space-y-2">
+                      <li className="flex items-center justify-between">
+                        <span>Requests Sent Per Month:</span>
+                        <span className="font-medium">5</span>
+                      </li>
+                      <li className="flex items-center justify-between">
+                        <span>Requests Received Per Month:</span>
+                        <span className="font-medium">Unlimited</span>
+                      </li>
+                      <li className="flex items-center justify-between">
+                        <span>Ad-free Browsing:</span>
+                        <span className="font-medium">Yes</span>
+                      </li>
+                      <li className="flex items-center justify-between">
+                        <span>Video Calling:</span>
+                        <span className="font-medium">Yes</span>
+                      </li>
+                      <li className="flex items-center justify-between">
+                        <span>Message Allowance:</span>
+                        <span className="font-medium">10</span>
+                      </li>
+                      <li className="flex items-center justify-between">
+                        <span>Word Count Per Message:</span>
+                        <span className="font-medium">20</span>
+                      </li>
+                      <li className="flex items-center justify-between">
+                        <span>Ad-free Browsing:</span>
+                        <span className="font-medium">Yes</span>
+                      </li>
+                      <li className="flex items-center justify-between">
+                        <span>Video Calling:</span>
+                        <span className="font-medium">Yes</span>
+                      </li>
+                    </ul>
+                    {!isPro ? (
+                      <Button 
+                        className="w-full bg-primary hover:bg-primary/90" 
+                        onClick={handleUpgrade}
+                        disabled={isLoadingPayment}
+                      >
+                        {isLoadingPayment ? "Processing..." : "Upgrade to Premium"}
+                      </Button>
+                    ) : (
+                      <Button 
+                        className="w-full" 
+                        variant="outline"
+                        disabled
+                      >
+                        Current Plan
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
-              <Button variant="destructive" onClick={handleDeleteAccount}>
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete Account
-              </Button>
-            </div>
-            
-            <Separator />
-            
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-medium">Log Out</h3>
-                <p className="text-sm text-muted-foreground">
-                  Sign out of your account on this device
-                </p>
+            </CardContent>
+          </Card>
+          
+          {/* Password Change */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Lock className="h-5 w-5" />
+                Change My Password
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 gap-4">
+                <div className="relative">
+                  <Input 
+                    type={showCurrentPassword ? "text" : "password"} 
+                    placeholder="Current password*" 
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                  />
+                  <Button 
+                    type="button"
+                    variant="ghost" 
+                    size="sm"
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1"
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                  >
+                    {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+                
+                <div className="relative">
+                  <Input 
+                    type={showNewPassword ? "text" : "password"} 
+                    placeholder="New password*" 
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                  />
+                  <Button 
+                    type="button"
+                    variant="ghost" 
+                    size="sm"
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                  >
+                    {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
+                
+                <div className="relative">
+                  <Input 
+                    type={showConfirmPassword ? "text" : "password"} 
+                    placeholder="Confirm password*" 
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                  />
+                  <Button 
+                    type="button"
+                    variant="ghost" 
+                    size="sm"
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+                </div>
               </div>
-              <Button variant="outline" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Log Out
+              
+              <Button 
+                onClick={handlePasswordChange}
+                className="w-full md:w-auto md:ml-auto block"
+              >
+                Change password
               </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+          
+          {/* Help Center */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <HelpCircle className="h-5 w-5" />
+                Help Center
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                  <h3 className="font-medium mb-2">Toggle visibility</h3>
+                  <Button 
+                    variant="outline" 
+                    className="w-full border-red-300 text-red-500 hover:bg-red-50"
+                    onClick={handleHideProfile}
+                  >
+                    {user?.hidden ? 'Show my profile' : 'Hide my profile'}
+                  </Button>
+                </div>
+                
+                <div>
+                  <h3 className="font-medium mb-2">Having any issues?</h3>
+                  <Button 
+                    variant="outline" 
+                    className="w-full border-blue-300 text-blue-500 hover:bg-blue-50"
+                    onClick={handleContactSupport}
+                  >
+                    <Mail className="mr-2 h-4 w-4" />
+                    Contact us
+                  </Button>
+                </div>
+                
+                <div>
+                  <h3 className="font-medium mb-2">Please be sure!</h3>
+                  <Button variant="outline" className="w-full border-red-300 text-red-500 hover:bg-red-50">
+                    Delete my account
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
       <Navbar />
     </div>

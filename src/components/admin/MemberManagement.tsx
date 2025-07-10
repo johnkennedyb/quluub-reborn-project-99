@@ -8,12 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import EditUserDialog from './EditUserDialog';
-import CountryCityFilter from './CountryCityFilter';
-import ConfirmationDialog from './ConfirmationDialog';
-import SendEmailDialog from './SendEmailDialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import UserProfileCard from './UserProfileCard';
 import { useToast } from '@/hooks/use-toast';
-import { Search, Edit, Trash2, User, Users, Eye, Mail, AlertTriangle } from 'lucide-react';
+import EditUserDialog from './EditUserDialog';
+import { Search, Edit, Trash2, User, Users, Eye } from 'lucide-react';
 
 interface MemberManagementProps {
   stats: any;
@@ -25,8 +24,8 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
     gender: 'all',
     plan: 'all',
     status: 'all',
-    countries: [] as string[],
-    cities: [] as string[],
+    country: '',
+    city: '',
     inactiveFor: 'all',
     page: 1,
     limit: 20
@@ -34,160 +33,79 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
 
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [confirmDialog, setConfirmDialog] = useState<{
-    isOpen: boolean;
-    title: string;
-    description: string;
-    onConfirm: () => void;
-    variant?: 'default' | 'destructive';
-  }>({
-    isOpen: false,
-    title: '',
-    description: '',
-    onConfirm: () => {},
-    variant: 'default'
-  });
-  const [emailDialog, setEmailDialog] = useState<{
-    isOpen: boolean;
-    user: any;
-  }>({
-    isOpen: false,
-    user: null
-  });
 
-  const { users, loading, pagination, refetchData, deleteUser, updateUser, sendPasswordReset } = useAdminData({
-    ...filters,
-    country: filters.countries.join(','),
-    city: filters.cities.join(',')
-  });
+  const { users, loading, pagination, refetchData, deleteUser, updateUser, sendPasswordReset } = useAdminData(filters);
   const { toast } = useToast();
 
-  const handleFilterChange = (key: string, value: any) => {
+  const handleFilterChange = (key: string, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value, page: 1 }));
   };
 
-  const handleDeleteUser = (userId: string, userName: string) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Delete User Account',
-      description: `Are you sure you want to permanently delete ${userName}'s account? This action cannot be undone and will remove all their data including messages, matches, and profile information.`,
-      onConfirm: async () => {
-        try {
-          await deleteUser(userId);
-          toast({ title: 'Success', description: 'User has been successfully deleted.' });
-        } catch (error: any) {
-          toast({ title: 'Error', description: error.message || 'An unexpected error occurred.', variant: 'destructive' });
-        }
-        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
-      },
-      variant: 'destructive'
-    });
-  };
 
-  const handleUpgradeToPremium = (userId: string, userName: string) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: 'Upgrade to Premium',
-      description: `Are you sure you want to upgrade ${userName} to Premium? This will give them access to all premium features including unlimited messaging, video calls, and advanced search filters.`,
-      onConfirm: async () => {
-        try {
-          await updateUser(userId, { plan: 'premium' });
-          toast({ title: 'Success', description: 'User upgraded to Premium successfully.' });
-        } catch (error: any) {
-          toast({ title: 'Error', description: error.message || 'Failed to upgrade user.', variant: 'destructive' });
-        }
-        setConfirmDialog(prev => ({ ...prev, isOpen: false }));
-      }
-    });
-  };
 
-  const handleStatusChange = (userId: string, userName: string, currentStatus: string, newStatus: string) => {
-    const isActivating = newStatus === 'active' && currentStatus !== 'active';
-    const isDeactivating = newStatus !== 'active' && currentStatus === 'active';
-    
-    if (isActivating || isDeactivating) {
-      setConfirmDialog({
-        isOpen: true,
-        title: isActivating ? 'Activate User Account' : 'Change User Status',
-        description: isActivating 
-          ? `Are you sure you want to activate ${userName}'s account? They will be able to access the platform and appear in searches.`
-          : `Are you sure you want to change ${userName}'s status to ${newStatus}? This will affect their ability to use the platform.`,
-        onConfirm: async () => {
-          try {
-            await updateUser(userId, { status: newStatus });
-            toast({ title: 'Success', description: 'User status updated successfully.' });
-          } catch (error: any) {
-            toast({ title: 'Error', description: error.message || 'Failed to update user status.', variant: 'destructive' });
-          }
-          setConfirmDialog(prev => ({ ...prev, isOpen: false }));
-        },
-        variant: isDeactivating ? 'destructive' : 'default'
-      });
-    } else {
-      // Direct update for non-critical status changes
-      updateUser(userId, { status: newStatus });
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm('Are you sure you want to permanently delete this user and all their associated data? This action cannot be undone.')) {
+      return;
     }
-  };
 
-  const openEmailDialog = (user: any) => {
-    setEmailDialog({
-      isOpen: true,
-      user
-    });
+    try {
+      await deleteUser(userId);
+      toast({ title: 'Success', description: 'User has been successfully deleted.' });
+      // refetchData is already called within the deleteUser hook on success
+    } catch (error: any) {
+      console.error('Failed to delete user:', error);
+      toast({ title: 'Error', description: error.message || 'An unexpected error occurred.', variant: 'destructive' });
+    }
   };
 
   const renderUserCard = (user: any) => (
     <Card key={user._id} className="mb-4">
       <CardContent className="p-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-center space-x-4 min-w-0 flex-1">
-            <Avatar className="flex-shrink-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <Avatar>
               <AvatarFallback>
                 {user.fname?.[0]}{user.lname?.[0]}
               </AvatarFallback>
             </Avatar>
-            <div className="min-w-0 flex-1">
-              <h3 className="font-semibold truncate">{user.fname} {user.lname}</h3>
-              <p className="text-sm text-gray-500 truncate">{user.email}</p>
-              <div className="flex flex-wrap items-center gap-2 mt-1">
-                <Badge variant={user.gender === 'male' ? 'default' : 'secondary'} className="text-xs">
+            <div>
+              <h3 className="font-semibold">{user.fname} {user.lname}</h3>
+              <p className="text-sm text-gray-500">{user.email}</p>
+              <div className="flex items-center space-x-2 mt-1">
+                <Badge variant={user.gender === 'male' ? 'default' : 'secondary'}>
                   {user.gender}
                 </Badge>
-                <Badge variant={user.plan === 'premium' ? 'default' : 'outline'} className="text-xs">
-                  {user.plan === 'freemium' ? 'Free' : user.plan}
+                <Badge variant={user.plan === 'premium' ? 'default' : 'outline'}>
+                  {user.plan}
                 </Badge>
-                <Badge variant={user.status === 'active' ? 'default' : 'destructive'} className="text-xs">
+                <Badge variant={user.status === 'active' ? 'default' : 'destructive'}>
                   {user.status}
                 </Badge>
-                {user.hidden && <Badge variant="destructive" className="text-xs">Hidden</Badge>}
+                {user.hidden && <Badge variant="destructive">Hidden</Badge>}
               </div>
             </div>
           </div>
           
-          <div className="flex flex-col lg:items-end space-y-2 flex-shrink-0">
-            <div className="text-sm text-gray-500 lg:text-right">
+          <div className="flex flex-col items-end space-y-2">
+            <div className="text-sm text-gray-500">
               {user.age && <span>{user.age} years old</span>}
               {user.country && <span> • {user.country}</span>}
             </div>
-            <div className="text-sm text-gray-500 lg:text-right">
-              Matches: {user.matchCount || 0} • Messages: {user.messageCount || 0}
+            <div className="text-sm text-gray-500">
+              Matches: {user.matchCount} • Messages: {user.messageCount}
             </div>
-            <div className="text-sm text-gray-500 lg:text-right">
-              {user.lastSeenAgo !== null && user.lastSeenAgo !== undefined 
-                ? `Last seen ${user.lastSeenAgo} days ago` 
-                : 'Never logged in'}
+            <div className="text-sm text-gray-500">
+              {user.lastSeenAgo !== null ? `Last seen ${user.lastSeenAgo} days ago` : 'Never logged in'}
             </div>
             
-            <div className="flex flex-wrap gap-2">
+            <div className="flex space-x-2">
+
+              
               <Link to={`/admin/user/${user._id}`}>
                 <Button size="sm" variant="outline">
                   <Eye className="h-4 w-4" />
                 </Button>
               </Link>
-
-              <Button size="sm" variant="outline" onClick={() => openEmailDialog(user)}>
-                <Mail className="h-4 w-4" />
-              </Button>
 
               <Button size="sm" variant="outline" onClick={() => {
                 setSelectedUser(user);
@@ -195,23 +113,8 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
               }}>
                 <Edit className="h-4 w-4" />
               </Button>
-
-              {user.plan === 'freemium' && (
-                <Button 
-                  size="sm" 
-                  variant="default" 
-                  onClick={() => handleUpgradeToPremium(user._id, `${user.fname} ${user.lname}`)}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  Upgrade
-                </Button>
-              )}
               
-              <Button 
-                size="sm" 
-                variant="destructive" 
-                onClick={() => handleDeleteUser(user._id, `${user.fname} ${user.lname}`)}
-              >
+              <Button size="sm" variant="destructive" onClick={() => handleDeleteUser(user._id)}>
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
@@ -224,7 +127,7 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
   return (
     <div className="space-y-6">
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Members</CardTitle>
@@ -281,7 +184,7 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
           <CardTitle>Member Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <Input
@@ -311,6 +214,7 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
                 <SelectItem value="all">All Plans</SelectItem>
                 <SelectItem value="free">Free</SelectItem>
                 <SelectItem value="premium">Premium</SelectItem>
+
               </SelectContent>
             </Select>
             
@@ -339,14 +243,19 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
                 <SelectItem value="365">12+ months inactive</SelectItem>
               </SelectContent>
             </Select>
-          </div>
 
-          <div className="mt-4">
-            <CountryCityFilter
-              selectedCountries={filters.countries}
-              selectedCities={filters.cities}
-              onCountriesChange={(countries) => handleFilterChange('countries', countries)}
-              onCitiesChange={(cities) => handleFilterChange('cities', cities)}
+            <Input
+              type="text"
+              placeholder="Filter by country"
+              value={filters.country}
+              onChange={(e) => handleFilterChange('country', e.target.value)}
+            />
+
+            <Input
+              type="text"
+              placeholder="Filter by city"
+              value={filters.city}
+              onChange={(e) => handleFilterChange('city', e.target.value)}
             />
           </div>
         </CardContent>
@@ -365,7 +274,7 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
               {users.map(renderUserCard)}
               
               {/* Pagination */}
-              <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
+              <div className="flex justify-between items-center mt-6">
                 <Button
                   variant="outline"
                   disabled={!pagination.hasPrevPage}
@@ -391,39 +300,19 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
         </CardContent>
       </Card>
 
+
+
       {/* Edit User Dialog */}
       {selectedUser && (
         <EditUserDialog
           user={selectedUser}
           isOpen={editDialogOpen}
           onOpenChange={setEditDialogOpen}
-          onUserUpdate={async (userId, data) => {
-            await updateUser(userId, data);
-            setEditDialogOpen(false);
+          onUserUpdate={(userId, data) => {
+            updateUser(userId, data);
+            setEditDialogOpen(false); // Close dialog on successful update
           }}
           sendPasswordReset={sendPasswordReset}
-          onStatusChange={handleStatusChange}
-        />
-      )}
-
-      {/* Confirmation Dialog */}
-      <ConfirmationDialog
-        isOpen={confirmDialog.isOpen}
-        onOpenChange={(open) => setConfirmDialog(prev => ({ ...prev, isOpen: open }))}
-        title={confirmDialog.title}
-        description={confirmDialog.description}
-        onConfirm={confirmDialog.onConfirm}
-        variant={confirmDialog.variant}
-      />
-
-      {/* Send Email Dialog */}
-      {emailDialog.user && (
-        <SendEmailDialog
-          isOpen={emailDialog.isOpen}
-          onOpenChange={(open) => setEmailDialog(prev => ({ ...prev, isOpen: open }))}
-          recipientName={`${emailDialog.user.fname} ${emailDialog.user.lname}`}
-          recipientEmail={emailDialog.user.email}
-          userId={emailDialog.user._id}
         />
       )}
     </div>

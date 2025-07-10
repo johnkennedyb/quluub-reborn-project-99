@@ -1,31 +1,43 @@
-
-import React, { useEffect, useState } from 'react';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
+import React, { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import { adminService } from '@/lib/api-client';
-import { format } from 'date-fns';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Trash2 } from 'lucide-react';
 
-export interface ScheduledEmailListProps {
+interface ScheduledEmailListProps {
   refreshKey: number;
-  setRefreshKey?: React.Dispatch<React.SetStateAction<number>>;
 }
 
-const ScheduledEmailList = ({ refreshKey, setRefreshKey }: ScheduledEmailListProps) => {
-  const [scheduledEmails, setScheduledEmails] = useState([]);
-  const [loading, setLoading] = useState(false);
+interface ScheduledEmail {
+  _id: string;
+  subject: string;
+  recipients: { _id: string; fname: string; lname: string; email: string }[];
+  sendTime: string;
+}
+
+const ScheduledEmailList = ({ refreshKey }: ScheduledEmailListProps) => {
+  const [emails, setEmails] = useState<ScheduledEmail[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   const fetchScheduledEmails = async () => {
-    setLoading(true);
+    setIsLoading(true);
     try {
-      const emails = await adminService.getScheduledEmails();
-      setScheduledEmails(emails);
+      const response = await fetch('/api/admin/scheduled-emails', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setEmails(data);
+      } else {
+        throw new Error(data.message || 'Failed to fetch scheduled emails');
+      }
     } catch (error) {
-      toast({ title: 'Error', description: 'Failed to fetch scheduled emails.', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Could not fetch scheduled emails.', variant: 'destructive' });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -33,64 +45,64 @@ const ScheduledEmailList = ({ refreshKey, setRefreshKey }: ScheduledEmailListPro
     fetchScheduledEmails();
   }, [refreshKey]);
 
-  const handleCancel = async (emailId: string) => {
+  const handleCancelEmail = async (emailId: string) => {
+    if (!confirm('Are you sure you want to cancel this scheduled email?')) {
+      return;
+    }
+
     try {
-      await adminService.cancelScheduledEmail(emailId);
-      toast({ title: 'Success', description: 'Scheduled email cancelled.' });
-      fetchScheduledEmails();
-      if (setRefreshKey) {
-        setRefreshKey(prev => prev + 1);
+      const response = await fetch(`/api/admin/scheduled-emails/${emailId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+
+      if (response.ok) {
+        toast({ title: 'Success', description: 'Scheduled email cancelled successfully.' });
+        fetchScheduledEmails(); // Refresh the list
+      } else {
+        const data = await response.json();
+        throw new Error(data.message || 'Failed to cancel email');
       }
     } catch (error) {
-      toast({ title: 'Error', description: 'Failed to cancel email.', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Failed to cancel scheduled email.', variant: 'destructive' });
     }
   };
 
-  if (loading) {
-    return <div className="text-center p-4">Loading scheduled emails...</div>;
+  if (isLoading) {
+    return <div>Loading scheduled emails...</div>;
   }
 
   return (
-    <div>
-      <h3 className="text-lg font-semibold mb-4">Scheduled Emails</h3>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Subject</TableHead>
-            <TableHead>Recipients</TableHead>
-            <TableHead>Scheduled For</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {scheduledEmails.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={5} className="text-center">No scheduled emails found.</TableCell>
-            </TableRow>
-          ) : (
-            scheduledEmails.map((email: any) => (
-              <TableRow key={email._id}>
-                <TableCell>{email.subject}</TableCell>
-                <TableCell>{email.recipientType}</TableCell>
-                <TableCell>{format(new Date(email.sendAt), 'PPP p')}</TableCell>
-                <TableCell>{email.status}</TableCell>
-                <TableCell>
-                  <Button 
-                    variant="destructive" 
-                    size="sm"
-                    onClick={() => handleCancel(email._id)}
-                    disabled={email.status === 'sent'}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>Pending Scheduled Emails</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {emails.length === 0 ? (
+          <p>No pending emails.</p>
+        ) : (
+          <div className="space-y-4">
+            {emails.map((email) => (
+              <div key={email._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div>
+                  <p className="font-semibold">{email.subject}</p>
+                  <p className="text-sm text-gray-500">
+                    Scheduled for: {new Date(email.sendTime).toLocaleString()}
+                  </p>
+                  <p className="text-sm text-gray-500">Recipients: {email.recipients.length}</p>
+                </div>
+                <Button variant="destructive" size="sm" onClick={() => handleCancelEmail(email._id)}>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Cancel
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 

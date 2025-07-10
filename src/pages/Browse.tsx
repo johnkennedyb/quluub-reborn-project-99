@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
@@ -6,9 +5,16 @@ import { Heart, X, Send, UserPlus, Search, Filter, Star } from "lucide-react";
 import AdComponent from '@/components/AdComponent';
 import { useAuth } from '@/contexts/AuthContext';
 import { userService, relationshipService } from "@/lib/api-client";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { User } from "@/types/user";
 import { useNavigate } from "react-router-dom";
+import { 
+  Pagination, 
+  PaginationContent, 
+  PaginationItem, 
+  PaginationNext, 
+  PaginationPrevious 
+} from "@/components/ui/pagination";
 import { Card, CardContent } from "@/components/ui/card";
 import { UserProfileCard } from "@/components/UserProfileCard";
 import { Loader2 } from "lucide-react";
@@ -26,13 +32,11 @@ const Browse = () => {
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [usersPerPage] = useState(30);
+  const [usersPerPage] = useState(30); // Show 30 users per page
   const [loading, setLoading] = useState(true);
   const [processingAction, setProcessingAction] = useState(false);
   const [pendingConnections, setPendingConnections] = useState<string[]>([]);
   const [countryFilter, setCountryFilter] = useState("");
-  const [hijabFilter, setHijabFilter] = useState("");
-  const [beardFilter, setBeardFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [favoriteUsers, setFavoriteUsers] = useState<string[]>([]);
   const { toast } = useToast();
@@ -41,28 +45,16 @@ const Browse = () => {
 
   useEffect(() => {
     const fetchUsers = async () => {
-      if (!user) return;
-      
       try {
         setLoading(true);
-        const fetchedUsers = await userService.getBrowseUsers();
+        const fetchedUsers = await userService.getBrowseUsers({ showAll: true });
         console.log("Browse users:", fetchedUsers);
-        
         if (fetchedUsers && fetchedUsers.length > 0) {
-          // Filter users based on current user's gender (men see women, women see men)
-          const oppositeGenderUsers = fetchedUsers.filter((u: User) => {
-            if (user.gender === 'male') {
-              return u.gender === 'female';
-            } else if (user.gender === 'female') {
-              return u.gender === 'male';
-            }
-            return true; // fallback for other genders
-          });
-          
-          setUsers(oppositeGenderUsers);
-          setFilteredUsers(oppositeGenderUsers);
-          setTotalPages(Math.ceil(oppositeGenderUsers.length / usersPerPage));
+          setUsers(fetchedUsers);
+          setFilteredUsers(fetchedUsers);
+          setTotalPages(Math.ceil(fetchedUsers.length / usersPerPage));
         } else {
+          // If no users found, show toast
           toast({
             title: "No users found",
             description: "No potential matches were found at this time.",
@@ -83,6 +75,7 @@ const Browse = () => {
 
     fetchUsers();
 
+    // Fetch favorites
     const fetchFavorites = async () => {
       try {
         const favoritesData = await userService.getFavorites();
@@ -97,6 +90,7 @@ const Browse = () => {
 
     fetchFavorites();
 
+    // Fetch pending connections to highlight already requested users
     const fetchPendingRequests = async () => {
       try {
         const response = await relationshipService.getPendingRequests();
@@ -110,22 +104,14 @@ const Browse = () => {
     };
     
     fetchPendingRequests();
-  }, [toast, usersPerPage, user]);
+  }, [toast, usersPerPage]);
 
-  // Filter users based on search, country, hijab, and beard filters
+  // Filter users based on search and country filter
   useEffect(() => {
     let result = [...users];
     
     if (countryFilter) {
       result = result.filter(user => user.country === countryFilter);
-    }
-    
-    if (hijabFilter && user?.gender === 'male') {
-      result = result.filter(user => user.hijab === hijabFilter);
-    }
-    
-    if (beardFilter && user?.gender === 'female') {
-      result = result.filter(user => user.beard === beardFilter);
     }
     
     if (searchQuery) {
@@ -140,8 +126,8 @@ const Browse = () => {
     
     setFilteredUsers(result);
     setTotalPages(Math.ceil(result.length / usersPerPage));
-    setCurrentPage(1);
-  }, [countryFilter, hijabFilter, beardFilter, searchQuery, users, usersPerPage, user]);
+    setCurrentPage(1); // Reset to first page when filters change
+  }, [countryFilter, searchQuery, users, usersPerPage]);
 
   const handleLike = async (userId: string) => {
     if (processingAction) return;
@@ -170,6 +156,7 @@ const Browse = () => {
   };
 
   const handleSkip = (userId: string) => {
+    // In a real app, you might want to track skipped users
     toast({
       title: "Skipped",
       description: "You've skipped this profile",
@@ -217,31 +204,25 @@ const Browse = () => {
     }
   };
 
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const goToPrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
   // Get unique countries for the filter
   const uniqueCountries = [...new Set(users.filter(user => user.country).map(user => user.country))];
 
-  // Get current users for the page
+  // Get current users
   const indexOfLastUser = currentPage * usersPerPage;
   const indexOfFirstUser = indexOfLastUser - usersPerPage;
   const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
-
-  // Create array with ads inserted every 5 users
-  const createUsersWithAds = (users: User[]) => {
-    const result: (User | { type: 'ad', id: string })[] = [];
-    
-    users.forEach((user, index) => {
-      result.push(user);
-      
-      // Add ad after every 5 users (but not after the last user)
-      if ((index + 1) % 5 === 0 && index < users.length - 1 && user?.plan !== 'premium') {
-        result.push({ type: 'ad', id: `ad-${index}` });
-      }
-    });
-    
-    return result;
-  };
-
-  const usersWithAds = createUsersWithAds(currentUsers);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -274,34 +255,6 @@ const Browse = () => {
                 ))}
               </SelectContent>
             </Select>
-            
-            {/* Hijab filter for men viewing women */}
-            {user?.gender === 'male' && (
-              <Select value={hijabFilter} onValueChange={setHijabFilter}>
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue placeholder="Hijab" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Any</SelectItem>
-                  <SelectItem value="Yes">Yes</SelectItem>
-                  <SelectItem value="No">No</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-            
-            {/* Beard filter for women viewing men */}
-            {user?.gender === 'female' && (
-              <Select value={beardFilter} onValueChange={setBeardFilter}>
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue placeholder="Beard" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Any</SelectItem>
-                  <SelectItem value="Yes">Yes</SelectItem>
-                  <SelectItem value="No">No</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
           </div>
         </div>
         
@@ -312,17 +265,8 @@ const Browse = () => {
         ) : filteredUsers.length > 0 ? (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-              {usersWithAds.map((item, index) => {
-                if ('type' in item && item.type === 'ad') {
-                  return (
-                    <div key={item.id} className="sm:col-span-2 lg:col-span-4 my-4">
-                      <AdComponent />
-                    </div>
-                  );
-                }
-                
-                const user = item as User;
-                return (
+              {currentUsers.reduce((acc, user, index) => {
+                acc.push(
                   <div key={user._id || user.id} className="flex flex-col h-full">
                     <UserProfileCard
                       user={user}
@@ -374,68 +318,65 @@ const Browse = () => {
                     </div>
                   </div>
                 );
-              })}
+
+                if (user?.plan !== 'premium' && (index + 1) % 5 === 0 && (index + 1) < currentUsers.length) {
+                  acc.push(
+                    <div key={`ad-${index}`} className="sm:col-span-2 lg:col-span-4 my-4">
+                      <AdComponent />
+                    </div>
+                  );
+                }
+
+                return acc;
+              }, [] as JSX.Element[])}
             </div>
             
-            {/* Pagination */}
-            <div className="flex justify-center items-center space-x-4 mt-8">
-              <Button 
-                variant="outline" 
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} 
-                disabled={currentPage === 1}
-              >
-                Previous
-              </Button>
-              
-              <div className="flex items-center space-x-2">
-                {/* Show page numbers */}
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
-                  if (pageNum > totalPages) return null;
-                  
-                  return (
-                    <Button
-                      key={pageNum}
-                      variant={currentPage === pageNum ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setCurrentPage(pageNum)}
-                    >
-                      {pageNum}
-                    </Button>
-                  );
-                })}
-              </div>
+            <Pagination className="mt-6">
+              <PaginationContent>
+                <PaginationItem>
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    onClick={goToPrevPage} 
+                    disabled={currentPage === 1}
+                    className="cursor-pointer"
+                  >
+                    <PaginationPrevious />
+                  </Button>
+                </PaginationItem>
+                <PaginationItem className="flex items-center px-4">
+                  Page {currentPage} of {totalPages}
+                </PaginationItem>
 
-              <Button 
-                variant="outline" 
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} 
-                disabled={currentPage === totalPages}
-              >
-                Next
-              </Button>
-            </div>
-
-            <div className="text-center mt-4 text-sm text-muted-foreground">
-              Showing {indexOfFirstUser + 1}-{Math.min(indexOfLastUser, filteredUsers.length)} of {filteredUsers.length} profiles
-            </div>
+                <PaginationItem>
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    onClick={goToNextPage} 
+                    disabled={currentPage === totalPages}
+                    className="cursor-pointer"
+                  >
+                    <PaginationNext />
+                  </Button>
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
           </>
         ) : (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <p className="text-lg text-center text-muted-foreground">
-                {searchQuery || countryFilter || hijabFilter || beardFilter ? 
+                {searchQuery || countryFilter ? 
                   "No users match your search criteria." :
                   "No more profiles to browse. Check back later!"}
               </p>
-              {(searchQuery || countryFilter || hijabFilter || beardFilter) && (
+              {(searchQuery || countryFilter) && (
                 <Button 
                   variant="outline" 
                   className="mt-4"
                   onClick={() => {
                     setSearchQuery("");
                     setCountryFilter("");
-                    setHijabFilter("");
-                    setBeardFilter("");
                   }}
                 >
                   Clear Filters
