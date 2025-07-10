@@ -38,24 +38,31 @@ export const loadJitsiScript = (): Promise<void> => {
   });
 };
 
-export const initializeJitsi = async (
-  containerId: string,
-  config: JitsiConfig
-): Promise<JitsiAPI> => {
-  await loadJitsiScript();
-
+export const createJitsiMeeting = (options: {
+  roomName: string;
+  parentNode: HTMLElement;
+  userInfo?: {
+    displayName?: string;
+    email?: string;
+    avatarUrl?: string;
+  };
+  configOverwrite?: any;
+  interfaceConfigOverwrite?: any;
+}): JitsiAPI => {
   const domain = 'meet.jit.si';
-  const options = {
-    roomName: config.roomName,
+  
+  const jitsiOptions = {
+    roomName: options.roomName,
     width: '100%',
     height: '100%',
-    parentNode: document.getElementById(containerId),
+    parentNode: options.parentNode,
     configOverwrite: {
       startWithAudioMuted: false,
       startWithVideoMuted: false,
       enableWelcomePage: false,
       prejoinPageEnabled: false,
       disableDeepLinking: true,
+      ...options.configOverwrite,
     },
     interfaceConfigOverwrite: {
       TOOLBAR_BUTTONS: [
@@ -93,17 +100,40 @@ export const initializeJitsi = async (
       SHOW_WATERMARK_FOR_GUESTS: false,
       SHOW_POWERED_BY: false,
       MOBILE_APP_PROMO: false,
+      ...options.interfaceConfigOverwrite,
     },
     userInfo: {
-      displayName: config.displayName || 'Anonymous',
-      email: config.userEmail || '',
-      avatarUrl: config.userAvatarUrl || ''
+      displayName: options.userInfo?.displayName || 'Anonymous',
+      email: options.userInfo?.email || '',
+      avatarUrl: options.userInfo?.avatarUrl || ''
     }
   };
 
-  const api = new window.JitsiMeetExternalAPI(domain, options);
+  const api = new window.JitsiMeetExternalAPI(domain, jitsiOptions);
   
   return api;
+};
+
+export const initializeJitsi = async (
+  containerId: string,
+  config: JitsiConfig
+): Promise<JitsiAPI> => {
+  await loadJitsiScript();
+
+  const container = document.getElementById(containerId);
+  if (!container) {
+    throw new Error(`Container with id ${containerId} not found`);
+  }
+
+  return createJitsiMeeting({
+    roomName: config.roomName,
+    parentNode: container,
+    userInfo: {
+      displayName: config.displayName,
+      email: config.userEmail,
+      avatarUrl: config.userAvatarUrl,
+    },
+  });
 };
 
 export const cleanupJitsi = (api: JitsiAPI | null) => {
