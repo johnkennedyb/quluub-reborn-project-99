@@ -61,7 +61,7 @@ const EditUserDialog = ({ user, isOpen, onOpenChange, onUserUpdate, sendPassword
   const handleSave = async () => {
     setSaving(true);
     try {
-      const updateData = { ...formData };
+      const updateData: any = { ...formData };
       if (formData.dob) {
         updateData.dob = formData.dob.toISOString();
       }
