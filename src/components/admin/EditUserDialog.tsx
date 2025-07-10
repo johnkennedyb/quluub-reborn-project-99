@@ -139,8 +139,8 @@ const EditUserDialog = ({ user, isOpen, onOpenChange, onUserUpdate, sendPassword
               <PopoverContent className="w-auto p-0">
                 <Calendar
                   mode="single"
-                  selected={formData.dob}
-                  onSelect={(date) => setFormData(prev => ({ ...prev, dob: date }))}
+                  selected={formData.dob || undefined}
+                  onSelect={(date) => setFormData(prev => ({ ...prev, dob: date || null }))}
                   initialFocus
                 />
               </PopoverContent>

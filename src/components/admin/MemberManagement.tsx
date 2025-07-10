@@ -397,8 +397,8 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
           user={selectedUser}
           isOpen={editDialogOpen}
           onOpenChange={setEditDialogOpen}
-          onUserUpdate={(userId, data) => {
-            updateUser(userId, data);
+          onUserUpdate={async (userId, data) => {
+            await updateUser(userId, data);
             setEditDialogOpen(false);
           }}
           sendPasswordReset={sendPasswordReset}
