@@ -1,8 +1,9 @@
+
 import axios from 'axios';
 import { LoginCredentials, SignupData, User } from '@/types/user';
 
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: 'https://quluub-reborn-project-33-8lca.onrender.com/api',
   headers: {
     'Content-Type': 'application/json',
   },
