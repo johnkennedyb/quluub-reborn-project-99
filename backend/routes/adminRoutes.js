@@ -37,7 +37,8 @@ const {
   sendAdminPushNotification,
   getAdminPushNotifications,
   getPaymentHistory,
-  processRefund
+  processRefund,
+  sendIndividualEmail
 } = require('../controllers/adminController');
 const {
   getAllSubscriptions
@@ -85,6 +86,7 @@ const emailAttachmentUpload = multer({
 // All admin routes require authentication and admin privileges
 router.post('/bulk-email', protect, isAdmin, emailAttachmentUpload.array('attachments', 5), sendBulkEmail);
 router.post('/schedule-email', protect, isAdmin, emailAttachmentUpload.array('attachments', 5), scheduleEmail);
+router.post('/send-individual-email', protect, isAdmin, sendIndividualEmail);
 router.use(protect, isAdmin);
 
 // Admin dashboard routes
@@ -144,8 +146,8 @@ router.get('/conversion-metrics', getConversionMetrics);
 router.get('/churn-analysis', getChurnAnalysis);
 router.get('/referral-analysis', getReferralAnalysis);
 
-// VIP users route
-router.get('/vip-users', getVipUsers);
+// Premium users route (renamed from VIP)
+router.get('/premium-users', getVipUsers);
 
 // Subscription and Payment routes
 router.get('/subscriptions', getAllSubscriptions);

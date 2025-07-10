@@ -638,6 +638,30 @@ const processRefund = async (req, res) => {
   }
 };
 
+// Add new function for individual email sending
+const sendIndividualEmail = async (req, res) => {
+  try {
+    const { userId, subject, message } = req.body;
+
+    if (!userId || !subject || !message) {
+      return res.status(400).json({ message: 'User ID, subject, and message are required' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Send individual email using the email service
+    await sendBulkEmailService([user.email], subject, message, []);
+
+    res.json({ message: 'Email sent successfully' });
+  } catch (error) {
+    console.error('Error sending individual email:', error);
+    res.status(500).json({ message: 'Failed to send email' });
+  }
+};
+
 module.exports = {
   getStats,
   getAllUsers,
@@ -669,6 +693,7 @@ module.exports = {
   sendMatchSuggestions,
   getPaymentHistory,
   processRefund,
+  sendIndividualEmail,
   getMatchingInsights: async (req, res) => res.json({ message: 'Feature coming soon' }),
   getEngagementMetrics: async (req, res) => res.json({ message: 'Feature coming soon' }),
   getConversionMetrics: async (req, res) => res.json({ message: 'Feature coming soon' }),

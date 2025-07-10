@@ -21,6 +21,7 @@ export interface JitsiMeetConfig {
     disableProfile?: boolean;
     hideDisplayName?: boolean;
     enableUserRolesBasedOnToken?: boolean;
+    callStatsThreshold?: number;
   };
   interfaceConfigOverwrite?: {
     DISABLE_JOIN_LEAVE_NOTIFICATIONS?: boolean;
@@ -70,13 +71,11 @@ export const createJitsiMeeting = (config: JitsiMeetConfig) => {
       requireDisplayName: false,
       disableProfile: true,
       hideDisplayName: false,
-      // Enable anonymous access without authentication
       enableUserRolesBasedOnToken: false,
-      // Additional configurations for guest access
       disableDeepLinking: true,
       disableInviteFunctions: true,
-      // 5 minute call limit (300 seconds)
-      callStatsThreshold: 300,
+      // Enhanced call time limit for premium users only
+      callStatsThreshold: 300, // 5 minutes for free users
       ...config.configOverwrite,
     },
     interfaceConfigOverwrite: {

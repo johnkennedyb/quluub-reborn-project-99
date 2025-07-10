@@ -7,14 +7,14 @@ const User = require('../models/User');
 const Chat = require('../models/Chat');
 const { sendVideoCallNotificationEmail } = require('../utils/emailService');
 
-// @desc    Initiate a video call
+// @desc    Initiate a video call using Jitsi
 // @route   POST /api/video-call/initiate
 // @access  Private
 exports.initiateCall = asyncHandler(async (req, res) => {
   const { recipientId } = req.body;
   const callerId = req.user._id;
 
-  console.log('Video call initiation request:', { recipientId, callerId });
+  console.log('Jitsi video call initiation request:', { recipientId, callerId });
 
   if (!recipientId) {
     res.status(400);
@@ -34,6 +34,12 @@ exports.initiateCall = asyncHandler(async (req, res) => {
     throw new Error('Caller not found');
   }
 
+  // Video calls are only available for premium users
+  if (caller.plan !== 'premium') {
+    res.status(403);
+    throw new Error('Video calls are only available for premium members');
+  }
+
   // Check for existing active call between these users
   let existingCall = await Call.findOne({
     $or: [
@@ -45,10 +51,9 @@ exports.initiateCall = asyncHandler(async (req, res) => {
   let roomId, call;
 
   if (existingCall) {
-    // Reuse existing call
     roomId = existingCall.roomId;
     call = existingCall;
-    console.log('Reusing existing call:', call._id);
+    console.log('Reusing existing Jitsi call:', call._id);
   } else {
     // Generate a unique room ID for Jitsi
     roomId = `quluub-${uuidv4()}`;
@@ -59,8 +64,9 @@ exports.initiateCall = asyncHandler(async (req, res) => {
         recipient: recipientId,
         roomId,
         status: 'ringing',
+        platform: 'jitsi'
       });
-      console.log('New call record created:', call._id);
+      console.log('New Jitsi call record created:', call._id);
     } catch (error) {
       console.error('Error creating call:', error);
       res.status(500);
@@ -83,7 +89,7 @@ exports.initiateCall = asyncHandler(async (req, res) => {
       status: "UNREAD"
     });
     await chat.save();
-    console.log('Video call link sent in chat');
+    console.log('Jitsi video call link sent in chat');
   } catch (chatError) {
     console.error('Error sending chat message:', chatError);
   }
@@ -104,7 +110,7 @@ exports.initiateCall = asyncHandler(async (req, res) => {
     let notificationMethods = [];
 
     if (io) {
-      console.log(`Attempting to notify recipient ${recipientId} about incoming call from ${caller.fname} ${caller.lname}`);
+      console.log(`Attempting to notify recipient ${recipientId} about incoming Jitsi call from ${caller.fname} ${caller.lname}`);
       console.log('Total connected sockets:', io.sockets.sockets.size);
 
       // Multiple notification strategies to ensure delivery
@@ -133,7 +139,7 @@ exports.initiateCall = asyncHandler(async (req, res) => {
           
           recipientNotified = true;
           notificationMethods.push('room-broadcast');
-          console.log(`Notification sent to recipient room: ${recipientId}`);
+          console.log(`Jitsi notification sent to recipient room: ${recipientId}`);
         }
       } catch (error) {
         console.error('Error sending room notification:', error);
@@ -166,7 +172,7 @@ exports.initiateCall = asyncHandler(async (req, res) => {
             
             recipientNotified = true;
             notificationMethods.push('direct-socket');
-            console.log(`Direct notification sent to socket: ${recipientSocket.id}`);
+            console.log(`Direct Jitsi notification sent to socket: ${recipientSocket.id}`);
           }
         } catch (error) {
           console.error('Error sending direct socket notification:', error);
@@ -187,7 +193,7 @@ exports.initiateCall = asyncHandler(async (req, res) => {
             platform: 'jitsi'
           });
           notificationMethods.push('broadcast');
-          console.log('Fallback broadcast notification sent');
+          console.log('Fallback broadcast notification sent for Jitsi call');
         } catch (error) {
           console.error('Error sending broadcast notification:', error);
         }
@@ -209,7 +215,7 @@ exports.initiateCall = asyncHandler(async (req, res) => {
           jitsiRoomUrl
         );
         emailSent = true;
-        console.log('Email notification sent to parent/guardian');
+        console.log('Email notification sent to parent/guardian for Jitsi call');
       } catch (error) {
         console.error('Error sending email notification:', error);
       }
@@ -219,7 +225,7 @@ exports.initiateCall = asyncHandler(async (req, res) => {
       roomId,
       callUrl,
       jitsiRoomUrl,
-      message: 'Call initiated successfully',
+      message: 'Jitsi call initiated successfully',
       recipientNotified: recipientNotified || notificationMethods.length > 0,
       platform: 'jitsi',
       callId: call._id,
@@ -284,7 +290,8 @@ exports.updateCallStatus = asyncHandler(async (req, res) => {
     call: {
       roomId: call.roomId,
       status: call.status,
-      duration: call.duration
+      duration: call.duration,
+      platform: 'jitsi'
     }
   });
 });
@@ -321,6 +328,7 @@ exports.getCallByRoom = asyncHandler(async (req, res) => {
     recipient: call.recipient,
     startedAt: call.startedAt,
     endedAt: call.endedAt,
-    duration: call.duration
+    duration: call.duration,
+    platform: 'jitsi'
   });
 });
