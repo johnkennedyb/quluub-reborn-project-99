@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -51,7 +50,7 @@ const EditUserDialog = ({ user, isOpen, onOpenChange, onUserUpdate, sendPassword
         plan: user.plan || 'freemium',
         status: user.status || 'active',
         hidden: user.hidden || false,
-        dob: user.dob ? new Date(user.dob) : null,
+        dob: user.dob ? (typeof user.dob === 'string' ? new Date(user.dob) : user.dob) : null,
         country: user.country || '',
         city: user.city || '',
         region: user.region || ''
