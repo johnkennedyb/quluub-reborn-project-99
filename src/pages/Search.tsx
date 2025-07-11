@@ -33,17 +33,12 @@ const Search = () => {
   const [maritalStatus, setMaritalStatus] = useState("any");
   const [patternOfSalaah, setPatternOfSalaah] = useState("any");
   const [sortBy, setSortBy] = useState("newest");
-  const [searchGender, setSearchGender] = useState("any");
   const [showHijabOnly, setShowHijabOnly] = useState(false);
   const [showBeardOnly, setShowBeardOnly] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const { user: currentUser } = useAuth();
 
-  useEffect(() => {
-    if (currentUser) {
-      setSearchGender(currentUser.gender === 'male' ? 'female' : 'male');
-    }
-  }, [currentUser]);
+
   
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -60,8 +55,8 @@ const Search = () => {
   useEffect(() => {
     const params: any = {};
 
-    if (searchGender !== "any") {
-      params.gender = searchGender;
+    if (currentUser) {
+      params.gender = currentUser.gender === 'male' ? 'female' : 'male';
     }
 
     if (location !== "anywhere") {
@@ -83,7 +78,7 @@ const Search = () => {
     params.page = currentPage;
 
     setFilterParams(params);
-  }, [currentUser, location, nationality, showHijabOnly, showBeardOnly, currentPage, searchGender]);
+  }, [currentUser, location, nationality, showHijabOnly, showBeardOnly, currentPage]);
 
   const { users, page, pages, isLoading, error } = useBrowseUsers(filterParams);
   const [pendingConnections, setPendingConnections] = useState<string[]>([]);
@@ -424,18 +419,7 @@ const Search = () => {
                   <Switch id="beard" checked={showBeardOnly} onCheckedChange={setShowBeardOnly} disabled={currentUser?.gender !== 'female'} />
                 </div>
 
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Gender</label>
-                  <Select value={searchGender} onValueChange={setSearchGender}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select gender" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="male">Male</SelectItem>
-                      <SelectItem value="female">Female</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+
               </div>
             </CardContent>
           </Card>

@@ -55,7 +55,7 @@ exports.updateUserProfile = async (req, res) => {
     
     // Update fields
     const updatableFields = [
-      'fname', 'lname', 'parentEmail', 'nationality', 'country', 'build', 
+      'fname', 'lname', 'parentEmail', 'nationality', 'country', 'state', 'city', 'build', 
       'appearance', 'maritalStatus', 'patternOfSalaah', 
       'genotype', 'summary', 'workEducation', 'hidden',
       'profile_pic', 'kunya', 'dob', 'ethnicity', 'waliDetails', 'hijab', 'beard'
