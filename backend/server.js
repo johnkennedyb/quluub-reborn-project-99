@@ -21,7 +21,7 @@ connectDB();
 const app = express();
 
 const corsOptions = {
-  origin: ['http://localhost:8080', 'http://localhost:8080', process.env.FRONTEND_URL].filter(Boolean),
+  origin: ['https://preview--quluub-reborn-project-99.lovable.app', 'http://localhost:8080', 'http://localhost:8080', process.env.FRONTEND_URL].filter(Boolean),
   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
   credentials: true,
   optionsSuccessStatus: 204,
