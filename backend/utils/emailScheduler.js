@@ -1,9 +1,9 @@
 const cron = require('node-cron');
-const ScheduledEmail = require('../models/ScheduledEmail');
 const User = require('../models/User');
+const ScheduledEmail = require('../models/ScheduledEmail');
 const Relationship = require('../models/Relationship');
 const UserActivityLog = require('../models/UserActivityLog');
-const { 
+const {
   sendBulkEmail: sendBulkEmailService,
   sendProfileViewEmail,
   sendPendingRequestsEmail,
@@ -12,45 +12,52 @@ const {
 } = require('./emailService');
 
 const startScheduler = () => {
+  console.log('Email scheduler started with all jobs.');
+
   // 1. Admin-scheduled bulk emails (runs every minute)
   cron.schedule('* * * * *', async () => {
-    console.log('Checking for admin-scheduled emails...');
-    console.log('Running scheduled email job...');
+    // console.log('Checking for admin-scheduled emails...');
     const now = new Date();
 
-    const emailsToSend = await ScheduledEmail.find({
-      status: 'pending',
-      sendAt: { $lte: now },
-    });
+    try {
+      const emailsToSend = await ScheduledEmail.find({
+        status: 'pending',
+        sendAt: { $lte: now },
+      });
 
-    if (emailsToSend.length === 0) {
-      console.log('No scheduled emails to send at this time.');
-      return;
-    }
-
-    for (const email of emailsToSend) {
-      try {
-        let recipients = [];
-        if (email.sendToAll) {
-          recipients = await User.find({});
-        } else {
-          recipients = await User.find({ '_id': { $in: email.recipients } });
-        }
-
-        if (recipients.length > 0) {
-          await sendBulkEmailService(recipients, email.subject, email.message, email.attachments);
-        }
-
-        email.status = 'sent';
-        await email.save();
-        console.log(`Successfully sent scheduled email: ${email.subject}`);
-      } catch (error) {
-        console.error(`Failed to send scheduled email: ${email.subject}`, error);
-        email.status = 'failed';
-        email.error = error.message;
-        email.lastAttempt = new Date();
-        await email.save();
+      if (emailsToSend.length === 0) {
+        // console.log('No scheduled emails to send at this time.');
+        return;
       }
+
+      console.log(`Found ${emailsToSend.length} admin-scheduled email(s) to send.`);
+
+      for (const email of emailsToSend) {
+        try {
+          let recipients = [];
+          if (email.sendToAll) {
+            recipients = await User.find({});
+          } else {
+            recipients = await User.find({ '_id': { $in: email.recipients } });
+          }
+
+          if (recipients.length > 0) {
+            await sendBulkEmailService(recipients, email.subject, email.message, email.attachments);
+          }
+
+          email.status = 'sent';
+          await email.save();
+          console.log(`Successfully sent scheduled email: ${email.subject}`);
+        } catch (error) {
+          console.error(`Failed to send scheduled email: ${email.subject}`, error);
+          email.status = 'failed';
+          email.error = error.message;
+          email.lastAttempt = new Date();
+          await email.save();
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching admin-scheduled emails:', error);
     }
   });
 
@@ -102,7 +109,6 @@ const startScheduler = () => {
       const users = await User.find({ 'settings.emailNotifications': true, 'settings.showSuggestions': true });
 
       for (const user of users) {
-        // Basic suggestion logic: find users of the opposite gender in the same country, not yet connected.
         const existingConnections = await Relationship.find({ $or: [{ follower_user_id: user._id }, { followed_user_id: user._id }] }).select('follower_user_id followed_user_id');
         const connectedUserIds = existingConnections.map(rel => (rel.follower_user_id.toString() === user._id.toString() ? rel.followed_user_id : rel.follower_user_id));
         connectedUserIds.push(user._id); // Exclude self

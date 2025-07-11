@@ -250,11 +250,10 @@ export const chatService = {
 
 // Payment service
 export const paymentService = {
-  createPaystackPayment: async () => {
-    console.log('API: Creating Paystack payment');
-    const response = await apiClient.post('/payments/create-paystack-payment');
-    return response.data;
-  }
+  createPaystackPayment: (plan: string, amount: number) => {
+    console.log('API: Creating Paystack payment for', { plan, amount });
+    return apiClient.post('/payments/create-paystack-payment', { plan, amount }).then(res => res.data);
+  },
 };
 
 // Admin service
@@ -289,22 +288,12 @@ export const adminService = {
     }
   },
   
-  updateUserStatus: async (userId: string, status: string) => {
+  updateUserAccountStatus: async (userId: string, status: string, reportId?: string) => {
     try {
-      const response = await apiClient.put(`/admin/users/${userId}/status`, { status });
+      const response = await apiClient.put(`/admin/users/${userId}/status`, { status, reportId });
       return response.data;
     } catch (error) {
       console.error('Admin update user status error:', error);
-      throw error;
-    }
-  },
-  
-  getSystemMetrics: async () => {
-    try {
-      const response = await apiClient.get('/admin/system');
-      return response.data;
-    } catch (error) {
-      console.error('Admin system metrics error:', error);
       throw error;
     }
   },
@@ -360,9 +349,9 @@ export const adminService = {
     }
   },
 
-  getAllPayments: async () => {
+  getPaymentHistory: async (params?: any) => {
     try {
-      const response = await apiClient.get('/admin/payments');
+      const response = await apiClient.get('/admin/payments', { params });
       return response.data;
     } catch (error) {
       console.error('Admin payments error:', error);
@@ -401,12 +390,12 @@ export const adminService = {
     }
   },
 
-  resetUserPassword: async (userId: string) => {
+  sendPasswordResetLink: async (userId: string) => {
     try {
-      const response = await apiClient.put(`/admin/users/${userId}/reset-password`);
+      const response = await apiClient.post(`/admin/users/${userId}/reset-password`);
       return response.data;
     } catch (error) {
-      console.error('Admin reset password error:', error);
+      console.error('Admin send password reset link error:', error);
       throw error;
     }
   },
@@ -421,7 +410,59 @@ export const adminService = {
     }
   },
 
-  // Email configuration methods
+    verifyUserEmail: async (userId: string) => {
+    try {
+      const response = await apiClient.post(`/admin/users/${userId}/verify-email`);
+      return response.data;
+    } catch (error) {
+      console.error('Admin verify user email error:', error);
+      throw error;
+    }
+  },
+
+  // Reports
+  getReportedProfiles: async () => {
+    try {
+      const response = await apiClient.get('/admin/reported-profiles');
+      return response.data;
+    } catch (error) {
+      console.error('Admin get reported profiles error:', error);
+      throw error;
+    }
+  },
+
+  dismissReport: async (reportId: string) => {
+    try {
+      const response = await apiClient.put(`/admin/reports/${reportId}/dismiss`);
+      return response.data;
+    } catch (error) {
+      console.error('Admin dismiss report error:', error);
+      throw error;
+    }
+  },
+
+  // Push Notifications
+  sendAdminPushNotification: async (notificationData: any) => {
+    try {
+      const response = await apiClient.post('/admin/push-notifications', notificationData);
+      return response.data;
+    } catch (error) {
+      console.error('Admin send push notification error:', error);
+      throw error;
+    }
+  },
+
+  getAdminPushNotifications: async (params?: any) => {
+    try {
+      const response = await apiClient.get('/admin/push-notifications', { params });
+      return response.data;
+    } catch (error) {
+      console.error('Admin get push notifications error:', error);
+      throw error;
+    }
+  },
+
+  // Email Marketing
   getEmailConfig: async () => {
     try {
       const response = await apiClient.get('/admin/email-config');
@@ -442,9 +483,21 @@ export const adminService = {
     }
   },
 
-  sendBulkEmail: async (emailData: any) => {
+  sendBulkEmail: async (emailData: { recipients: string[], subject: string, message: string, attachments?: File[] }) => {
     try {
-      const response = await apiClient.post('/admin/bulk-email', emailData);
+      const formData = new FormData();
+      formData.append('recipients', JSON.stringify(emailData.recipients));
+      formData.append('subject', emailData.subject);
+      formData.append('message', emailData.message);
+      if (emailData.attachments) {
+        emailData.attachments.forEach(file => {
+          formData.append('attachments', file);
+        });
+      }
+
+      const response = await apiClient.post('/admin/bulk-email', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       return response.data;
     } catch (error) {
       console.error('Admin send bulk email error:', error);
@@ -508,11 +561,7 @@ export const emailService = {
     return response.data;
   },
   
-  resendValidationEmail: async (email: string) => {
-    console.log(`API: Resending validation email to ${email}`);
-    const response = await apiClient.post('/auth/resend-validation', { email });
-    return response.data;
-  },
+ 
   
   getVerificationStatus: async () => {
     console.log('API: Getting email verification status');

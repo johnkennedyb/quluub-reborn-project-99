@@ -18,7 +18,7 @@ const UserProfile = ({ userId }: UserProfileProps) => {
       try {
         const response = await fetch(`/api/admin/users/${userId}`, {
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
           },
         });
         const data = await response.json();

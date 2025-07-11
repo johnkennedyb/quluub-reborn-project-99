@@ -1,3 +1,5 @@
+const footer = require('./footer');
+
 const requestWithdrawnEmail = (recipientName, withdrawerName) => {
   const subject = 'Connection Request Withdrawn on Quluub';
   const html = `
@@ -12,10 +14,7 @@ const requestWithdrawnEmail = (recipientName, withdrawerName) => {
         <p style="color: #333; line-height: 1.6; font-size: 16px;">
           The connection request you received from ${withdrawerName} has been withdrawn.
         </p>
-        <p style="color: #333; line-height: 1.6; font-size: 16px; margin-top: 30px;">
-          JazaakumuLlahu khairan,<br>
-          The Quluub Team
-        </p>
+        ${footer}
       </div>
     </div>
   `;

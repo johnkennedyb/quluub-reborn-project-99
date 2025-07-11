@@ -1,3 +1,5 @@
+const footer = require('./footer');
+
 const purchasePlanEmail = (recipientName) => {
   const subject = 'Unlock Exclusive Features with Our Premium Plan!';
   const html = `
@@ -15,10 +17,7 @@ const purchasePlanEmail = (recipientName) => {
         <p style="color: #333; line-height: 1.6; font-size: 16px;">
           Upgrade today and start making meaningful connections!
         </p>
-        <p style="color: #333; line-height: 1.6; font-size: 16px; margin-top: 30px;">
-          JazaakumuLlahu khairan,<br>
-          The Quluub Team
-        </p>
+        ${footer}
       </div>
     </div>
   `;

@@ -6,14 +6,6 @@ import { Select as UiSelect, SelectContent, SelectItem, SelectTrigger, SelectVal
 import { DatePicker } from "@/components/ui/date-picker";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
-} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -480,7 +472,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                 required
               />
             </div>
-            
+
             <div className="flex justify-between">
               <Button
                 type="button"
@@ -501,7 +493,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
             </div>
           </div>
         );
-        
+
       case 7:
         return (
           <div className="space-y-6">
@@ -517,8 +509,8 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                   className="flex-1"
                   required
                 />
-                <Button 
-                  type="button" 
+                <Button
+                  type="button"
                   variant="outline"
                   onClick={handleSuggestUsername}
                   className="whitespace-nowrap"
@@ -532,11 +524,11 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                 </p>
               )}
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="gender">I am a</Label>
-              <Select 
-                value={formData.gender} 
+              <UiSelect
+                value={formData.gender}
                 onValueChange={(value) => handleSelectChange("gender", value)}
               >
                 <SelectTrigger className="w-full">
@@ -546,9 +538,9 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                   <SelectItem value="male">Man</SelectItem>
                   <SelectItem value="female">Woman</SelectItem>
                 </SelectContent>
-              </Select>
+              </UiSelect>
             </div>
-            
+
             <div className="flex justify-between">
               <Button
                 type="button"
@@ -569,13 +561,13 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
             </div>
           </div>
         );
-        
+
       case 8:
         return (
           <div className="space-y-6">
             <div className="rounded-lg border p-4 space-y-4">
               <h3 className="font-medium text-lg">Registration Summary</h3>
-              
+
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Email:</span>
@@ -597,7 +589,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Ethnicity:</span>
-                  <span className="font-medium">{formData.ethnicity}</span>
+                  <span className="font-medium">{formData.ethnicity.join(', ')}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Location:</span>
@@ -608,7 +600,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                   <span className="font-medium">{formData.gender === "male" ? "Man" : "Woman"}</span>
                 </div>
               </div>
-              
+
               <div className="pt-2">
                 <p className="text-sm font-medium mb-1">Summary</p>
                 <p className="text-sm text-muted-foreground bg-muted p-2 rounded">
@@ -616,7 +608,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                 </p>
               </div>
             </div>
-            
+
             <div className="flex justify-between">
               <Button
                 type="button"
@@ -637,44 +629,42 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
             </div>
           </div>
         );
-        
+
       default:
         return null;
     }
   };
-  
+
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader>
-        <CardTitle className="text-2xl text-center">
-          {step === 1 ? "Create Account" : 
-           step === 8 ? "Review Your Information" : 
-           `Step ${step - 1} of 7`}
-        </CardTitle>
-        <CardDescription className="text-center">
+    <>
+      <div className="text-center mb-4">
+        <h2 className="text-2xl font-bold">
+          {step === 1 ? "Create Account" :
+            step === 8 ? "Review Your Information" :
+              `Step ${step - 1} of 7`}
+        </h2>
+        <p className="text-muted-foreground">
           {step === 1 ? "Enter your information to create an account" : 
            step === 8 ? "Please confirm your details" : 
            "Please complete all required fields"}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {renderStepContent()}
-      </CardContent>
+        </p>
+      </div>
+
+      {renderStepContent()}
+
       {step === 1 && (
-        <CardFooter className="flex justify-center">
-          <p className="text-sm text-muted-foreground">
-            Already have an account?{" "}
-            <button 
-              type="button"
-              onClick={onSwitchToLogin}
-              className="text-primary hover:underline font-medium"
-            >
-              Log in
-            </button>
-          </p>
-        </CardFooter>
+        <p className="text-sm text-center mt-4">
+          Already have an account?{" "}
+          <button 
+            type="button"
+            onClick={onSwitchToLogin}
+            className="text-primary hover:underline font-semibold"
+          >
+            Log in
+          </button>
+        </p>
       )}
-      
+
       {/* Email verification modal */}
       <Dialog open={showVerification} onOpenChange={setShowVerification}>
         <DialogContent className="sm:max-w-[425px]">
@@ -698,12 +688,12 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                 </InputOTPGroup>
               </InputOTP>
               
-              <p className="text-sm text-muted-foreground">
+              <div className="text-sm text-muted-foreground">
                 Didn't receive a code?{" "}
-                <p className="text-primary hover:underline font-medium">
+                <span className="text-primary hover:underline font-medium">
                   Check your email inbox and click the verification link.
-                </p>
-              </p>
+                </span>
+              </div>
               
               <p className="text-xs text-center text-muted-foreground mt-2">
                 Alternatively, check your email inbox and click the verification link.
@@ -720,7 +710,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
           </div>
         </DialogContent>
       </Dialog>
-    </Card>
+    </>
   );
 };
 

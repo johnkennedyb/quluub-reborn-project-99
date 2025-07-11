@@ -1,3 +1,5 @@
+const footer = require('./footer');
+
 const waliNewJoinerEmail = (waliName, sisterName) => {
   const subject = 'Notification: Your Ward Has Joined Quluub';
   const html = `
@@ -18,10 +20,7 @@ const waliNewJoinerEmail = (waliName, sisterName) => {
         <p style="color: #333; line-height: 1.6; font-size: 16px;">
           If you have any questions or need further information, please do not hesitate to contact us. We are here to support you and your ward throughout this process.
         </p>
-        <p style="color: #333; line-height: 1.6; font-size: 16px; margin-top: 30px;">
-          JazakumuLlahu Khairan,<br>
-          The Quluub Team
-        </p>
+        ${footer}
       </div>
     </div>
   `;

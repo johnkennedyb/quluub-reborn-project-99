@@ -12,20 +12,63 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import UserProfileCard from './UserProfileCard';
 import { useToast } from '@/hooks/use-toast';
 import EditUserDialog from './EditUserDialog';
-import { Search, Edit, Trash2, User, Users, Eye } from 'lucide-react';
+import SendEmailDialog from './SendEmailDialog';
+import { Search, Edit, Trash2, User, Users, Eye, Mail } from 'lucide-react';
+import ReactSelect from 'react-select';
 
 interface MemberManagementProps {
   stats: any;
 }
 
+const countryOptions = [
+  { value: 'USA', label: 'USA' },
+  { value: 'Canada', label: 'Canada' },
+  { value: 'UK', label: 'UK' },
+  { value: 'Australia', label: 'Australia' },
+  { value: 'Pakistan', label: 'Pakistan' },
+];
+
+const cityOptions: { [key: string]: { value: string; label: string }[] } = {
+  USA: [
+    { value: 'New York', label: 'New York' },
+    { value: 'Los Angeles', label: 'Los Angeles' },
+  ],
+  Canada: [
+    { value: 'Toronto', label: 'Toronto' },
+    { value: 'Vancouver', label: 'Vancouver' },
+  ],
+  UK: [
+    { value: 'London', label: 'London' },
+    { value: 'Manchester', label: 'Manchester' },
+  ],
+  Australia: [
+    { value: 'Sydney', label: 'Sydney' },
+    { value: 'Melbourne', label: 'Melbourne' },
+  ],
+  Pakistan: [
+    { value: 'Lahore', label: 'Lahore' },
+    { value: 'Karachi', label: 'Karachi' },
+  ],
+};
+
 const MemberManagement = ({ stats }: MemberManagementProps) => {
-  const [filters, setFilters] = useState({
+    const [filters, setFilters] = useState<{
+    search: string;
+    gender: string;
+    plan: string;
+    status: string;
+    country: string[];
+    city: string[];
+    inactiveFor: string;
+    page: number;
+    limit: number;
+  }>({
     search: '',
     gender: 'all',
     plan: 'all',
     status: 'all',
-    country: '',
-    city: '',
+    country: [],
+    city: [],
     inactiveFor: 'all',
     page: 1,
     limit: 20
@@ -33,12 +76,23 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
 
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [userForEmail, setUserForEmail] = useState<any>(null);
 
-  const { users, loading, pagination, refetchData, deleteUser, updateUser, sendPasswordReset } = useAdminData(filters);
+  const { users, loading, pagination, refetchData, deleteUser, updateUser, sendPasswordReset, sendEmail } = useAdminData(filters);
   const { toast } = useToast();
 
   const handleFilterChange = (key: string, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value, page: 1 }));
+  };
+
+  const handleMultiSelectChange = (key: 'country' | 'city', selectedOptions: any) => {
+    const values = selectedOptions ? selectedOptions.map((option: any) => option.value) : [];
+    if (key === 'country') {
+      setFilters(prev => ({ ...prev, country: values, city: [], page: 1 }));
+    } else {
+      setFilters(prev => ({ ...prev, city: values, page: 1 }));
+    }
   };
 
 
@@ -117,6 +171,13 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
               <Button size="sm" variant="destructive" onClick={() => handleDeleteUser(user._id)}>
                 <Trash2 className="h-4 w-4" />
               </Button>
+
+              <Button size="sm" variant="outline" onClick={() => {
+                setUserForEmail(user);
+                setEmailDialogOpen(true);
+              }}>
+                <Mail className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         </div>
@@ -127,7 +188,7 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
   return (
     <div className="space-y-6">
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Members</CardTitle>
@@ -184,17 +245,16 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
           <CardTitle>Member Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 pb-4">
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search members..."
+                placeholder="Search..."
                 value={filters.search}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
-                className="pl-10"
+                className="col-span-1 sm:col-span-2 md:col-span-3 lg:col-span-1"
               />
             </div>
-            
             <Select value={filters.gender} onValueChange={(value) => handleFilterChange('gender', value)}>
               <SelectTrigger>
                 <SelectValue placeholder="Gender" />
@@ -205,19 +265,17 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
                 <SelectItem value="female">Female</SelectItem>
               </SelectContent>
             </Select>
-            
             <Select value={filters.plan} onValueChange={(value) => handleFilterChange('plan', value)}>
               <SelectTrigger>
                 <SelectValue placeholder="Plan" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Plans</SelectItem>
-                <SelectItem value="free">Free</SelectItem>
                 <SelectItem value="premium">Premium</SelectItem>
-
+                <SelectItem value="pro">Pro</SelectItem>
+                <SelectItem value="free">Free</SelectItem>
               </SelectContent>
             </Select>
-            
             <Select value={filters.status} onValueChange={(value) => handleFilterChange('status', value)}>
               <SelectTrigger>
                 <SelectValue placeholder="Status" />
@@ -230,7 +288,6 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
                 <SelectItem value="banned">Banned</SelectItem>
               </SelectContent>
             </Select>
-
             <Select value={filters.inactiveFor} onValueChange={(value) => handleFilterChange('inactiveFor', value)}>
               <SelectTrigger>
                 <SelectValue placeholder="Inactive Period" />
@@ -244,18 +301,24 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
               </SelectContent>
             </Select>
 
-            <Input
-              type="text"
-              placeholder="Filter by country"
-              value={filters.country}
-              onChange={(e) => handleFilterChange('country', e.target.value)}
+            <ReactSelect
+              isMulti
+              options={countryOptions}
+              className="basic-multi-select"
+              classNamePrefix="select"
+              placeholder="Filter by country..."
+              onChange={(selected) => handleMultiSelectChange('country', selected)}
             />
 
-            <Input
-              type="text"
-              placeholder="Filter by city"
-              value={filters.city}
-              onChange={(e) => handleFilterChange('city', e.target.value)}
+            <ReactSelect
+              isMulti
+              options={filters.country.flatMap(country => cityOptions[country] || [])}
+              className="basic-multi-select"
+              classNamePrefix="select"
+              placeholder="Filter by city..."
+              value={(filters.country.flatMap(country => cityOptions[country] || [])).filter(option => filters.city.includes(option.value))}
+              onChange={(selected) => handleMultiSelectChange('city', selected)}
+              isDisabled={filters.country.length === 0}
             />
           </div>
         </CardContent>
@@ -310,9 +373,21 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
           onOpenChange={setEditDialogOpen}
           onUserUpdate={(userId, data) => {
             updateUser(userId, data);
-            setEditDialogOpen(false); // Close dialog on successful update
+            setEditDialogOpen(false);
           }}
           sendPasswordReset={sendPasswordReset}
+        />
+      )}
+
+      {userForEmail && (
+        <SendEmailDialog
+          user={userForEmail}
+          isOpen={emailDialogOpen}
+          onOpenChange={setEmailDialogOpen}
+          onSendEmail={async (userId, subject, message) => {
+            await sendEmail(userId, subject, message);
+            setEmailDialogOpen(false);
+          }}
         />
       )}
     </div>

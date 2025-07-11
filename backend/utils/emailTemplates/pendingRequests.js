@@ -1,3 +1,5 @@
+const footer = require('./footer');
+
 const pendingRequestsEmail = (recipientName, requestCount) => {
   const subject = 'Pending Connection Requests Awaiting Your Response';
   const html = `
@@ -18,10 +20,7 @@ const pendingRequestsEmail = (recipientName, requestCount) => {
         <p style="color: #333; line-height: 1.6; font-size: 16px;">
           May Allaah guide you in making the best decision.
         </p>
-        <p style="color: #333; line-height: 1.6; font-size: 16px; margin-top: 30px;">
-          JazaakumuLlahu khairan,<br>
-          The Quluub Team
-        </p>
+        ${footer}
       </div>
     </div>
   `;

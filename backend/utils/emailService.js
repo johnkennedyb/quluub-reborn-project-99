@@ -19,6 +19,7 @@ const contactWaliEmail = require('./emailTemplates/contactWali');
 const waliViewChatEmail = require('./emailTemplates/waliViewChat');
 const validateEmailTemplate = require('./emailTemplates/validateEmail');
 const videoCallNotificationEmail = require('./emailTemplates/videoCallNotification');
+const testEmailTemplate = require('./emailTemplates/testEmail');
 
 // Default configuration - can be updated dynamically
 let emailConfig = {
@@ -26,8 +27,8 @@ let emailConfig = {
   port: parseInt(process.env.SMTP_PORT) || 465,
   secure: true,
   auth: {
-    user: process.env.SMTP_USER || 'mail@quluub.com',
-    pass: process.env.SMTP_PASS || 'Z}!QLm__(e8p?I8J'
+    user: process.env.MAIL_USER || 'mail@quluub.com',
+    pass: process.env.MAIL_PASSWORD || 'Z}!QLm__(e8p?I8J'
   },
   tls: {
     rejectUnauthorized: false
@@ -137,9 +138,10 @@ const sendSuggestedAccountsEmail = (email, recipientName) => sendEmail(email, su
 const sendContactWaliEmail = (email, brotherName) => sendEmail(email, contactWaliEmail, brotherName);
 const sendWaliViewChatEmail = (email, waliName, wardName, brotherName, chatLink) => sendEmail(email, waliViewChatEmail, waliName, wardName, brotherName, chatLink);
 const sendVideoCallNotificationEmail = (parentEmail, waliName, wardName, brotherName, callUrl) => sendEmail(parentEmail, videoCallNotificationEmail, waliName, wardName, brotherName, callUrl);
+
 const sendValidationEmail = (email, recipientName, validationToken) => {
-    const validationUrl = `${process.env.FRONTEND_URL}/validate-email?token=${validationToken}`;
-    sendEmail(email, validateEmailTemplate, recipientName, validationUrl);
+  const validationUrl = `${process.env.FRONTEND_URL}/validate-email?token=${validationToken}`;
+  sendEmail(email, validateEmailTemplate, recipientName, validationUrl);
 };
 
 // New function to send bulk emails
@@ -177,7 +179,8 @@ const sendBulkEmail = async (users, subject, message, attachments = []) => {
             </div>
           </div>
         </div>
-      `
+      `,
+      attachments: attachments
     };
 
     try {
@@ -203,48 +206,15 @@ const sendTestEmail = async (testEmail) => {
     from: `"${emailSettings.fromName}" <${emailSettings.fromEmail}>`,
     to: testEmail,
     subject: 'Test Email - Quluub Configuration',
-    html: `
-      <div style="max-width: 600px; margin: 0 auto; padding: 20px; font-family: Arial, sans-serif; background-color: #f9f9f9;">
-        <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-          <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #075e54; margin: 0;">Email Configuration Test</h1>
-            <p style="color: #666; font-size: 16px; margin-top: 10px;">Quluub</p>
-          </div>
-          
-          <p style="color: #333; line-height: 1.6; font-size: 16px;">
-            This is a test email to verify your email configuration is working correctly.
-          </p>
-          
-          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h3 style="color: #075e54; margin-top: 0;">Configuration Details:</h3>
-            <p style="margin: 5px 0;"><strong>SMTP Host:</strong> ${emailConfig.host}</p>
-            <p style="margin: 5px 0;"><strong>SMTP Port:</strong> ${emailConfig.port}</p>
-            <p style="margin: 5px 0;"><strong>From Email:</strong> ${emailSettings.fromEmail}</p>
-            <p style="margin: 5px 0;"><strong>From Name:</strong> ${emailSettings.fromName}</p>
-            <p style="margin: 5px 0;"><strong>Reply To:</strong> ${emailSettings.replyTo}</p>
-          </div>
-          
-          <p style="color: #25d366; font-weight: bold; text-align: center;">
-            ✅ Email configuration is working correctly!
-          </p>
-          
-          <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee;">
-            <p style="color: #999; font-size: 12px; text-align: center;">
-              Test email sent at: ${new Date().toLocaleString()}<br>
-              Quluub Admin Panel
-            </p>
-          </div>
-        </div>
-      </div>
-    `
+    html: `<h1>Test Email</h1><p>This is a test email to verify your email configuration.</p>`
   };
 
   try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log('Test email sent successfully:', info.messageId);
+    await transporter.sendMail(mailOptions);
+    console.log('Test email sent successfully');
   } catch (error) {
     console.error('Error sending test email:', error);
-    throw error; // Re-throw the error to be caught by the controller
+    throw error;
   }
 };
 
@@ -255,7 +225,6 @@ const getEmailConfigService = () => {
 
 // Function to get email metrics (placeholder)
 const getEmailMetricsService = async () => {
-  // In a real application, you would fetch this data from a database or analytics service
   return {
     sentLast24Hours: 0,
     sentLast7Days: 0,

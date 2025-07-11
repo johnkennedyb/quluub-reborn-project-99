@@ -124,7 +124,7 @@ const AdminDashboard = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           {/* Desktop Navigation */}
           {!isMobile && (
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-10 gap-1">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-11 gap-1">
               {tabItems.map(({ value, label, icon: Icon }) => (
                 <TabsTrigger key={value} value={value} className="flex items-center space-x-1 text-xs lg:text-sm">
                   <Icon className="h-3 w-3 lg:h-4 lg:w-4" />

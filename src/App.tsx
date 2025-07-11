@@ -8,7 +8,7 @@ import {
 } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
-import { AuthProvider, AuthContext } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 
 // Components
@@ -59,7 +59,7 @@ function AppWrapper() {
 // App Component
 function App() {
   const navigate = useNavigate();
-  const { user } = useContext(AuthContext);
+    const { user } = useAuth();
   const [socket, setSocket] = useState<Socket | null>(null);
   const [incomingCall, setIncomingCall] = useState<{
     callerName: string;

@@ -10,20 +10,20 @@ import { useState } from 'react';
 
 const SuggestedMatches = () => {
   const { 
-    vipUsers, 
+    premiumUsers,
     potentialMatches, 
-    loadingVips, 
+    loadingPremiums,
     loadingMatches, 
     isSubmitting,
     fetchPotentialMatches, 
     sendSuggestions 
   } = useAdminData();
   
-  const [selectedVipUser, setSelectedVipUser] = useState<string>('');
+  const [selectedPremiumUser, setSelectedPremiumUser] = useState<string>('');
   const [selectedMatches, setSelectedMatches] = useState<string[]>([]);
 
-  const handleVipUserSelect = async (userId: string) => {
-    setSelectedVipUser(userId);
+  const handlePremiumUserSelect = async (userId: string) => {
+    setSelectedPremiumUser(userId);
     setSelectedMatches([]);
     if (userId) {
       await fetchPotentialMatches(userId);
@@ -39,8 +39,8 @@ const SuggestedMatches = () => {
   };
 
   const handleSendSuggestions = async () => {
-    if (selectedVipUser && selectedMatches.length > 0) {
-      await sendSuggestions(selectedVipUser, selectedMatches);
+    if (selectedPremiumUser && selectedMatches.length > 0) {
+      await sendSuggestions(selectedPremiumUser, selectedMatches);
       setSelectedMatches([]);
     }
   };
@@ -54,23 +54,23 @@ const SuggestedMatches = () => {
             Manual Match Suggestions
           </CardTitle>
           <CardDescription>
-            Send curated match suggestions to VIP users to improve their experience.
+            Send curated match suggestions to Premium users to improve their experience.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div>
-            <label className="text-sm font-medium mb-2 block">Select VIP User</label>
-            <Select onValueChange={handleVipUserSelect} value={selectedVipUser}>
+            <label className="text-sm font-medium mb-2 block">Select Premium User</label>
+            <Select onValueChange={handlePremiumUserSelect} value={selectedPremiumUser}>
               <SelectTrigger>
-                <SelectValue placeholder="Choose a VIP user..." />
+                <SelectValue placeholder="Choose a Premium user..." />
               </SelectTrigger>
               <SelectContent>
-                {loadingVips ? (
-                  <SelectItem value="loading" disabled>Loading VIP users...</SelectItem>
-                ) : vipUsers.length === 0 ? (
-                  <SelectItem value="no-users" disabled>No VIP users found</SelectItem>
+                {loadingPremiums ? (
+                  <SelectItem value="loading" disabled>Loading Premium users...</SelectItem>
+                ) : premiumUsers.length === 0 ? (
+                  <SelectItem value="no-users" disabled>No Premium users found</SelectItem>
                 ) : (
-                  vipUsers.map((user) => (
+                  premiumUsers.map((user) => (
                     <SelectItem key={user._id} value={user._id}>
                       {user.fullName} (@{user.username}) - {user.plan}
                     </SelectItem>
@@ -80,7 +80,7 @@ const SuggestedMatches = () => {
             </Select>
           </div>
 
-          {selectedVipUser && (
+          {selectedPremiumUser && (
             <div>
               <h3 className="text-lg font-medium mb-4 flex items-center gap-2">
                 <Users className="h-4 w-4" />

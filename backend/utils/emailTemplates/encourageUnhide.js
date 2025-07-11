@@ -1,3 +1,5 @@
+const footer = require('./footer');
+
 const encourageUnhideEmail = (recipientName) => {
   const subject = 'Your Profile Status Update';
   const html = `
@@ -18,10 +20,7 @@ const encourageUnhideEmail = (recipientName) => {
         <p style="color: #333; line-height: 1.6; font-size: 16px;">
           If you need any assistance or have questions, please don't hesitate to contact our support team.
         </p>
-        <p style="color: #333; line-height: 1.6; font-size: 16px; margin-top: 30px;">
-          JazaakumuLlahu khairan,<br>
-          The Quluub Team
-        </p>
+        ${footer}
       </div>
     </div>
   `;

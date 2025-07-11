@@ -1,3 +1,5 @@
+const footer = require('./footer');
+
 const resetPasswordEmail = (recipientName, resetLink) => {
   const subject = 'Password Reset Request';
   const html = `
@@ -18,10 +20,7 @@ const resetPasswordEmail = (recipientName, resetLink) => {
         <p style="color: #333; line-height: 1.6; font-size: 16px;">
           For security reasons, this link will expire in 24 hours. If you need further assistance, please contact our support team.
         </p>
-        <p style="color: #333; line-height: 1.6; font-size: 16px; margin-top: 30px;">
-          JazakumuLlahu Khair,<br>
-          The Quluub Team
-        </p>
+        ${footer}
       </div>
     </div>
   `;

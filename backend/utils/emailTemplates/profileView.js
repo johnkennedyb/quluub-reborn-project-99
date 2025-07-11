@@ -1,3 +1,5 @@
+const footer = require('./footer');
+
 const profileViewEmail = (recipientName, viewCount) => {
   const subject = 'Your Profile Views on Quluub This Week';
   const html = `
@@ -12,10 +14,7 @@ const profileViewEmail = (recipientName, viewCount) => {
         <p style="color: #333; line-height: 1.6; font-size: 16px;">
           This week, ${viewCount} people viewed your profile on Quluub. Log in now to view.
         </p>
-        <p style="color: #333; line-height: 1.6; font-size: 16px; margin-top: 30px;">
-          JazaakumuLlahu khairan,<br>
-          The Quluub Team
-        </p>
+        ${footer}
       </div>
     </div>
   `;

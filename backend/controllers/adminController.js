@@ -1,19 +1,19 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const Call = require('../models/Call');
 const PushNotification = require('../models/PushNotification');
 const Chat = require('../models/Chat');
+const Payment = require('../models/Payment');
+const Report = require('../models/Report');
 const Relationship = require('../models/Relationship');
+const Subscription = require('../models/Subscription');
 const ScheduledEmail = require('../models/ScheduledEmail');
 const Notification = require('../models/Notification');
-const Payment = require('../models/Payment');
-const Subscription = require('../models/Subscription');
 const UserActivityLog = require('../models/UserActivityLog');
 const WaliChat = require('../models/WaliChat');
-const Report = require('../models/Report');
 const crypto = require('crypto');
-const { sendBulkEmail: sendBulkEmailService, sendTestEmail: sendTestEmailService, updateEmailConfig, getEmailConfigService, getEmailMetricsService } = require('../utils/emailService');
+const { sendBulkEmail: sendBulkEmailService, sendTestEmailService, updateEmailConfig, getEmailConfigService, getEmailMetricsService } = require('../utils/emailService');
 const { sendPushNotification: sendPushNotificationService } = require('../utils/pushNotificationService');
-const { getCountryName } = require('../utils/countryUtils');
 
 // @desc    Get admin stats
 // @route   GET /api/admin/stats
@@ -65,16 +65,13 @@ const getStats = async (req, res) => {
     const conversionRate = totalMembers > 0 ? (totalSubscriptions / totalMembers) * 100 : 0;
     const freeToProConversions = await Subscription.countDocuments({ plan: { $in: ['premium', 'pro'] }, createdAt: { $gte: oneMonthAgo } });
 
-    // Corrected Churn & Growth Rate Calculations
     const membersAtStartOfMonth = await User.countDocuments({ createdAt: { $lt: oneMonthAgo } });
-    const churnedUsersLastMonth = await User.countDocuments({ status: 'inactive', lastSeen: { $lt: oneMonthAgo, $gte: threeMonthsAgo } }); // Example: users who became inactive last month
+    const churnedUsersLastMonth = await User.countDocuments({ status: 'inactive', lastSeen: { $lt: oneMonthAgo, $gte: threeMonthsAgo } });
     const churnRate = membersAtStartOfMonth > 0 ? (churnedUsersLastMonth / membersAtStartOfMonth) * 100 : 0;
     const growthRate = membersAtStartOfMonth > 0 ? ((totalMembers - membersAtStartOfMonth) / membersAtStartOfMonth) * 100 : 0;
 
-    // Engagement Rate
     const engagementRate = totalMembers > 0 ? (activeThisWeek / totalMembers) * 100 : 0;
 
-    // Geographic & Referral Stats
     const geographicDistribution = await User.aggregate([
       { $group: { _id: '$country', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
@@ -134,25 +131,11 @@ const getAllUsers = async (req, res) => {
       ];
     }
 
-    if (gender && gender !== 'all') {
-      query.gender = gender;
-    }
-
-    if (plan && plan !== 'all') {
-      query.plan = plan;
-    }
-
-    if (status && status !== 'all') {
-      query.status = status;
-    }
-
-    if (country) {
-      query.country = { $regex: country, $options: 'i' };
-    }
-
-    if (city) {
-      query.city = { $regex: city, $options: 'i' };
-    }
+    if (gender && gender !== 'all') query.gender = gender;
+    if (plan && plan !== 'all') query.plan = plan;
+    if (status && status !== 'all') query.status = status;
+    if (country) query.country = { $regex: country, $options: 'i' };
+    if (city) query.city = { $regex: city, $options: 'i' };
 
     if (inactiveFor && inactiveFor !== 'all') {
       const days = parseInt(inactiveFor, 10);
@@ -202,7 +185,36 @@ const getUserDetails = async (req, res) => {
   }
 };
 
-// @desc    Update user status
+// @desc    Update user
+// @route   PUT /api/admin/users/:id
+// @access  Private/Admin
+const updateUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (user) {
+      user.fname = req.body.fname || user.fname;
+      user.lname = req.body.lname || user.lname;
+      user.email = req.body.email || user.email;
+      user.plan = req.body.plan || user.plan;
+      user.status = req.body.status || user.status;
+      if (req.body.emailVerified !== undefined) {
+        user.emailVerified = req.body.emailVerified;
+      }
+      user.city = req.body.city || user.city;
+      user.country = req.body.country || user.country;
+      user.gender = req.body.gender || user.gender;
+      user.dob = req.body.dob || user.dob;
+      const updatedUser = await user.save();
+      res.json(updatedUser);
+    } else {
+      res.status(404).json({ message: 'User not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Update user account status
 // @route   PUT /api/admin/users/:id/status
 // @access  Private/Admin
 const updateUserAccountStatus = async (req, res) => {
@@ -217,7 +229,6 @@ const updateUserAccountStatus = async (req, res) => {
     user.status = status || user.status;
     const updatedUser = await user.save();
 
-    // If a reportId is provided, update the report status to 'action_taken'
     if (reportId) {
       const report = await Report.findById(reportId);
       if (report) {
@@ -240,34 +251,9 @@ const updateUserPlan = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (user) {
-      user.plan = req.body.plan || user.plan;
-      const updatedUser = await user.save();
-      res.json(updatedUser);
-    } else {
-      res.status(404).json({ message: 'User not found' });
-    }
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// @desc    Update user
-// @route   PUT /api/admin/users/:id
-// @access  Private/Admin
-const updateUser = async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-    if (user) {
-      user.fname = req.body.fname || user.fname;
-      user.lname = req.body.lname || user.lname;
-      user.email = req.body.email || user.email;
-      user.plan = req.body.plan || user.plan;
-      user.status = req.body.status || user.status;
-      user.isVerified = req.body.isVerified;
-      user.city = req.body.city || user.city;
-      user.country = req.body.country || user.country;
-      user.gender = req.body.gender || user.gender;
-      user.dob = req.body.dob || user.dob;
+      if (req.body.plan !== undefined) {
+        user.plan = req.body.plan;
+      }
       const updatedUser = await user.save();
       res.json(updatedUser);
     } else {
@@ -282,7 +268,7 @@ const updateUser = async (req, res) => {
 // @route   DELETE /api/admin/users/:id
 // @access  Private/Admin
 const deleteUser = async (req, res) => {
-  const session = await User.startSession();
+  const session = await mongoose.startSession();
   session.startTransaction();
   try {
     const userId = req.params.id;
@@ -294,7 +280,6 @@ const deleteUser = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Remove all associated data
     await Relationship.deleteMany({ $or: [{ user1: userId }, { user2: userId }] }, { session });
     await Chat.deleteMany({ participants: userId }, { session });
     await Notification.deleteMany({ recipient: userId }, { session });
@@ -304,10 +289,8 @@ const deleteUser = async (req, res) => {
     await WaliChat.deleteMany({ participants: userId }, { session });
     await PushNotification.deleteMany({ recipient: userId }, { session });
 
-    // Remove user from other users' arrays (e.g., blocked, favorites)
     await User.updateMany({}, { $pull: { blockedUsers: userId, favoriteUsers: userId, viewedBy: userId } }, { session });
 
-    // Finally, delete the user
     await User.deleteOne({ _id: userId }, { session });
 
     await session.commitTransaction();
@@ -330,7 +313,7 @@ const verifyUserEmail = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (user) {
-      user.isVerified = true;
+      user.emailVerified = true;
       await user.save();
       res.json({ message: 'User email verified successfully.' });
     } else {
@@ -348,12 +331,9 @@ const sendPasswordResetLink = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (user) {
-      const resetToken = crypto.randomBytes(32).toString('hex');
-      user.passwordResetToken = crypto.createHash('sha256').update(resetToken).digest('hex');
-      user.passwordResetExpires = Date.now() + 3600000; // 1 hour
-      await user.save();
+      const resetToken = user.getResetPasswordToken();
+      await user.save({ validateBeforeSave: false });
 
-      // This URL should point to your frontend's password reset page
       const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
       const message = `You are receiving this email because you (or an administrator) have requested the reset of the password for your account.\n\nPlease click on the following link, or paste it into your browser to complete the process within one hour of receiving it:\n\n${resetUrl}\n\nIf you did not request this, please ignore this email and your password will remain unchanged.\n`;
 
@@ -364,7 +344,7 @@ const sendPasswordResetLink = async (req, res) => {
         console.error('Email sending error:', emailError);
         user.passwordResetToken = undefined;
         user.passwordResetExpires = undefined;
-        await user.save();
+        await user.save({ validateBeforeSave: false });
         return res.status(500).json({ message: 'Error sending password reset email.' });
       }
     } else {
@@ -375,23 +355,12 @@ const sendPasswordResetLink = async (req, res) => {
   }
 };
 
-// @desc    Get system metrics
-// @route   GET /api/admin/system
-// @access  Private/Admin
-const getSystemMetrics = async (req, res) => {
-  try {
-    res.json({ cpuUsage: '75%', memoryUsage: '60%', diskUsage: '80%' });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
 // @desc    Get all calls
 // @route   GET /api/admin/calls
 // @access  Private/Admin
 const getAllCalls = async (req, res) => {
   try {
-        const calls = await Call.find({}).populate('caller recipient', 'fname lname');
+    const calls = await Call.find({}).populate('caller recipient', 'fname lname');
     res.json(calls);
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
@@ -411,8 +380,8 @@ const saveCallRecord = async (req, res) => {
   }
 };
 
-// @desc    Upload call recording
-// @route   POST /api/admin/call-recordings
+// @desc    Get reported profiles
+// @route   GET /api/admin/reports
 // @access  Private/Admin
 const getReportedProfiles = async (req, res) => {
   try {
@@ -420,13 +389,16 @@ const getReportedProfiles = async (req, res) => {
       .populate('reporter', 'fname lname username')
       .populate('reported', 'fname lname username')
       .sort({ createdAt: -1 });
-    res.json({ reports });
+    res.json(reports);
   } catch (error) {
     console.error('Error fetching reported profiles:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
 
+// @desc    Dismiss a report
+// @route   PUT /api/admin/reports/:id/dismiss
+// @access  Private/Admin
 const dismissReport = async (req, res) => {
   try {
     const report = await Report.findById(req.params.id);
@@ -442,22 +414,11 @@ const dismissReport = async (req, res) => {
   }
 };
 
-const uploadCallRecording = async (req, res) => {
-  try {
-    if (req.file) {
-      res.json({ message: 'File uploaded successfully', path: req.file.path });
-    } else {
-      res.status(400).json({ message: 'No file uploaded' });
-    }
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-};
 
 // @desc    Send bulk email
 // @route   POST /api/admin/bulk-email
 // @access  Private/Admin
-const sendBulkEmail = async (req, res) => {
+const handleSendBulkEmail = async (req, res) => {
   try {
     const { userIds, subject, message, sendToAll } = req.body;
     let users = [];
@@ -532,6 +493,29 @@ const saveEmailConfig = async (req, res) => {
 // @desc    Get email config
 // @route   GET /api/admin/email-config
 // @access  Private/Admin
+const sendPushNotification = async (req, res) => {
+  try {
+    const { title, message, target } = req.body;
+    // In a real app, you would have a service to send push notifications
+    console.log(`Sending push notification: ${title} - ${message} to ${target}`);
+    res.json({ message: 'Push notification sent successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const getPremiumUsers = async (req, res) => {
+  try {
+    const premiumUsers = await User.find({ plan: 'premium' })
+      .select('-password')
+      .sort({ createdAt: -1 });
+    res.json(premiumUsers);
+  } catch (error) {
+    console.error('Error fetching premium users:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 const getEmailConfig = async (req, res) => {
   try {
     const config = await getEmailConfigService();
@@ -541,109 +525,9 @@ const getEmailConfig = async (req, res) => {
   }
 };
 
-const getMatchingInsights = async (req, res) => {
-  try {
-    const totalMatches = await Match.countDocuments({ status: 'accepted' });
-    const totalRequests = await Match.countDocuments();
-    const successRate = totalRequests > 0 ? (totalMatches / totalRequests) * 100 : 0;
-    const totalUsers = await User.countDocuments();
-    const avgMatchesPerUser = totalUsers > 0 ? totalMatches / totalUsers : 0;
-
-    res.json({
-      totalMatches,
-      totalRequests,
-      successRate: successRate.toFixed(2),
-      avgMatchesPerUser: avgMatchesPerUser.toFixed(2),
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-const getEngagementMetrics = async (req, res) => {
-  try {
-    const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const activeThisWeek = await User.countDocuments({ lastSeen: { $gte: oneWeekAgo } });
-    const totalUsers = await User.countDocuments();
-    const engagementRate = totalUsers > 0 ? (activeThisWeek / totalUsers) * 100 : 0;
-
-    res.json({
-      activeThisWeek,
-      engagementRate: engagementRate.toFixed(2),
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-const getConversionMetrics = async (req, res) => {
-  try {
-    const premiumUsers = await User.countDocuments({ plan: { $in: ['premium', 'pro'] } });
-    const totalUsers = await User.countDocuments();
-    const conversionRate = totalUsers > 0 ? (premiumUsers / totalUsers) * 100 : 0;
-
-    res.json({
-      premiumUsers,
-      conversionRate: conversionRate.toFixed(2),
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-const getChurnAnalysis = async (req, res) => {
-  try {
-    // This is a simplified churn calculation.
-    // A more accurate calculation would track subscription renewals over time.
-    const oneMonthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const churnedUsers = await Subscription.countDocuments({
-      status: 'cancelled',
-      endDate: { $gte: oneMonthAgo },
-    });
-    const totalSubscriptions = await Subscription.countDocuments();
-    const churnRate = totalSubscriptions > 0 ? (churnedUsers / totalSubscriptions) * 100 : 0;
-
-    res.json({
-      churnedUsers,
-      churnRate: churnRate.toFixed(2),
-    });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-const getReferralAnalysis = async (req, res) => {
-  try {
-    const referrals = await User.aggregate([
-      { $match: { referredBy: { $exists: true } } },
-      { $group: { _id: '$referredBy', count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 10 },
-      {
-        $lookup: {
-          from: 'users',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'referrer',
-        },
-      },
-      { $unwind: '$referrer' },
-      {
-        $project: {
-          _id: '$referrer._id',
-          username: '$referrer.username',
-          fname: '$referrer.fname',
-          lname: '$referrer.lname',
-          count: '$count',
-        },
-      },
-    ]);
-
-    res.json({ referrals });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-const getChatReports = (req, res) => res.json({ message: 'Not implemented' });
-const sendChatReport = (req, res) => res.json({ message: 'Not implemented' });
-const getVipUsers = (req, res) => res.json({ message: 'Not implemented' });
+// @desc    Get payment history
+// @route   GET /api/admin/payments
+// @access  Private/Admin
 const getPaymentHistory = async (req, res) => {
   try {
     const payments = await Payment.find()
@@ -656,6 +540,9 @@ const getPaymentHistory = async (req, res) => {
   }
 };
 
+// @desc    Process a refund
+// @route   POST /api/admin/payments/:id/refund
+// @access  Private/Admin
 const processRefund = async (req, res) => {
   const { id } = req.params;
 
@@ -670,14 +557,11 @@ const processRefund = async (req, res) => {
       return res.status(400).json({ message: 'Only successful payments can be refunded.' });
     }
 
-    // In a real application, you would integrate with your payment gateway (e.g., Stripe) here
-    // const refund = await stripe.refunds.create({ payment_intent: payment.transactionId });
-
+    // In a real application, you would integrate with your payment gateway (e.g., Stripe)
     // For now, we'll just update our internal status
     payment.status = 'refunded';
     await payment.save();
 
-    // Downgrade the user's plan
     const user = await User.findById(payment.user._id);
     if (user) {
       user.plan = 'freemium';
@@ -691,75 +575,6 @@ const processRefund = async (req, res) => {
     res.status(500).json({ message: 'Server error while processing refund.' });
   }
 };
-
-const getPotentialMatches = async (req, res) => {
-  try {
-    const vipUserId = req.params.id;
-    const vipUser = await User.findById(vipUserId);
-
-    if (!vipUser) {
-      return res.status(404).json({ message: 'VIP user not found' });
-    }
-
-    // Determine the target gender for matches
-    const targetGender = vipUser.gender === 'male' ? 'female' : 'male';
-
-    // Find users the VIP has already interacted with
-    const existingRelationships = await Relationship.find({
-      $or: [
-        { follower_user_id: vipUserId },
-        { followed_user_id: vipUserId },
-      ],
-    });
-
-    const interactedUserIds = existingRelationships.flatMap(rel => [
-      rel.follower_user_id,
-      rel.followed_user_id,
-    ]);
-    const uniqueInteractedIds = [...new Set(interactedUserIds)];
-
-    // Find potential matches
-    const potentialMatches = await User.find({
-      _id: { $ne: vipUserId, $nin: uniqueInteractedIds },
-      gender: targetGender,
-      status: 'active',
-    })
-      .select('fname lname email gender age country city summary plan')
-      .limit(50);
-
-    res.json({ matches: potentialMatches });
-  } catch (error) {
-    console.error('Error fetching potential matches:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-const sendMatchSuggestions = async (req, res) => {
-  try {
-    const vipUserId = req.params.id;
-    const { suggestedUserIds } = req.body;
-
-    if (!suggestedUserIds || !Array.isArray(suggestedUserIds) || suggestedUserIds.length === 0) {
-      return res.status(400).json({ message: 'No suggested user IDs provided.' });
-    }
-
-    const suggestions = suggestedUserIds.map(suggestedId => ({
-      follower_user_id: vipUserId,
-      followed_user_id: suggestedId,
-      status: 'pending', // Admin-initiated suggestions are pending
-    }));
-
-    await Relationship.insertMany(suggestions);
-
-    res.status(201).json({ message: 'Match suggestions sent successfully.' });
-  } catch (error) {
-    console.error('Error sending match suggestions:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-const getReportDetails = (req, res) => res.json({ message: 'Not implemented' });
-const resolveReport = (req, res) => res.json({ message: 'Not implemented' });
-const getSystemSettings = (req, res) => res.json({ message: 'Not implemented' });
 
 // @desc    Send push notification
 // @route   POST /api/admin/push-notifications
@@ -798,8 +613,6 @@ const sendAdminPushNotification = async (req, res) => {
 
     const tokens = usersToNotify.map(user => user.pushToken).filter(Boolean);
 
-    // This is where you would integrate with a push notification service like Firebase Cloud Messaging (FCM)
-    // For now, we will simulate the sending process.
     console.log(`Simulating sending push notification to ${tokens.length} tokens.`);
 
     const newNotification = new PushNotification({
@@ -820,154 +633,42 @@ const sendAdminPushNotification = async (req, res) => {
   }
 };
 
+// @desc    Get admin push notifications history
+// @route   GET /api/admin/push-notifications
+// @access  Private/Admin
 const getAdminPushNotifications = async (req, res) => {
   try {
     const notifications = await PushNotification.find().sort({ sentAt: -1 });
     res.json({ notifications });
   } catch (error) {
-    console.error('Error fetching push notifications:', error);
+    console.error('Error fetching push notifications history:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
-
-// @desc    Schedule an email
-// @route   POST /api/admin/schedule-email
-// @access  Private/Admin
-const scheduleEmail = async (req, res) => {
-  try {
-    const { userIds, subject, message, sendToAll, sendAt } = req.body;
-    let users = [];
-
-    if (sendToAll === 'true' || sendToAll === true) {
-      users = await User.find({}, '_id');
-    } else {
-      if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
-        return res.status(400).json({ message: 'Please select at least one user.' });
-      }
-      users = await User.find({ '_id': { $in: userIds } }, '_id');
-    }
-
-    if (users.length === 0) {
-      return res.status(404).json({ message: 'No users found to schedule email for.' });
-    }
-    
-    if (!sendAt) {
-        return res.status(400).json({ message: 'Please provide a scheduled time.' });
-    }
-
-    let attachments = [];
-    if (req.files) {
-      attachments = req.files.map(file => ({
-        filename: file.originalname,
-        content: file.buffer.toString('base64'), // Store as base64
-        contentType: file.mimetype,
-      }));
-    }
-
-    const newScheduledEmail = new ScheduledEmail({
-      recipients: users.map(u => u._id),
-      subject,
-      message,
-      attachments,
-      sendTime: new Date(sendAt),
-      status: 'pending',
-    });
-
-    await newScheduledEmail.save();
-
-    res.status(201).json({ message: `Email scheduled successfully for ${users.length} users.` });
-  } catch (error) {
-    console.error('Error scheduling email:', error);
-    res.status(500).json({ message: 'Failed to schedule email.' });
-  }
-};
-
-// @desc    Get all scheduled emails
-// @route   GET /api/admin/scheduled-emails
-// @access  Private/Admin
-const getScheduledEmails = async (req, res) => {
-  try {
-    const scheduledEmails = await ScheduledEmail.find({ status: 'pending' }).populate('recipients', 'fname lname email');
-    res.json(scheduledEmails);
-  } catch (error) {
-    console.error('Error getting scheduled emails:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// @desc    Cancel a scheduled email
-// @route   DELETE /api/admin/scheduled-emails/:id
-// @access  Private/Admin
-const cancelScheduledEmail = async (req, res) => {
-  try {
-    const email = await ScheduledEmail.findById(req.params.id);
-
-    if (!email) {
-      return res.status(404).json({ message: 'Scheduled email not found' });
-    }
-
-    if (email.status !== 'pending') {
-      return res.status(400).json({ message: 'Cannot cancel an email that is not pending' });
-    }
-
-    await ScheduledEmail.deleteOne({ _id: req.params.id });
-
-    res.json({ message: 'Scheduled email cancelled successfully' });
-  } catch (error) {
-    console.error('Error cancelling scheduled email:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-const sendAdminNotification = (req, res) => res.json({ message: 'Not implemented' });
-const getAdminNotifications = (req, res) => res.json({ message: 'Not implemented' });
-const markNotificationAsRead = (req, res) => res.json({ message: 'Not implemented' });
-
 
 module.exports = {
-  getReportedProfiles,
-  dismissReport,
-  getAdminPushNotifications,
-  scheduleEmail,
-  getScheduledEmails,
-  cancelScheduledEmail,
+  getPremiumUsers,
+  sendPushNotification,
   getStats,
   getAllUsers,
   getUserDetails,
+  updateUser,
   updateUserAccountStatus,
   updateUserPlan,
-  updateUser,
   deleteUser,
-  sendPasswordResetLink,
   verifyUserEmail,
-  getSystemMetrics,
+  sendPasswordResetLink,
   getAllCalls,
   saveCallRecord,
-  uploadCallRecording,
-  sendBulkEmail,
+  getReportedProfiles,
+  dismissReport,
+  handleSendBulkEmail,
   sendTestEmail,
   getEmailMetrics,
   saveEmailConfig,
   getEmailConfig,
-  getMatchingInsights,
-  getEngagementMetrics,
-  getConversionMetrics,
-  getChurnAnalysis,
-  getReferralAnalysis,
-  getChatReports,
-  getReportedProfiles,
-  sendChatReport,
-  dismissReport,
-  getVipUsers,
-  getPotentialMatches,
-  processRefund,
   getPaymentHistory,
-  sendMatchSuggestions,
-  getReportDetails,
-  resolveReport,
-  getSystemSettings,
-  sendAdminNotification,
-  getAdminNotifications,
-  markNotificationAsRead,
+  processRefund,
   sendAdminPushNotification,
-  getAdminPushNotifications
+  getAdminPushNotifications,
 };

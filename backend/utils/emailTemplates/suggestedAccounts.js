@@ -1,3 +1,5 @@
+const footer = require('./footer');
+
 const suggestedAccountsEmail = (recipientName) => {
   const subject = 'Discover Potential Matches on Quluub';
   const html = `
@@ -15,10 +17,7 @@ const suggestedAccountsEmail = (recipientName) => {
         <p style="color: #333; line-height: 1.6; font-size: 16px; text-align: center; margin: 30px 0;">
           <a href="${process.env.FRONTEND_URL}/matches" style="background-color: #075e54; color: white; padding: 15px 25px; text-decoration: none; border-radius: 5px; font-size: 16px;">View Potential Matches</a>
         </p>
-        <p style="color: #333; line-height: 1.6; font-size: 16px; margin-top: 30px;">
-          JazaakumuLlahu khairan,<br>
-          The Quluub Team
-        </p>
+        ${footer}
       </div>
     </div>
   `;

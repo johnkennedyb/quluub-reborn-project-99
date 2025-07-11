@@ -1,3 +1,5 @@
+const footer = require('./footer');
+
 const waliViewChatEmail = (waliName, wardName, brotherName, chatLink) => {
   const subject = 'Notification: Your Ward is Chatting on Quluub';
   const html = `
@@ -18,10 +20,7 @@ const waliViewChatEmail = (waliName, wardName, brotherName, chatLink) => {
         <p style="color: #333; line-height: 1.6; font-size: 16px;">
           Thank you for your attention to this matter.
         </p>
-        <p style="color: #333; line-height: 1.6; font-size: 16px; margin-top: 30px;">
-          JazaakumuLlahu khairan,<br>
-          The Quluub Team
-        </p>
+        ${footer}
       </div>
     </div>
   `;

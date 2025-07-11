@@ -1,3 +1,5 @@
+const footer = require('./footer');
+
 const connectionRequestEmail = (recipientName, requesterUsername) => {
   const subject = "You've Received a Connection Request on Quluub!";
   const html = `
@@ -12,10 +14,7 @@ const connectionRequestEmail = (recipientName, requesterUsername) => {
         <p style="color: #333; line-height: 1.6; font-size: 16px;">
           You've received a new connection request from ${requesterUsername} on Quluub! Log in now to view and respond.
         </p>
-        <p style="color: #333; line-height: 1.6; font-size: 16px; margin-top: 30px;">
-          JazaakumuLlahu khairan,<br>
-          The Quluub Team
-        </p>
+        ${footer}
       </div>
     </div>
   `;

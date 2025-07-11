@@ -68,6 +68,22 @@ const EditUserDialog = ({ user, isOpen, onOpenChange, onUserUpdate, sendPassword
   }, [user, form]);
 
   const handleSaveChanges = async (values: z.infer<typeof formSchema>) => {
+    const planChanged = values.plan !== user.plan;
+    const statusChanged = values.status !== user.status;
+
+    let confirmationMessage = '';
+    if (planChanged && statusChanged) {
+      confirmationMessage = `You are about to change the user's plan to "${values.plan}" and status to "${values.status}". Are you sure?`;
+    } else if (planChanged) {
+      confirmationMessage = `You are about to change the user's plan to "${values.plan}". Are you sure?`;
+    } else if (statusChanged) {
+      confirmationMessage = `You are about to change the user's status to "${values.status}". Are you sure?`;
+    }
+
+    if (confirmationMessage && !confirm(confirmationMessage)) {
+      return; // User cancelled the action
+    }
+
     try {
       await onUserUpdate(user._id, values);
       toast({ title: 'Success', description: 'User details updated successfully.' });
@@ -76,10 +92,6 @@ const EditUserDialog = ({ user, isOpen, onOpenChange, onUserUpdate, sendPassword
       toast({ title: 'Error', description: 'Could not update user details.', variant: 'destructive' });
     }
   };
-
-
-
-
 
 
 

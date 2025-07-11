@@ -1,4 +1,6 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_API_KEY);
+const axios = require('axios');
+const crypto = require('crypto');
 const User = require('../models/User');
 const { sendPlanPurchasedEmail, sendPlanExpiringEmail, sendPlanExpiredEmail } = require('../utils/emailService');
 
@@ -6,7 +8,7 @@ const { sendPlanPurchasedEmail, sendPlanExpiringEmail, sendPlanExpiredEmail } = 
 // @route   POST /api/payments/create-checkout-session
 // @access  Private
 const createCheckoutSession = async (req, res) => {
-  const { priceId } = req.body;
+  const { priceId, plan } = req.body;
   const userId = req.user.id;
 
   try {
@@ -27,6 +29,10 @@ const createCheckoutSession = async (req, res) => {
       mode: 'subscription',
       customer_email: user.email,
       client_reference_id: userId,
+      metadata: {
+        userId: userId,
+        plan: plan || 'premium', // Default to premium if not provided
+      },
       success_url: `${process.env.CLIENT_URL}/profile?payment_success=true`,
       cancel_url: `${process.env.CLIENT_URL}/profile?payment_canceled=true`,
     });
@@ -55,7 +61,7 @@ const handleStripeWebhook = async (req, res) => {
   // Handle the event
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
-    const userId = session.client_reference_id;
+    const { userId, plan } = session.metadata;
     const subscriptionId = session.subscription;
 
     try {
@@ -63,7 +69,7 @@ const handleStripeWebhook = async (req, res) => {
       const user = await User.findById(userId);
       if (user) {
         user.subscription.status = 'active';
-        user.subscription.plan = subscription.items.data[0].plan.nickname;
+        user.subscription.plan = plan;
         user.subscription.stripeSubscriptionId = subscriptionId;
         user.subscription.stripeCustomerId = session.customer;
         user.subscription.currentPeriodEnd = new Date(subscription.current_period_end * 1000);
@@ -131,9 +137,82 @@ const processRefund = async (req, res) => {
   }
 };
 
+const createPaystackPayment = async (req, res) => {
+  const { plan, amount } = req.body; // amount should be in kobo
+  const userId = req.user.id;
+
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const paystackResponse = await axios.post(
+      'https://api.paystack.co/transaction/initialize',
+      {
+        email: user.email,
+        amount: amount,
+        metadata: {
+          user_id: userId,
+          plan: plan,
+        },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.PAYSTACK_SECRET_API_KEY}`,
+        },
+      }
+    );
+
+    res.json({
+      url: paystackResponse.data.data.authorization_url,
+    });
+  } catch (error) {
+    console.error('Error creating Paystack payment:', error.response ? error.response.data : error.message);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const handlePaystackWebhook = async (req, res) => {
+  const secret = process.env.PAYSTACK_SECRET_API_KEY;
+  const hash = crypto.createHmac('sha512', secret).update(JSON.stringify(req.body)).digest('hex');
+
+  if (hash !== req.headers['x-paystack-signature']) {
+    console.error('Paystack webhook signature verification failed.');
+    return res.status(400).send('Webhook Error: Invalid signature');
+  }
+
+  const event = req.body;
+
+  if (event.event === 'charge.success') {
+    const { email } = event.data.customer;
+    const { plan } = event.data.metadata;
+
+    try {
+      const user = await User.findOne({ email });
+      if (user) {
+        user.plan = plan;
+        const expirationDate = new Date();
+        expirationDate.setDate(expirationDate.getDate() + 30);
+        user.premiumExpirationDate = expirationDate;
+        
+        await user.save();
+        console.log(`Successfully updated plan for user ${user.email} to ${plan}`);
+        sendPlanPurchasedEmail(user.email, user.fname, plan);
+      }
+    } catch (error) {
+      console.error('Error in Paystack charge.success webhook:', error);
+    }
+  }
+
+  res.sendStatus(200);
+};
+
 module.exports = { 
   createCheckoutSession, 
   handleStripeWebhook, 
+  createPaystackPayment,
+  handlePaystackWebhook,
   getAllPayments, 
   processRefund 
 };

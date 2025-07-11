@@ -165,7 +165,10 @@ const Settings = () => {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
           },
-          body: JSON.stringify({ priceId: 'price_1Q5CNeBbkcQFdkf0i8BryMoN' }), // Premium discounted price
+          body: JSON.stringify({ 
+            priceId: 'price_1Q5CNeBbkcQFdkf0i8BryMoN', // Premium discounted price
+            plan: 'premium'
+          }),
         });
 
         if (!response.ok) {
@@ -177,8 +180,10 @@ const Settings = () => {
         window.location.href = session.url;
       } else {
         // Use the existing Paystack service for NGN
-        const { authorization_url } = await paymentService.createPaystackPayment();
-        window.location.href = authorization_url;
+        const plan = 'premium';
+        const amount = parseInt(pricing.NGN.premium, 10) * 100; // Convert to kobo
+        const { url } = await paymentService.createPaystackPayment(plan, amount);
+        window.location.href = url;
       }
     } catch (error) {
       console.error('Payment error:', error);

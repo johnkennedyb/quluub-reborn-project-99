@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import axios from 'axios';
-import { useQueryClient } from '@tanstack/react-query';
 
+// Interfaces
 interface AdminStats {
   totalMembers: number;
   maleMembers: number;
@@ -81,14 +81,7 @@ interface ReportedProfile {
 
 interface Subscription {
   _id: string;
-  user: { 
-    _id: string; 
-    username: string; 
-    fname: string; 
-    lname: string; 
-    email: string;
-    fullName: string; 
-  };
+  user: { _id: string; username: string; fname: string; lname: string; email: string; fullName: string };
   plan: string;
   status: string;
   startDate: string;
@@ -100,14 +93,7 @@ interface Subscription {
 
 interface Payment {
   _id: string;
-  user: { 
-    _id: string; 
-    username: string; 
-    fname: string; 
-    lname: string; 
-    email: string;
-    fullName: string; 
-  };
+  user: { _id: string; username: string; fname: string; lname: string; email: string; fullName: string };
   amount: number;
   currency: string;
   plan: string;
@@ -122,12 +108,7 @@ interface AdminCall {
   _id: string;
   conversationId: string;
   participants: Array<{
-    userId: {
-      _id: string;
-      fname: string;
-      lname: string;
-      username: string;
-    };
+    userId: { _id: string; fname: string; lname: string; username: string };
     joinedAt: Date;
     leftAt?: Date;
   }>;
@@ -162,15 +143,26 @@ interface UserFilters {
   sortOrder?: 'asc' | 'desc';
 }
 
+interface CallPagination {
+  totalCalls: number;
+  totalPages: number;
+  currentPage: number;
+}
+
+interface CallStatistics {
+  totalDuration: number;
+  averageDuration: number;
+  totalCalls: number;
+}
+
 const defaultUserFilters: UserFilters = {};
 const defaultCallFilters: CallFilters = {};
 
+// API Client Setup
 const createApiClient = () => {
   const apiClient = axios.create({
     baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
   });
 
   apiClient.interceptors.request.use(
@@ -199,35 +191,34 @@ const createApiClient = () => {
   return apiClient;
 };
 
+// Main Hook
 export const useAdminData = (filters: UserFilters = defaultUserFilters, callFilters: CallFilters = defaultCallFilters) => {
+  const { toast } = useToast();
+    const apiClient = useMemo(() => createApiClient(), []);
+
+  // State Declarations
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [calls, setCalls] = useState<AdminCall[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const [error, setError] = useState<any>(null);
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 1,
     total: 0,
     hasNextPage: false,
-    hasPrevPage: false
+    hasPrevPage: false,
+    totalUsers: 0,
   });
-  const [callPagination, setCallPagination] = useState<any>({});
   const [reportedProfiles, setReportedProfiles] = useState<ReportedProfile[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [pushNotifications, setPushNotifications] = useState<any[]>([]);
-  const [vipUsers, setVipUsers] = useState<AdminUser[]>([]);
+  const [premiumUsers, setPremiumUsers] = useState<AdminUser[]>([]);
   const [potentialMatches, setPotentialMatches] = useState<AdminUser[]>([]);
-  const [loadingVips, setLoadingVips] = useState<boolean>(true);
+  const [loadingPremiums, setLoadingPremiums] = useState<boolean>(true);
   const [loadingMatches, setLoadingMatches] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [callStats, setCallStats] = useState({
-    totalCalls: 0,
-    completedCalls: 0,
-    avgDuration: 0,
-    totalDuration: 0
-  });
   const [callPagination, setCallPagination] = useState<CallPagination>({
     totalCalls: 0,
     totalPages: 0,
@@ -239,107 +230,107 @@ export const useAdminData = (filters: UserFilters = defaultUserFilters, callFilt
     totalCalls: 0,
   });
 
-  const [loadingVips, setLoadingVips] = useState(false);
-  const [loadingMatches, setLoadingMatches] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
+  // Data Fetching Callbacks
   const fetchAdminStats = useCallback(async () => {
     try {
       const response = await apiClient.get('/admin/statistics');
       setStats(response.data);
     } catch (err) {
-      console.error('❌ Failed to fetch admin stats', err);
+      console.error('Failed to fetch admin stats', err);
       toast({ title: 'Error', description: 'Could not fetch admin statistics.', variant: 'destructive' });
     }
-  }, [toast]);
+  }, [apiClient, toast]);
 
-  const fetchUsers = useCallback(async (currentFilters: any) => {
+  const fetchUsers = useCallback(async (currentFilters: UserFilters) => {
     try {
-      const params = new URLSearchParams(currentFilters).toString();
+      const params = new URLSearchParams(currentFilters as any).toString();
       const response = await apiClient.get(`/admin/users?${params}`);
-      setUsers(Array.isArray(response.data.users) ? response.data.users : []);
+      setUsers(response.data.users || []);
       setPagination({
         totalUsers: response.data.totalUsers,
         totalPages: response.data.totalPages,
         currentPage: response.data.currentPage,
+        hasNextPage: response.data.currentPage < response.data.totalPages,
+        hasPrevPage: response.data.currentPage > 1,
+        total: response.data.totalUsers,
       });
     } catch (err) {
-      console.error('❌ Failed to fetch users', err);
+      console.error('Failed to fetch users', err);
       toast({ title: 'Error', description: 'Could not fetch users.', variant: 'destructive' });
       setUsers([]);
     }
-  }, [toast]);
+  }, [apiClient, toast]);
 
   const fetchCalls = useCallback(async (cFilters: CallFilters) => {
     try {
       const params = new URLSearchParams(cFilters as any).toString();
       const response = await apiClient.get(`/admin/calls?${params}`);
-      setCalls(Array.isArray(response.data.calls) ? response.data.calls : []);
+      setCalls(response.data.calls || []);
       setCallPagination({
         totalCalls: response.data.totalCalls,
         totalPages: response.data.totalPages,
         currentPage: response.data.currentPage,
       });
-      setCallStats(prevStats => response.data.statistics || prevStats);
+      setCallStats(response.data.statistics || callStats);
     } catch (error) {
-      console.error('❌ Failed to fetch calls:', error);
+      console.error('Failed to fetch calls:', error);
       toast({ title: 'Error', description: 'Could not fetch calls.', variant: 'destructive' });
       setCalls([]);
     }
-  }, [toast]);
+  }, [apiClient, toast, callStats]);
 
   const fetchReportedProfiles = useCallback(async () => {
     try {
       const response = await apiClient.get('/admin/reported-profiles');
-      setReportedProfiles(Array.isArray(response.data) ? response.data : []);
+      setReportedProfiles(response.data || []);
     } catch (err) {
-      console.error('❌ Failed to fetch reported profiles', err);
+      console.error('Failed to fetch reported profiles', err);
       toast({ title: 'Error', description: 'Could not fetch reported profiles.', variant: 'destructive' });
     }
-  }, [toast]);
+  }, [apiClient, toast]);
 
   const fetchSubscriptions = useCallback(async () => {
     try {
       const response = await apiClient.get('/admin/subscriptions');
-      setSubscriptions(Array.isArray(response.data) ? response.data : []);
+      setSubscriptions(response.data || []);
     } catch (err) {
-      console.error('❌ Failed to fetch subscriptions', err);
+      console.error('Failed to fetch subscriptions', err);
       toast({ title: 'Error', description: 'Could not fetch subscriptions.', variant: 'destructive' });
     }
-  }, [toast]);
+  }, [apiClient, toast]);
 
   const fetchPayments = useCallback(async () => {
     try {
       const response = await apiClient.get('/admin/payments');
-      setPayments(Array.isArray(response.data) ? response.data : []);
+      setPayments(response.data || []);
     } catch (err) {
-      console.error('❌ Failed to fetch payments', err);
+      console.error('Failed to fetch payments', err);
       toast({ title: 'Error', description: 'Could not fetch payments.', variant: 'destructive' });
     }
-  }, [toast]);
+  }, [apiClient, toast]);
 
   const fetchPushNotifications = useCallback(async () => {
     try {
       const response = await apiClient.get('/admin/push-notifications');
-      setPushNotifications(Array.isArray(response.data) ? response.data : []);
+      setPushNotifications(response.data || []);
     } catch (err) {
-      console.error('❌ Failed to fetch push notifications', err);
+      console.error('Failed to fetch push notifications', err);
       toast({ title: 'Error', description: 'Could not fetch push notifications.', variant: 'destructive' });
     }
-  }, [toast]);
+  }, [apiClient, toast]);
 
-  const fetchVipUsers = useCallback(async () => {
-    setLoadingVips(true);
+  const fetchPremiumUsers = useCallback(async () => {
+    setLoadingPremiums(true);
     try {
-      const response = await apiClient.get('/admin/vip-users');
-      setVipUsers(response.data.vips || []);
+      const response = await apiClient.get('/admin/premium-users');
+      setPremiumUsers(response.data || []);
     } catch (error) {
-      console.error('❌ Failed to fetch VIP users:', error);
-      toast({ title: 'Error', description: 'Could not fetch VIP users.', variant: 'destructive' });
+      console.error('Failed to fetch premium users:', error);
+      toast({ title: 'Error', description: 'Could not fetch premium users.', variant: 'destructive' });
     } finally {
-      setLoadingVips(false);
+      setLoadingPremiums(false);
     }
-  }, [toast]);
+  }, [apiClient, toast]);
 
   const fetchPotentialMatches = useCallback(async (userId: string) => {
     setLoadingMatches(true);
@@ -347,7 +338,7 @@ export const useAdminData = (filters: UserFilters = defaultUserFilters, callFilt
       const response = await apiClient.get(`/admin/users/${userId}/potential-matches`);
       setPotentialMatches(response.data.matches || []);
     } catch (error) {
-      console.error('❌ Failed to fetch potential matches:', error);
+      console.error('Failed to fetch potential matches:', error);
       setPotentialMatches([]);
     } finally {
       setLoadingMatches(false);
@@ -358,414 +349,165 @@ export const useAdminData = (filters: UserFilters = defaultUserFilters, callFilt
     setLoading(true);
     setError(null);
     try {
-      await Promise.all([
-        fetchAdminStats(),
-        fetchUsers(filters),
-        fetchReportedProfiles(),
-        fetchSubscriptions(),
-        fetchPayments(),
-        fetchPushNotifications(),
-        fetchVipUsers(),
-      ]);
+      await fetchAdminStats();
+      await fetchUsers(filters);
+      await fetchReportedProfiles();
+      await fetchSubscriptions();
+      await fetchPayments();
+      await fetchPushNotifications();
+      await fetchPremiumUsers();
+      await fetchCalls(callFilters);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
-      setError(errorMessage);
-      console.error('❌ Failed to refetch data:', err);
+      console.error('Failed to refetch data:', err);
+      setError(err);
       toast({ title: 'Error', description: 'Failed to refresh data.', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
-  }, [
-    filters, 
-    toast,
-    fetchAdminStats, 
-    fetchUsers, 
-    fetchReportedProfiles, 
-    fetchSubscriptions, 
-    fetchPayments, 
-    fetchPushNotifications, 
-    fetchVipUsers
-  ]);
+  }, [filters, callFilters, apiClient, toast]);
 
   useEffect(() => {
     refetchData();
   }, [refetchData]);
 
+  // Action Callbacks
   const deleteUser = useCallback(async (userId: string) => {
     try {
       await apiClient.delete(`/admin/users/${userId}`);
       toast({ title: 'Success', description: 'User deleted successfully.' });
-      refetchData();
-    } catch (error) {
-      console.error('❌ Failed to delete user:', error);
-      toast({ title: 'Error', description: 'Could not delete user.', variant: 'destructive' });
-    }
-  }, [apiClient, refetchData, toast]);
-
-  const updateUser = useCallback(async (userId: string, data: Partial<AdminUser>) => {
-    try {
-      await apiClient.put(`/admin/users/${userId}`, data);
-      toast({ title: 'Success', description: 'User updated successfully.' });
-      refetchData();
-    } catch (error) {
-      console.error('❌ Failed to update user:', error);
-      toast({ title: 'Error', description: 'Could not update user.', variant: 'destructive' });
-    }
-  }, [apiClient, refetchData, toast]);
-  
-  const sendPasswordReset = useCallback(async (email: string) => {
-    try {
-      await apiClient.post('/auth/request-password-reset', { email });
-      toast({ title: 'Success', description: `Password reset link sent to ${email}.` });
-    } catch (error) {
-      console.error('❌ Failed to send password reset:', error);
-      toast({ title: 'Error', description: 'Could not send password reset link.', variant: 'destructive' });
-    }
-  }, [apiClient, toast]);
-
-  const updateUserStatus = useCallback(async (userId: string, status: string) => {
-    try {
-      await apiClient.put(`/admin/users/${userId}/status`, { status });
-      toast({ title: 'Success', description: 'User status updated.' });
-      refetchData();
-    } catch (error) {
-      console.error('❌ Failed to update user status:', error);
-      toast({ title: 'Error', description: 'Could not update user status.', variant: 'destructive' });
-    }
-  }, [apiClient, refetchData, toast]);
-
-  const dismissReport = useCallback(async (reportId: string) => {
-    try {
-      await apiClient.put(`/admin/reported-profiles/${reportId}/dismiss`);
-      toast({ title: 'Success', description: 'Report dismissed.' });
-      fetchReportedProfiles();
-    } catch (error) {
-      console.error('❌ Failed to dismiss report:', error);
-      toast({ title: 'Error', description: 'Could not dismiss report.', variant: 'destructive' });
-    }
-  }, [apiClient, fetchReportedProfiles, toast]);
-  
-  const sendSuggestions = useCallback(async (userId: string, suggestedUserIds: string[]) => {
-      setIsSubmitting(true);
-      try {
-          await apiClient.post(`/admin/users/${userId}/send-suggestions`, { suggestedUserIds });
-          toast({ title: 'Success', description: 'Suggestions sent successfully.' });
-      } catch (error) {
-          console.error('❌ Failed to send suggestions:', error);
-          toast({ title: 'Error', description: 'Could not send suggestions.', variant: 'destructive' });
-      } finally {
-          setIsSubmitting(false);
-      }
-  }, [apiClient, toast]);
-
-  const sendPushNotification = useCallback(async (data: { title: string; message: string; target: string; targetUsers?: string[] }) => {
-    try {
-      await apiClient.post('/admin/push-notifications', data);
-      await fetchPushNotifications();
-      toast({ title: 'Success', description: 'Push notification sent.' });
-    } catch (error) {
-      console.error('❌ Failed to send push notification:', error);
-      throw new Error('Failed to send push notification.');
-    }
-  }, [apiClient, fetchPushNotifications, toast]);
-
-  const updateUserPlan = useCallback(async (userId: string, plan: string) => {
-    try {
-      await apiClient.put(`/admin/users/${userId}/plan`, { plan });
-      setUsers(prev => prev.map(user => 
-        user._id === userId ? { ...user, plan } : user
-      ));
-      toast({ title: 'Success', description: 'User plan updated.' });
-    } catch (err) {
-      console.error('Failed to update user plan', err);
-      toast({ title: 'Error', description: 'Could not update user plan.', variant: 'destructive' });
-    }
-  }, [apiClient, toast]);
-
-  const sendTestPushNotification = useCallback(async (userId: string) => {
-    try {
-      await apiClient.post(`/admin/users/${userId}/test-push`);
-      toast({ title: 'Success', description: 'Test push sent.' });
-    } catch (err) {
-      console.error('Failed to send test push', err);
-      toast({ title: 'Error', description: 'Could not send test push.', variant: 'destructive' });
-    }
-  }, [apiClient, toast]);
-
-  const impersonateUser = useCallback(async (userId: string) => {
-    try {
-      const response = await apiClient.post(`/admin/users/${userId}/impersonate`);
-      const { token, user } = response.data;
-      localStorage.setItem('impersonationToken', token);
-      localStorage.setItem('impersonatingUser', JSON.stringify(user));
-      window.open('/', '_blank');
-    } catch (err) {
-      console.error('Failed to impersonate user', err);
-      toast({ title: 'Error', description: 'Could not impersonate user.', variant: 'destructive' });
-    }
-  }, [apiClient, toast]);
-
-  const stopImpersonation = useCallback(() => {
-    localStorage.removeItem('impersonationToken');
-    localStorage.removeItem('impersonatingUser');
-    window.location.reload();
-  }, []);
-
-  return {
-    stats,
-    users,
-    calls,
-    loading,
-    error,
-    pagination,
-    callPagination,
-    reportedProfiles,
-    subscriptions,
-    payments,
-    pushNotifications,
-    vipUsers,
-    potentialMatches,
-    loadingVips,
-    loadingMatches,
-    isSubmitting,
-    callStats,
-    refetchData,
-    deleteUser,
-    updateUser,
-    sendPasswordReset,
-    updateUserStatus,
-    dismissReport,
-    sendSuggestions,
-    sendPushNotification,
-    fetchPushNotifications,
-    fetchCalls,
-    fetchPotentialMatches,
-    updateUserPlan,
-    sendTestPushNotification,
-    impersonateUser,
-    stopImpersonation,
-  };
-};
-  }, [refetchData]);
-
-  const deleteUser = useCallback(async (userId: string) => {
-    try {
-      await apiClient.delete(`/admin/users/${userId}`);
-      toast({ title: 'Success', description: 'User deleted successfully.' });
-      refetchData();
-    } catch (error) {
-      console.error('❌ Failed to delete user:', error);
-      toast({ title: 'Error', description: 'Could not delete user.', variant: 'destructive' });
-    }
-  }, [apiClient, refetchData, toast]);
-
-  const updateUser = useCallback(async (userId: string, data: Partial<AdminUser>) => {
-    try {
-      await apiClient.put(`/admin/users/${userId}`, data);
-      toast({ title: 'Success', description: 'User updated successfully.' });
-      refetchData();
-    } catch (error) {
-      console.error('❌ Failed to update user:', error);
-      toast({ title: 'Error', description: 'Could not update user.', variant: 'destructive' });
-    }
-  }, [apiClient, refetchData, toast]);
-  
-  const sendPasswordReset = useCallback(async (email: string) => {
-    try {
-      await apiClient.post('/auth/request-password-reset', { email });
-      toast({ title: 'Success', description: `Password reset link sent to ${email}.` });
-    } catch (error) {
-      console.error('❌ Failed to send password reset:', error);
-      toast({ title: 'Error', description: 'Could not send password reset link.', variant: 'destructive' });
-    }
-  }, [apiClient, toast]);
-
-  const updateUserStatus = useCallback(async (userId: string, status: string) => {
-    try {
-      await apiClient.put(`/admin/users/${userId}/status`, { status });
-      toast({ title: 'Success', description: 'User status updated.' });
-      refetchData();
-    } catch (error) {
-      console.error('❌ Failed to update user status:', error);
-      toast({ title: 'Error', description: 'Could not update user status.', variant: 'destructive' });
-    }
-  }, [apiClient, refetchData, toast]);
-
-  const dismissReport = useCallback(async (reportId: string) => {
-    try {
-      await apiClient.put(`/admin/reported-profiles/${reportId}/dismiss`);
-      toast({ title: 'Success', description: 'Report dismissed.' });
-      fetchReportedProfiles();
-    } catch (error) {
-      console.error('❌ Failed to dismiss report:', error);
-      toast({ title: 'Error', description: 'Could not dismiss report.', variant: 'destructive' });
-    }
-  }, [apiClient, fetchReportedProfiles, toast]);
-  
-  const sendSuggestions = useCallback(async (userId: string, suggestedUserIds: string[]) => {
-      setIsSubmitting(true);
-      try {
-          await apiClient.post(`/admin/users/${userId}/send-suggestions`, { suggestedUserIds });
-          toast({ title: 'Success', description: 'Suggestions sent successfully.' });
-      } catch (error) {
-          console.error('❌ Failed to send suggestions:', error);
-          toast({ title: 'Error', description: 'Could not send suggestions.', variant: 'destructive' });
-      } finally {
-          setIsSubmitting(false);
-      }
-  }, [apiClient, toast]);
-
-  const sendPushNotification = useCallback(async (data: { title: string; message: string; target: string; targetUsers?: string[] }) => {
-    try {
-      await apiClient.post('/admin/push-notifications', data);
-      await fetchPushNotifications();
-      toast({ title: 'Success', description: 'Push notification sent.' });
-    } catch (error) {
-      console.error('❌ Failed to send push notification:', error);
-      throw new Error('Failed to send push notification.');
-    }
-  }, [apiClient, fetchPushNotifications, toast]);
-
-  const updateUserPlan = useCallback(async (userId: string, plan: string) => {
-    try {
-      await apiClient.put(`/admin/users/${userId}/plan`, { plan });
-      setUsers(prev => prev.map(user => 
-        user._id === userId ? { ...user, plan } : user
-      ));
-      toast({ title: 'Success', description: 'User plan updated.' });
-    } catch (err) {
-      console.error('Failed to update user plan', err);
-      toast({ title: 'Error', description: 'Could not update user plan.', variant: 'destructive' });
-    }
-  }, [apiClient, toast]);
-
-  const sendTestPushNotification = useCallback(async (userId: string) => {
-    try {
-      await apiClient.post(`/admin/users/${userId}/test-push`);
-      toast({ title: 'Success', description: 'Test push sent.' });
-    } catch (err) {
-      console.error('Failed to send test push', err);
-      toast({ title: 'Error', description: 'Could not send test push.', variant: 'destructive' });
-    }
-  }, [apiClient, toast]);
-
-  const impersonateUser = useCallback(async (userId: string) => {
-    try {
-      const response = await apiClient.post(`/admin/users/${userId}/impersonate`);
-      const { token, user } = response.data;
-      localStorage.setItem('impersonationToken', token);
-      localStorage.setItem('impersonatingUser', JSON.stringify(user));
-      window.open('/', '_blank');
-    } catch (err) {
-      console.error('Failed to impersonate user', err);
-      toast({ title: 'Error', description: 'Could not impersonate user.', variant: 'destructive' });
-    }
-  }, [apiClient, toast]);
-
-  const stopImpersonation = useCallback(() => {
-    localStorage.removeItem('impersonationToken');
-    localStorage.removeItem('impersonatingUser');
-    window.location.reload();
-  }, []);
-
-  return {
-    stats,
-    users,
-    calls,
-    loading,
-    error,
-    pagination,
-    callPagination,
-    reportedProfiles,
-    subscriptions,
-    payments,
-    pushNotifications,
-    vipUsers,
-    potentialMatches,
-    loadingVips,
-    loadingMatches,
-    isSubmitting,
-    callStats,
-    refetchData,
-    deleteUser,
-    updateUser,
-    sendPasswordReset,
-    updateUserStatus,
-    dismissReport,
-    sendSuggestions,
-    sendPushNotification,
-    fetchPushNotifications,
-    fetchCalls,
-    fetchPotentialMatches,
-    updateUserPlan,
-    sendTestPushNotification,
-    impersonateUser,
-    stopImpersonation,
-  };
-};
-  }, [fetchAdminStats, fetchUsers, filters, toast]);
-
-  const updateUser = useCallback(async (userId: string, data: Partial<AdminUser>) => {
-    try {
-      await apiClient.put(`/admin/users/${userId}`, data);
       await refetchData();
     } catch (error) {
-      console.error(`❌ Failed to update user ${userId}:`, error);
-      throw new Error('Failed to update user.');
+      console.error('Failed to delete user:', error);
+      toast({ title: 'Error', description: 'Could not delete user.', variant: 'destructive' });
     }
-  }, [apiClient, refetchData]);
+  }, [apiClient, refetchData, toast]);
 
-  const deleteUser = useCallback(async (userId: string) => {
+  const updateUser = useCallback(async (userId: string, data: Partial<AdminUser>) => {
     try {
-      await apiClient.delete(`/admin/users/${userId}`);
-      await refetchData(); // Refetch data to reflect the deletion
+      await apiClient.put(`/admin/users/${userId}`, data);
+      toast({ title: 'Success', description: 'User updated successfully.' });
+      await refetchData();
     } catch (error) {
-      console.error(`❌ Failed to delete user ${userId}:`, error);
-      throw new Error('Failed to delete user.');
+      console.error('Failed to update user:', error);
+      toast({ title: 'Error', description: 'Could not update user.', variant: 'destructive' });
     }
-  }, [apiClient, refetchData]);
+  }, [apiClient, refetchData, toast]);
 
-  const sendPasswordReset = useCallback(async (userId: string) => {
+  
+
+  const updateUserAccountStatus = useCallback(async (userId: string, status: string, reportId?: string) => {
     try {
-      await apiClient.post(`/admin/users/${userId}/reset-password`);
+      await apiClient.put(`/admin/users/${userId}/status`, { status, reportId });
+      toast({ title: 'Success', description: 'User status updated successfully.' });
+      await refetchData();
     } catch (error) {
-      console.error(`❌ Failed to send password reset for user ${userId}:`, error);
-      throw new Error('Failed to send password reset link.');
+      console.error('Failed to update user status:', error);
+      toast({ title: 'Error', description: 'Could not update user status.', variant: 'destructive' });
     }
-  }, [apiClient]);
+  }, [apiClient, refetchData, toast]);
 
-  const processRefund = useCallback(async (paymentId: string) => {
+  const updateUserPlan = useCallback(async (userId: string, plan: string) => {
     try {
-      const response = await apiClient.post(`/admin/payments/${paymentId}/refund`);
-      toast({ title: 'Success', description: 'Refund processed successfully!' });
-      // Refetch payments to update the UI
-      fetchPayments();
-      return response.data;
-    } catch (error: any) {
-      console.error('❌ Failed to process refund:', error);
-      toast({ title: 'Error', description: error.response?.data?.message || 'Failed to process refund.', variant: 'destructive' });
-      throw error;
-    }
-  }, [apiClient, toast, fetchPayments]);
-
-  const fetchPotentialMatches = useCallback(async (userId: string) => {
-    setLoadingMatches(true);
-    try {
-      const response = await apiClient.get(`/admin/users/${userId}/potential-matches`);
-      setPotentialMatches(response.data.matches || []);
+      await apiClient.put(`/admin/users/${userId}/plan`, { plan });
+      setUsers(prev => prev.map(user => 
+        user._id === userId ? { ...user, plan } : user
+      ));
+      toast({ title: 'Success', description: 'User plan updated successfully.' });
     } catch (error) {
-      console.error('❌ Failed to fetch potential matches:', error);
-      setPotentialMatches([]);
+      console.error('Failed to update user plan:', error);
+      toast({ title: 'Error', description: 'Could not update user plan.', variant: 'destructive' });
+    }
+  }, [apiClient, toast]);
+
+
+
+  const dismissReport = useCallback(async (reportId: string) => {
+    try {
+      await apiClient.put(`/admin/reports/${reportId}/dismiss`);
+      toast({ title: 'Success', description: 'Report dismissed successfully.' });
+      await fetchReportedProfiles();
+    } catch (error) {
+      console.error('Failed to dismiss report:', error);
+      toast({ title: 'Error', description: 'Could not dismiss report.', variant: 'destructive' });
+    }
+  }, [apiClient, fetchReportedProfiles, toast]);
+
+  const verifyUserEmail = useCallback(async (userId: string) => {
+    try {
+      await apiClient.post(`/admin/users/${userId}/verify-email`);
+      toast({ title: 'Success', description: 'User email verified.' });
+      await refetchData();
+    } catch (error) {
+      console.error('Failed to verify email:', error);
+      toast({ title: 'Error', description: 'Could not verify email.', variant: 'destructive' });
+    }
+  }, [apiClient, refetchData, toast]);
+
+  const sendBulkEmail = useCallback(async (data: { recipients: string[], subject: string, message: string, attachments?: File[] }) => {
+    setIsSubmitting(true);
+    try {
+      const formData = new FormData();
+      formData.append('recipients', JSON.stringify(data.recipients));
+      formData.append('subject', data.subject);
+      formData.append('message', data.message);
+      if (data.attachments) {
+        data.attachments.forEach(file => {
+          formData.append('attachments', file);
+        });
+      }
+      await apiClient.post('/admin/bulk-email', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      toast({ title: 'Success', description: 'Bulk email sent successfully.' });
+    } catch (error) {
+      console.error('Failed to send bulk email:', error);
+      toast({ title: 'Error', description: 'Could not send bulk email.', variant: 'destructive' });
     } finally {
-      setLoadingMatches(false);
+      setIsSubmitting(false);
     }
-  }, [apiClient]);
+  }, [apiClient, toast]);
+
+  const sendPasswordResetLink = useCallback(async (userId: string) => {
+    try {
+      const user = users.find(u => u._id === userId);
+      await apiClient.post(`/admin/users/${userId}/reset-password`);
+      toast({ title: 'Success', description: `Password reset link sent to ${user?.username || 'user'}.` });
+    } catch (error) {
+      console.error('Failed to send password reset:', error);
+      toast({ title: 'Error', description: 'Could not send password reset link.', variant: 'destructive' });
+    }
+  }, [apiClient, toast, users]);
+
+  const sendPushNotification = useCallback(async (data: { title: string; body: string; target: string; userId?: string }) => {
+    try {
+      await apiClient.post('/admin/push-notifications', data);
+      toast({ title: 'Success', description: 'Push notification sent successfully.' });
+      await fetchPushNotifications();
+    } catch (error) {
+      console.error('Failed to send push notification:', error);
+      toast({ title: 'Error', description: 'Could not send push notification.', variant: 'destructive' });
+    }
+  }, [apiClient, fetchPushNotifications, toast]);
+
+  const impersonateUser = useCallback(async (userId: string) => {
+    try {
+      const response = await apiClient.post(`/admin/users/${userId}/impersonate`);
+      const { token, user } = response.data;
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+      window.open('/dashboard', '_blank');
+      toast({ title: 'Success', description: `Impersonating ${user.username}` });
+    } catch (error) {
+      console.error('Impersonation failed:', error);
+      toast({ title: 'Error', description: 'Failed to impersonate user.', variant: 'destructive' });
+    }
+  }, [apiClient, toast]);
 
   const sendSuggestions = useCallback(async (userId: string, suggestedUserIds: string[]) => {
     setIsSubmitting(true);
     try {
-      await apiClient.post(`/admin/users/${userId}/suggest-matches`, { suggestedUserIds });
-      toast({ title: 'Success', description: 'Match suggestions sent successfully!' });
+      await apiClient.post(`/admin/users/${userId}/send-suggestions`, { suggestedUserIds });
+      toast({ title: 'Success', description: 'Suggestions sent successfully.' });
     } catch (error) {
       console.error('Failed to send suggestions:', error);
       toast({ title: 'Error', description: 'Could not send suggestions.', variant: 'destructive' });
@@ -774,138 +516,71 @@ export const useAdminData = (filters: UserFilters = defaultUserFilters, callFilt
     }
   }, [apiClient, toast]);
 
-  const updateUserStatus = useCallback(async (userId: string, status: string) => {
+ 
+
+  const sendTestPushNotification = useCallback(async (userId: string) => {
     try {
-      console.log(`🔄 Updating user ${userId} status to ${status}`);
-      await apiClient.patch(`/admin/users/${userId}/status`, { status });
-      toast({ title: "Success", description: "User status updated successfully" });
-      fetchUsers(filters); // Refetch users to get the latest status
-      fetchReportedProfiles(); // Refetch reports as status change might be an action on a report
-    } catch (error) {
-      console.error("❌ Failed to update user status:", error);
-      const errorMessage = axios.isAxiosError(error)
-        ? error.response?.data?.message || error.message
-        : 'Failed to update user status';
-      toast({ title: "Error", description: errorMessage, variant: "destructive" });
-      throw error;
-    }
-  }, [apiClient, toast, filters, fetchUsers, fetchReportedProfiles]);
-
-  const dismissReport = useCallback(async (reportId: string) => {
-    try {
-      await apiClient.patch(`/admin/reported-profiles/${reportId}/dismiss`);
-      toast({ title: 'Success', description: 'Report dismissed.' });
-      fetchReportedProfiles(); // Refetch reports to update the list
-    } catch (error) {
-      toast({ title: 'Error', description: 'Could not dismiss report.', variant: 'destructive' });
-    }
-  }, [apiClient, toast, fetchReportedProfiles]);
-
-
-
-  const updateUserPlan = useCallback(async (userId: string, plan: string) => {
-    try {
-      await apiClient.put(`/admin/users/${userId}/plan`, { plan });
-      setUsers(prev => prev.map(user => 
-        user._id === userId ? { ...user, plan } : user
-      ));
-      toast({
-        title: "Success",
-        description: "User plan updated successfully",
-      });
-    } catch (error) {
-      const errorMessage = axios.isAxiosError(error)
-        ? error.response?.data?.message || error.message
-        : 'Failed to update user plan';
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
-      throw error;
+      await apiClient.post(`/admin/users/${userId}/test-push`);
+      toast({ title: 'Success', description: 'Test push sent.' });
+    } catch (err) {
+      console.error('Failed to send test push', err);
+      toast({ title: 'Error', description: 'Could not send test push.', variant: 'destructive' });
     }
   }, [apiClient, toast]);
 
-  const getUserDetails = useCallback(async (userId: string) => {
-    try {
-      console.log(`🔍 Fetching details for user ${userId}`);
-      const response = await apiClient.get(`/admin/users/${userId}`);
-      return response.data;
-    } catch (error) {
-      console.error("❌ Failed to fetch user details:", error);
-      throw error;
-    }
-  }, [apiClient]);
+  const stopImpersonation = useCallback(() => {
+    localStorage.removeItem('impersonationToken');
+    localStorage.removeItem('impersonatingUser');
+    window.location.reload();
+  }, []);
 
-  const refetchData = useCallback(async () => {
-    const adminToken = localStorage.getItem('adminToken');
-    if (!adminToken) {
-      console.warn("⚠️ No admin token found, skipping data fetch");
-      setLoading(false);
-      return;
-    }
+  const sendEmail = useCallback(async (emailData: { to: string; subject: string; message: string }) => {
     try {
-      setLoading(true);
-      await Promise.all([
-        fetchAdminStats(),
-        fetchUsers(filters),
-        fetchCalls(callFilters),
-        fetchReportedProfiles(),
-        fetchSubscriptions(),
-  useEffect(() => {
-    setLoading(true);
-    try {
-      await Promise.all([
-        fetchAdminStats(),
-        fetchUsers(filters),
-        fetchReportedProfiles(),
-        fetchPushNotifications(),
-        fetchSubscriptions(),
-        fetchPayments(),
-        fetchVipUsers(),
-        fetchPotentialMatches(),
-        fetchCalls(callFilters)
-      ]);
-    } catch (err: any) {
-      setError(err);
-      if (err.response && err.response.status === 401) {
-        window.location.href = '/admin/login';
-      }
-    } finally {
-      setLoading(false);
+      await apiClient.post('/admin/send-email', emailData);
+      toast({ title: 'Success', description: 'Email sent successfully.' });
+    } catch (err) {
+      console.error('Failed to send email', err);
+      toast({ title: 'Error', description: 'Could not send email.', variant: 'destructive' });
+      throw err; // Re-throw to allow caller to handle it
     }
-  }, [filters, callFilters, fetchAdminStats, fetchUsers, fetchReportedProfiles, fetchPushNotifications, fetchSubscriptions, fetchPayments, fetchVipUsers, fetchPotentialMatches, fetchCalls]);
+  }, [apiClient, toast]);
 
-  useEffect(() => {
-    refetchData();
-  }, [refetchData, fetchCalls]);
-
-  return { 
-    stats, 
+  // Returned Values
+  return {
+    stats,
     users,
     calls,
     loading,
     error,
     pagination,
-    refetchData,
-    deleteUser,
-    updateUser,
-    sendPasswordReset,
-    dismissReport,
-    updateUserStatus,
-    sendPushNotification,
-    fetchPushNotifications,
-    fetchCalls,
+    reportedProfiles,
+    subscriptions,
+    payments,
+    pushNotifications,
+    premiumUsers,
+    potentialMatches,
     callPagination,
     callStats,
-    vipUsers,
-    potentialMatches,
-    loadingVips,
+    loadingPremiums,
     loadingMatches,
     isSubmitting,
+    refetchData,
+    sendPushNotification,
+    updateUser,
+    updateUserAccountStatus,
+    deleteUser,
+    dismissReport,
+    verifyUserEmail,
+    sendBulkEmail,
+    sendEmail,
+    sendPasswordResetLink,
+    impersonateUser,
+    fetchCalls,
     fetchPotentialMatches,
+    
     sendSuggestions,
-    pushNotifications,
-    sendPushNotification
+    updateUserPlan,
+    sendTestPushNotification,
+    stopImpersonation,
   };
 };

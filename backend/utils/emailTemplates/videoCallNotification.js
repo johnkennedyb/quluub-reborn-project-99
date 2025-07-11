@@ -1,10 +1,12 @@
+const footer = require('./footer');
+
 const videoCallNotificationEmail = (waliName, wardName, brotherName, callUrl) => {
   const subject = 'Video Call Notification - Quluub';
   const html = `
     <div style="max-width: 600px; margin: 0 auto; padding: 20px; font-family: Arial, sans-serif; background-color: #f9f9f9;">
       <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
         <div style="text-align: center; margin-bottom: 30px;">
-          <img src="https://quluub.com/images/logo.png" alt="Quluub Logo" style="max-width: 150px;">
+          <img src="https://res.cloudinary.com/dn82ie7wt/image/upload/v1752017813/WhatsApp_Image_2025-07-08_at_17.57.16_40b9a289_v3d7iy.jpg" alt="Quluub Welcome" style="max-width: 100%; height: auto;" />
           <h1 style="color: #075e54; margin-top: 10px;">Video Call Notification</h1>
         </div>
         <p style="color: #333; font-size: 16px;">Assalamu Alaikum ${waliName},</p>
@@ -18,11 +20,7 @@ const videoCallNotificationEmail = (waliName, wardName, brotherName, callUrl) =>
           If the button doesn't work, copy and paste this link in your browser:<br>
           <a href="${callUrl}" style="color: #075e54; word-break: break-all;">${callUrl}</a>
         </p>
-        <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee;">
-          <p style="color: #999; font-size: 12px; text-align: center;">
-            May Allah bless and protect our families. Ameen.
-          </p>
-        </div>
+        ${footer}
       </div>
     </div>
   `;

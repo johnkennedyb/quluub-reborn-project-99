@@ -1,3 +1,5 @@
+const footer = require('./footer');
+
 const contactWaliEmail = (brotherName) => {
   const subject = 'Important: Contact the Wali';
   const html = `
@@ -15,10 +17,7 @@ const contactWaliEmail = (brotherName) => {
         <p style="color: #333; line-height: 1.6; font-size: 16px;">
           Please reach out to the sister's Wali.
         </p>
-        <p style="color: #333; line-height: 1.6; font-size: 16px; margin-top: 30px;">
-          JazaakumuLlahu khairan,<br>
-          The Quluub Team
-        </p>
+        ${footer}
       </div>
     </div>
   `;

@@ -1,7 +1,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { authService } from '../lib/api-client';
-import type { AuthResponse, LoginCredentials, SignupData, User } from '../types/user';
+import type { LoginCredentials, SignupData, User } from '../types/user';
 
 interface AuthContextType {
   user: User | null;
@@ -13,21 +13,15 @@ interface AuthContextType {
   updateUser: (userData: Partial<User>) => void;
 }
 
-export const AuthContext = createContext<AuthContextType>({
-  user: null,
-  isAuthenticated: false,
-  isLoading: true,
-  login: async () => {
-    throw new Error('Context not initialized');
-  },
-  signup: async () => {
-    throw new Error('Context not initialized');
-  },
-  logout: () => {},
-  updateUser: () => {},
-});
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);

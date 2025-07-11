@@ -1,3 +1,5 @@
+const footer = require('./footer');
+
 const connectionRejectedEmail = (recipientName) => {
   const subject = 'Connection Request Update on Quluub';
   const html = `
@@ -12,10 +14,7 @@ const connectionRejectedEmail = (recipientName) => {
         <p style="color: #333; line-height: 1.6; font-size: 16px;">
           Unfortunately, your recent connection request has been declined. Remember, everything happens by Allaah's will. Stay patient and trust in His plan.
         </p>
-        <p style="color: #333; line-height: 1.6; font-size: 16px; margin-top: 30px;">
-          JazaakumuLlahu khairan,<br>
-          The Quluub Team
-        </p>
+        ${footer}
       </div>
     </div>
   `;

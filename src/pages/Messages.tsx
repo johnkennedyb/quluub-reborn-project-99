@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useContext } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { chatService } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
-import { AuthContext } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { ArrowLeft, Video, Send, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,7 @@ interface Message {
 }
 
 const Messages = () => {
-  const { user } = useContext(AuthContext);
+    const { user } = useAuth();
   const { toast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();

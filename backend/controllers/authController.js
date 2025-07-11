@@ -3,8 +3,8 @@ const User = require('../models/User');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const generateToken = require('../utils/generateToken');
-const axios = require('axios');
 const crypto = require('crypto');
+const axios = require('axios');
 const { sendValidationEmail, sendWelcomeEmail, sendWaliNewJoinerEmail } = require('../utils/emailService');
 
 // Regular signup

@@ -34,33 +34,31 @@ const Auth = () => {
   const switchToLogin = () => setActiveTab("login");
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
+    <div 
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{
+        backgroundImage: 'url(https://res.cloudinary.com/dn82ie7wt/image/upload/v1752232003/bg_clsreb.png)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
+    >
+      <Card className="w-full max-w-md bg-white/80 backdrop-blur-sm">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold text-green-700">Welcome to Quluub</CardTitle>
           <CardDescription>Your Islamic marriage platform</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">Login</TabsTrigger>
-              <TabsTrigger value="signup">Sign Up</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="login">
-              <LoginForm 
-                onLogin={handleLogin}
-                onSwitchToSignup={switchToSignup}
-              />
-            </TabsContent>
-            
-            <TabsContent value="signup">
-              <SignupForm 
-                onSignup={handleSignup}
-                onSwitchToLogin={switchToLogin}
-              />
-            </TabsContent>
-          </Tabs>
+          {activeTab === 'login' ? (
+            <LoginForm 
+              onLogin={handleLogin}
+              onSwitchToSignup={switchToSignup}
+            />
+          ) : (
+            <SignupForm 
+              onSignup={handleSignup}
+              onSwitchToLogin={switchToLogin}
+            />
+          )}
 
           <div className="mt-6">
             <div className="relative">

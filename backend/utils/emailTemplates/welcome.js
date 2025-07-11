@@ -1,3 +1,5 @@
+const footer = require('./footer');
+
 const welcomeEmail = (recipientName) => {
   const subject = 'Welcome to Quluub - Your Journey Begins!';
   const html = `
@@ -21,10 +23,7 @@ const welcomeEmail = (recipientName) => {
         <p style="color: #333; line-height: 1.6; font-size: 16px;">
           May Allaah bless you on this journey.
         </p>
-        <p style="color: #333; line-height: 1.6; font-size: 16px; margin-top: 30px;">
-          JazaakumuLlahu khairan,<br>
-          The Quluub Team
-        </p>
+        ${footer}
       </div>
     </div>
   `;

@@ -4,14 +4,14 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Clock, Users, PhoneOff } from "lucide-react";
 import { loadJitsiScript, createJitsiMeeting } from "@/lib/jitsi";
-import { AuthContext } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
 import apiClient from "@/lib/api-client";
 
 const VideoCall = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { search } = useLocation();
-  const { user, isAuthenticated } = useContext(AuthContext);
+    const { user, isAuthenticated } = useAuth();
   const params = new URLSearchParams(search);
   const roomId = params.get("room");
 

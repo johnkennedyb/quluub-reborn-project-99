@@ -42,85 +42,65 @@ const LoginForm = ({ onLogin, onSwitchToSignup }: LoginFormProps) => {
   };
   
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader>
-        <CardTitle className="text-2xl text-center">Welcome Back</CardTitle>
-        <CardDescription className="text-center">
-          Enter your credentials to access your account
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-md text-sm flex items-center gap-2">
-              <AlertCircle className="h-4 w-4" />
-              <span>{error}</span>
-            </div>
-          )}
-          <div className="space-y-2">
-            <Label htmlFor="username">Username or Email</Label>
-            <Input 
-              id="username"
-              type="text" 
-              placeholder="username or email" 
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
-              <a href="#" className="text-xs text-primary hover:underline">
-                Forgot password?
-              </a>
-            </div>
-            <div className="relative">
-              <Input 
-                id="password"
-                type={showPassword ? "text" : "password"}
-                placeholder="••••••••" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                {showPassword ? (
-                  <EyeOff className="h-4 w-4" />
-                ) : (
-                  <Eye className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
-          </div>
-          <Button 
-            type="submit" 
-            className="w-full" 
-            disabled={isLoading}
-          >
-            {isLoading ? "Logging in..." : "Login"}
-          </Button>
-        </form>
-      </CardContent>
-      <CardFooter className="flex justify-center">
-        <p className="text-sm text-muted-foreground">
-          Don't have an account?{" "}
-          <button 
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-md text-sm flex items-center gap-2">
+          <AlertCircle className="h-4 w-4" />
+          <span>{error}</span>
+        </div>
+      )}
+      <div className="space-y-2">
+        <Label htmlFor="username">Username or Email</Label>
+        <Input 
+          id="username"
+          type="text" 
+          placeholder="username or email" 
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          required
+        />
+      </div>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="password">Password</Label>
+          <a href="#" className="text-xs text-primary hover:underline">
+            Forgot password?
+          </a>
+        </div>
+        <div className="relative">
+          <Input 
+            id="password"
+            type={showPassword ? "text" : "password"}
+            placeholder="••••••••" 
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          <Button
             type="button"
-            onClick={onSwitchToSignup}
-            className="text-primary hover:underline font-medium"
+            variant="ghost"
+            size="icon"
+            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+            onClick={() => setShowPassword(!showPassword)}
           >
-            Sign up
-          </button>
-        </p>
-      </CardFooter>
-    </Card>
+            {showPassword ? (
+              <EyeOff className="h-4 w-4" />
+            ) : (
+              <Eye className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      </div>
+      <Button type="submit" className="w-full" disabled={isLoading}>
+        {isLoading ? "Logging in..." : "Login"}
+      </Button>
+      <p className="text-sm text-center">
+        Don't have an account?{" "}
+        <button type="button" onClick={onSwitchToSignup} className="text-primary hover:underline font-semibold">
+          Sign up
+        </button>
+      </p>
+    </form>
   );
 };
 

@@ -19,17 +19,15 @@ interface AdminAuthContextType {
   adminLogout: () => void;
 }
 
-const AdminAuthContext = createContext<AdminAuthContextType>({
-  adminUser: null,
-  isAdminAuthenticated: false,
-  isLoading: true,
-  adminLogin: async () => {
-    throw new Error('AdminAuth context not initialized');
-  },
-  adminLogout: () => {},
-});
+const AdminAuthContext = createContext<AdminAuthContextType | undefined>(undefined);
 
-export const useAdminAuth = () => useContext(AdminAuthContext);
+export const useAdminAuth = () => {
+  const context = useContext(AdminAuthContext);
+  if (context === undefined) {
+    throw new Error('useAdminAuth must be used within an AdminAuthProvider');
+  }
+  return context;
+};
 
 export const AdminAuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
