@@ -184,43 +184,51 @@ exports.withdrawRequest = async (req, res) => {
 exports.getMatches = async (req, res) => {
   try {
     const userId = req.user._id.toString();
-    
-    console.log(`Getting matches for user: ${userId}`);
-    
+    const userGender = req.user.gender;
+
+    // Determine the gender to show in matches
+    const oppositeGender = userGender === 'male' ? 'female' : 'male';
+
     // Find all matched relationships where user is follower or followed
     const relationships = await Relationship.find({
       $or: [
         { follower_user_id: userId },
-        { followed_user_id: userId }
+        { followed_user_id: userId },
       ],
-      status: 'matched'
+      status: 'matched',
     });
-    
-    console.log(`Found ${relationships.length} match relationships`);
-    
+
     // Get array of matched user IDs
-    const matchedUserIds = relationships.map(rel => {
-      return rel.follower_user_id === userId ? rel.followed_user_id : rel.follower_user_id;
+    const matchedUserIds = relationships.map((rel) => {
+      return rel.follower_user_id === userId
+        ? rel.followed_user_id
+        : rel.follower_user_id;
     });
-    
-    // Get user details for matches
+
+    if (matchedUserIds.length === 0) {
+      return res.json({ count: 0, matches: [] });
+    }
+
+    // Get user details for matches, filtered by opposite gender
     const matches = await User.find({
-      _id: { $in: matchedUserIds }
+      _id: { $in: matchedUserIds },
+      gender: oppositeGender,
     }).select('-password');
-    
-    console.log(`Found ${matches.length} matched users`);
-    
+
     res.json({
       count: matches.length,
-      matches: matches.map(match => ({
+      matches: matches.map((match) => ({
         ...match._doc,
-        relationship: relationships.find(rel => 
-          rel.follower_user_id === match._id.toString() || rel.followed_user_id === match._id.toString()
-        )
-      }))
+        relationship: relationships.find(
+          (rel) =>
+            (rel.follower_user_id === match._id.toString() ||
+              rel.followed_user_id === match._id.toString()) &&
+            (rel.follower_user_id === userId || rel.followed_user_id === userId)
+        ),
+      })),
     });
   } catch (error) {
-    console.error("Get matches error:", error);
+    console.error('Get matches error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };

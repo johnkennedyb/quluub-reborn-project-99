@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useEffect, useState } from 'react';
 import { authService } from '../lib/api-client';
 import type { LoginCredentials, SignupData, User } from '../types/user';

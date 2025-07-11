@@ -27,6 +27,7 @@ export interface User {
   kunya?: string;
   nationality?: string;
   country?: string;
+  state?: string;
   region?: string;
   build?: string;
   appearance?: string;

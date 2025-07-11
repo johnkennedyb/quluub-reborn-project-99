@@ -11,7 +11,7 @@ import { getGoogleAuthUrl } from '@/config/google-oauth';
 
 const Auth = () => {
   const navigate = useNavigate();
-  const { login } = useAuth();
+  const { login, signup } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("login");
 
@@ -35,14 +35,16 @@ const Auth = () => {
 
   return (
     <div 
-      className="min-h-screen flex items-center justify-center p-4"
+      className="min-h-screen flex items-center justify-center bottom-0 p-8 "
       style={{
         backgroundImage: 'url(https://res.cloudinary.com/dn82ie7wt/image/upload/v1752232003/bg_clsreb.png)',
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: 'top',
         backgroundSize: 'cover',
-        backgroundPosition: 'center',
+        marginBottom: '-90px',
       }}
     >
-      <Card className="w-full max-w-md bg-white/80 backdrop-blur-sm">
+      <Card className="w-full max-w-md bg-white/80  backdrop-blur-sm">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold text-green-700">Welcome to Quluub</CardTitle>
           <CardDescription>Your Islamic marriage platform</CardDescription>

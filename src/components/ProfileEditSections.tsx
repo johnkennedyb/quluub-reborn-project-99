@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { getAllCountries, getStatesOfCountry, getCitiesOfState, ethnicities as allEthnicities } from "@/lib/data";
 import ReactSelect from "react-select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,11 @@ interface ProfileEditSectionsProps {
   user: User;
   onSave: (updatedUser: Partial<User>) => void;
   onCancel: () => void;
+}
+
+interface Location {
+  name: string;
+  isoCode?: string;
 }
 
 const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProps) => {
@@ -58,6 +64,7 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
     workEducation: user.workEducation || "",
     nationality: user.nationality || "",
     country: user.country || "",
+    state: user.state || "",
     region: user.region || "",
     ethnicity: user.ethnicity || "",
     height: user.height || "",
@@ -86,17 +93,53 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
   const [selectedTraits, setSelectedTraits] = useState<string[]>(parseTraits());
   const [selectedEthnicity, setSelectedEthnicity] = useState<string[]>(parseEthnicity());
 
+  const [countries, setCountries] = useState<Location[]>([]);
+  const [states, setStates] = useState<Location[]>([]);
+  const [cities, setCities] = useState<Location[]>([]);
+
+  const [selectedCountry, setSelectedCountry] = useState<Location | null>(null);
+  const [selectedState, setSelectedState] = useState<Location | null>(null);
+
   const handleEthnicityChange = (selectedOptions: any) => {
     if (selectedOptions.length <= 2) {
       setSelectedEthnicity(selectedOptions.map((option: any) => option.value));
     }
   };
 
-  const countries = [
-    { name: "Nigeria", cities: ["Lagos", "Abuja", "Kano"] },
-    { name: "United Kingdom", cities: ["London", "Manchester", "Birmingham"] },
-    { name: "United States", cities: ["New York", "Los Angeles", "Chicago"] },
-  ];
+  useEffect(() => {
+    const countries = getAllCountries();
+    setCountries(countries);
+
+    if (user.country) {
+      const country = countries.find(c => c.name === user.country) || null;
+      setSelectedCountry(country);
+    }
+  }, [user.country]);
+
+  useEffect(() => {
+    if (selectedCountry?.isoCode) {
+      const countryStates = getStatesOfCountry(selectedCountry.isoCode);
+      setStates(countryStates);
+      if (user.state) {
+        const state = countryStates.find(s => s.name === user.state) || null;
+        setSelectedState(state);
+      }
+    } else {
+      setStates([]);
+      setCities([]);
+    }
+  }, [selectedCountry, user.state]);
+
+  useEffect(() => {
+    if (selectedCountry?.isoCode && selectedState?.isoCode) {
+      const stateCities = getCitiesOfState(selectedCountry.isoCode, selectedState.isoCode);
+      setCities(stateCities);
+    } else {
+      setCities([]);
+    }
+  }, [selectedState]);
+
+
 
   const sections = [
     "Basic Info",
@@ -120,45 +163,8 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
     ...(user.gender === 'female' ? [{ icon: "👨‍👧", label: "Wali Details" }] : []),
   ];
 
-  const nationalityOptions = [
-    "Afghan", "Albanian", "Algerian", "American", "Andorran", "Angolan", "Antiguans", "Argentinean", "Armenian", "Australian",
-    "Austrian", "Azerbaijani", "Bahamian", "Bahraini", "Bangladeshi", "Barbadian", "Barbudans", "Batswana", "Belarusian", "Belgian",
-    "Belizean", "Beninese", "Bhutanese", "Bolivian", "Bosnian", "Brazilian", "British", "Bruneian", "Bulgarian", "Burkinabe",
-    "Burmese", "Burundian", "Cambodian", "Cameroonian", "Canadian", "Cape Verdean", "Central African", "Chadian", "Chilean", "Chinese",
-    "Colombian", "Comoran", "Congolese", "Costa Rican", "Croatian", "Cuban", "Cypriot", "Czech", "Danish", "Djibouti",
-    "Dominican", "Dutch", "East Timorese", "Ecuadorean", "Egyptian", "Emirian", "Equatorial Guinean", "Eritrean", "Estonian", "Ethiopian",
-    "Fijian", "Filipino", "Finnish", "French", "Gabonese", "Gambian", "Georgian", "German", "Ghanaian", "Greek",
-    "Grenadian", "Guatemalan", "Guinea-Bissauan", "Guinean", "Guyanese", "Haitian", "Herzegovinian", "Honduran", "Hungarian", "Icelander",
-    "Indian", "Indonesian", "Iranian", "Iraqi", "Irish", "Israeli", "Italian", "Ivorian", "Jamaican", "Japanese",
-    "Jordanian", "Kazakhstani", "Kenyan", "Kittian and Nevisian", "Kuwaiti", "Kyrgyz", "Laotian", "Latvian", "Lebanese", "Liberian",
-    "Libyan", "Liechtensteiner", "Lithuanian", "Luxembourger", "Macedonian", "Malagasy", "Malawian", "Malaysian", "Maldivan", "Malian",
-    "Maltese", "Marshallese", "Mauritanian", "Mauritian", "Mexican", "Micronesian", "Moldovan", "Monacan", "Mongolian", "Moroccan",
-    "Mosotho", "Motswana", "Mozambican", "Namibian", "Nauruan", "Nepalese", "New Zealander", "Ni-Vanuatu", "Nicaraguan", "Nigerian",
-    "Nigerien", "North Korean", "Northern Irish", "Norwegian", "Omani", "Pakistani", "Palauan", "Panamanian", "Papua New Guinean", "Paraguayan",
-    "Peruvian", "Polish", "Portuguese", "Qatari", "Romanian", "Russian", "Rwandan", "Saint Lucian", "Salvadoran", "Samoan",
-    "San Marinese", "Sao Tomean", "Saudi", "Scottish", "Senegalese", "Serbian", "Seychellois", "Sierra Leonean", "Singaporean", "Slovakian",
-    "Slovenian", "Solomon Islander", "Somali", "South African", "South Korean", "Spanish", "Sri Lankan", "Sudanese", "Surinamer", "Swazi",
-    "Swedish", "Swiss", "Syrian", "Taiwanese", "Tajik", "Tanzanian", "Thai", "Togolese", "Tongan", "Trinidadian or Tobagonian",
-    "Tunisian", "Turkish", "Tuvaluan", "Ugandan", "Ukrainian", "Uruguayan", "Uzbekistani", "Venezuelan", "Vietnamese", "Welsh",
-    "Yemenite", "Zambian", "Zimbabwean"
-  ];
-
-  const ethnicityOptions = [
-    "Afghan", "African American", "Albanian", "Algerian", "American Indian", "Arab", "Armenian", "Asian", "Australian Aboriginal",
-    "Azerbaijani", "Bangladeshi", "Basque", "Belarusian", "Bengali", "Berber", "Bosnian", "Brazilian", "Bulgarian", "Burmese",
-    "Cambodian", "Caribbean", "Catalan", "Caucasian", "Central Asian", "Cherokee", "Chinese", "Circassian", "Croatian", "Cuban",
-    "Czech", "Danish", "Dutch", "East African", "Eastern European", "Egyptian", "English", "Estonian", "Ethiopian", "European",
-    "Filipino", "Finnish", "French", "Georgian", "German", "Greek", "Gujarati", "Gypsy/Roma", "Haitian", "Han Chinese",
-    "Hispanic", "Hmong", "Hungarian", "Icelandic", "Indian", "Indigenous", "Indonesian", "Iranian", "Iraqi", "Irish",
-    "Italian", "Japanese", "Jewish", "Jordanian", "Kazakh", "Korean", "Kurdish", "Kyrgyz", "Lao", "Latin American",
-    "Latino", "Latvian", "Lebanese", "Lithuanian", "Macedonian", "Malay", "Maltese", "Maori", "Mexican", "Middle Eastern",
-    "Moldovan", "Mongolian", "Moroccan", "Native American", "Native Hawaiian", "Nepalese", "Nigerian", "Nordic", "North African", "Norwegian",
-    "Pacific Islander", "Pakistani", "Palestinian", "Persian", "Polish", "Portuguese", "Punjabi", "Romanian", "Russian", "Samoan",
-    "Scandinavian", "Scottish", "Serbian", "Sindhi", "Sinhalese", "Slavic", "Slovak", "Slovenian", "Somali", "South African",
-    "South Asian", "Southeast Asian", "Spanish", "Sri Lankan", "Sudanese", "Swedish", "Swiss", "Syrian", "Taiwanese", "Tajik",
-    "Tamil", "Thai", "Tibetan", "Turkish", "Turkmen", "Ukrainian", "Urdu", "Uzbek", "Vietnamese", "Welsh", "West African",
-    "White", "Yoruba", "Zulu"
-  ];
+  const nationalityOptions = allEthnicities.map(e => e.label);
+  const ethnicityOptions = allEthnicities.map(e => e.value);
 
   const interestOptions = [
     "Board Games", "Playing Card Games", "Fashion", "Museums", "Reading", "Tropics", "Nature Lover", "Flower Lover",
@@ -189,7 +195,8 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
       setFormData(prev => ({
         ...prev,
         [field]: value,
-        ...(field === 'country' && { region: '' }),
+        ...(field === 'country' && { state: '', region: '' }),
+        ...(field === 'state' && { region: '' }),
       }));
     }
   };
@@ -375,7 +382,14 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Country of Residence</Label>
-                <Select value={formData.country} onValueChange={(value) => handleInputChange("country", value)}>
+                <Select 
+                  value={formData.country} 
+                  onValueChange={(value) => {
+                    const country = countries.find(c => c.name === value) || null;
+                    setSelectedCountry(country);
+                    handleInputChange("country", value);
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select country" />
                   </SelectTrigger>
@@ -387,20 +401,40 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
                 </Select>
               </div>
               <div>
+                <Label>State/Province of Residence</Label>
+                <Select
+                  value={formData.state}
+                  onValueChange={(value) => {
+                    const state = states.find(s => s.name === value) || null;
+                    setSelectedState(state);
+                    handleInputChange("state", value);
+                  }}
+                  disabled={!selectedCountry || states.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select state/province" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {states.map((state) => (
+                      <SelectItem key={state.name} value={state.name}>{state.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
                 <Label>City of Residence</Label>
                 <Select
                   value={formData.region} // Using 'region' field for city
                   onValueChange={(value) => handleInputChange("region", value)}
-                  disabled={!formData.country}
+                  disabled={!selectedState || cities.length === 0}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select city" />
                   </SelectTrigger>
                   <SelectContent>
-                    {formData.country &&
-                      countries.find((c) => c.name === formData.country)?.cities.map((city) => (
-                        <SelectItem key={city} value={city}>{city}</SelectItem>
-                      ))}
+                    {cities.map((city) => (
+                      <SelectItem key={city.name} value={city.name}>{city.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -423,9 +457,11 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
                 <Label>Ethnicity</Label>
                 <ReactSelect
                   isMulti
-                  options={ethnicityOptions.map(e => ({ value: e, label: e }))}
-                  value={selectedEthnicity.map(e => ({ value: e, label: e }))}
+                  options={allEthnicities}
+                  value={allEthnicities.filter(option => selectedEthnicity.includes(option.value))}
                   onChange={handleEthnicityChange}
+                  getOptionValue={(option) => option.value}
+                  getOptionLabel={(option) => option.label}
                   placeholder="Select up to 2 ethnicities"
                 />
               </div>

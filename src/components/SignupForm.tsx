@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { getAllCountries, getStatesOfCountry, getCitiesOfState, ethnicities as allEthnicities } from "@/lib/data";
 import Select from "react-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,45 +35,17 @@ interface RegistrationData {
   dateOfBirth: Date | null;
   ethnicity: string[];
   countryOfResidence: string;
+  stateOfResidence: string;
   cityOfResidence: string;
   summary: string;
   username: string;
   gender: string;
 }
 
-const ethnicities = [
-  { value: "African", label: "African" },
-  { value: "Arab", label: "Arab" },
-  { value: "Asian", label: "Asian" },
-  { value: "Bengali", label: "Bengali" },
-  { value: "Black", label: "Black" },
-  { value: "Caribbean", label: "Caribbean" },
-  { value: "Chinese", label: "Chinese" },
-  { value: "East Asian", label: "East Asian" },
-  { value: "European", label: "European" },
-  { value: "Filipino", label: "Filipino" },
-  { value: "Hispanic/Latino", label: "Hispanic/Latino" },
-  { value: "Indian", label: "Indian" },
-  { value: "Indigenous", label: "Indigenous" },
-  { value: "Japanese", label: "Japanese" },
-  { value: "Korean", label: "Korean" },
-  { value: "Middle Eastern", label: "Middle Eastern" },
-  { value: "Mixed/Multi-ethnic", label: "Mixed/Multi-ethnic" },
-  { value: "Native American", label: "Native American" },
-  { value: "Pacific Islander", label: "Pacific Islander" },
-  { value: "South Asian", label: "South Asian" },
-  { value: "Southeast Asian", label: "Southeast Asian" },
-  { value: "Turkish", label: "Turkish" },
-  { value: "Vietnamese", label: "Vietnamese" },
-  { value: "White", label: "White" },
-  { value: "Other", label: "Other" },
-];
-
-const countries = [
-  { name: "Nigeria", cities: ["Lagos", "Abuja", "Kano"] },
-  { name: "United Kingdom", cities: ["London", "Manchester", "Birmingham"] },
-  { name: "United States", cities: ["New York", "Los Angeles", "Chicago"] },
-];
+interface Location {
+  name: string;
+  isoCode?: string;
+}
 
 const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
   const [step, setStep] = useState(1);
@@ -82,6 +55,13 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
   const [suggestedUsername, setSuggestedUsername] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
+  const [countries, setCountries] = useState<Location[]>([]);
+  const [states, setStates] = useState<Location[]>([]);
+  const [cities, setCities] = useState<Location[]>([]);
+
+  const [selectedCountry, setSelectedCountry] = useState<Location | null>(null);
+  const [selectedState, setSelectedState] = useState<Location | null>(null);
+
   const [formData, setFormData] = useState<RegistrationData>({
     email: "",
     firstName: "",
@@ -90,6 +70,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
     dateOfBirth: null,
     ethnicity: [],
     countryOfResidence: "",
+    stateOfResidence: "",
     cityOfResidence: "",
     summary: "",
     username: "",
@@ -111,6 +92,34 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
       setSuggestedUsername(`${firstPart}${randomNum}`);
     }
   }, [formData.firstName, step]);
+
+  useEffect(() => {
+    setCountries(getAllCountries());
+  }, []);
+
+  useEffect(() => {
+    if (selectedCountry?.isoCode) {
+      const countryStates = getStatesOfCountry(selectedCountry.isoCode);
+      setStates(countryStates);
+      setCities([]);
+      setSelectedState(null);
+      handleSelectChange("stateOfResidence", "");
+      handleSelectChange("cityOfResidence", "");
+    } else {
+      setStates([]);
+      setCities([]);
+    }
+  }, [selectedCountry]);
+
+  useEffect(() => {
+    if (selectedCountry?.isoCode && selectedState?.isoCode) {
+      const stateCities = getCitiesOfState(selectedCountry.isoCode, selectedState.isoCode);
+      setCities(stateCities);
+      handleSelectChange("cityOfResidence", "");
+    } else {
+      setCities([]);
+    }
+  }, [selectedState]);
 
   const generatePassword = (length: number) => {
     const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
@@ -332,7 +341,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
               <Select
                 isMulti
                 name="ethnicity"
-                options={formData.ethnicity.length >= 2 ? [] : ethnicities}
+                options={formData.ethnicity.length >= 2 ? [] : allEthnicities}
                 className="basic-multi-select"
                 classNamePrefix="select"
                 onChange={(selectedOptions) => {
@@ -340,7 +349,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                     handleSelectChange("ethnicity", selectedOptions.map(option => option.value));
                   }
                 }}
-                value={ethnicities.filter(option => formData.ethnicity.includes(option.value))}
+                value={allEthnicities.filter(option => formData.ethnicity.includes(option.value))}
                 placeholder="Select up to 2 ethnicities"
               />
             </div>
@@ -374,8 +383,9 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
               <UiSelect
                 value={formData.countryOfResidence}
                 onValueChange={(value) => {
+                  const country = countries.find(c => c.name === value) || null;
+                  setSelectedCountry(country);
                   handleSelectChange("countryOfResidence", value);
-                  handleSelectChange("cityOfResidence", ""); // Reset city on country change
                 }}
               >
                 <SelectTrigger className="w-full">
@@ -385,6 +395,50 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                   {countries.map((country) => (
                     <SelectItem key={country.name} value={country.name}>
                       {country.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </UiSelect>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="stateOfResidence">State/Province of Residence</Label>
+              <UiSelect
+                value={formData.stateOfResidence}
+                onValueChange={(value) => {
+                  const state = states.find(s => s.name === value) || null;
+                  setSelectedState(state);
+                  handleSelectChange("stateOfResidence", value);
+                }}
+                disabled={!selectedCountry || states.length === 0}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select your state/province" />
+                </SelectTrigger>
+                <SelectContent>
+                  {states.map((state) => (
+                    <SelectItem key={state.name} value={state.name}>
+                      {state.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </UiSelect>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="cityOfResidence">City of Residence</Label>
+              <UiSelect
+                value={formData.cityOfResidence}
+                onValueChange={(value) => handleSelectChange("cityOfResidence", value)}
+                disabled={!selectedState || cities.length === 0}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select your city" />
+                </SelectTrigger>
+                <SelectContent>
+                  {cities.map((city) => (
+                    <SelectItem key={city.name} value={city.name}>
+                      {city.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
