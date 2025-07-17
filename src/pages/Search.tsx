@@ -1,3 +1,4 @@
+
 import { useState , useEffect} from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,14 +33,15 @@ const Search = () => {
   const [nationality, setNationality] = useState("any");
   const [maritalStatus, setMaritalStatus] = useState("any");
   const [patternOfSalaah, setPatternOfSalaah] = useState("any");
+  const [build, setBuild] = useState("any");
+  const [appearance, setAppearance] = useState("any");
+  const [genotype, setGenotype] = useState("any");
   const [sortBy, setSortBy] = useState("newest");
   const [showHijabOnly, setShowHijabOnly] = useState(false);
   const [showBeardOnly, setShowBeardOnly] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const { user: currentUser } = useAuth();
 
-
-  
   const { toast } = useToast();
   const navigate = useNavigate();
   
@@ -49,6 +51,9 @@ const Search = () => {
     gender?: string;
     hijab?: string;
     beard?: string;
+    build?: string;
+    appearance?: string;
+    genotype?: string;
     page?: number;
   }>({});
   
@@ -66,6 +71,18 @@ const Search = () => {
     if (nationality !== "any") {
       params.nationality = nationality;
     }
+    
+    if (build !== "any") {
+      params.build = build;
+    }
+    
+    if (appearance !== "any") {
+      params.appearance = appearance;
+    }
+    
+    if (genotype !== "any") {
+      params.genotype = genotype;
+    }
 
     if (showHijabOnly) {
       params.hijab = 'Yes';
@@ -78,7 +95,7 @@ const Search = () => {
     params.page = currentPage;
 
     setFilterParams(params);
-  }, [currentUser, location, nationality, showHijabOnly, showBeardOnly, currentPage]);
+  }, [currentUser, location, nationality, showHijabOnly, showBeardOnly, currentPage, build, appearance, genotype]);
 
   const { users, page, pages, isLoading, error } = useBrowseUsers(filterParams);
   const [pendingConnections, setPendingConnections] = useState<string[]>([]);
@@ -403,6 +420,59 @@ const Search = () => {
                   </Select>
                 </div>
                 
+                {/* New filters */}
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Build</label>
+                  <Select value={build} onValueChange={setBuild}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Any build" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Any build</SelectItem>
+                      <SelectItem value="Slim">Slim</SelectItem>
+                      <SelectItem value="Athletic">Athletic</SelectItem>
+                      <SelectItem value="Average">Average</SelectItem>
+                      <SelectItem value="Curvy">Curvy</SelectItem>
+                      <SelectItem value="Large">Large</SelectItem>
+                      <SelectItem value="Muscular">Muscular</SelectItem>
+                      <SelectItem value="Petite">Petite</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Appearance</label>
+                  <Select value={appearance} onValueChange={setAppearance}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Any appearance" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Any appearance</SelectItem>
+                      <SelectItem value="Very Attractive">Very Attractive</SelectItem>
+                      <SelectItem value="Attractive">Attractive</SelectItem>
+                      <SelectItem value="Average">Average</SelectItem>
+                      <SelectItem value="Below Average">Below Average</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Genotype</label>
+                  <Select value={genotype} onValueChange={setGenotype}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Any genotype" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Any genotype</SelectItem>
+                      <SelectItem value="AA">AA</SelectItem>
+                      <SelectItem value="AS">AS</SelectItem>
+                      <SelectItem value="SS">SS</SelectItem>
+                      <SelectItem value="AC">AC</SelectItem>
+                      <SelectItem value="SC">SC</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
                     <Label htmlFor="hijab" className="text-sm font-medium">Hijab</Label>
@@ -418,8 +488,6 @@ const Search = () => {
                   </div>
                   <Switch id="beard" checked={showBeardOnly} onCheckedChange={setShowBeardOnly} disabled={currentUser?.gender !== 'female'} />
                 </div>
-
-
               </div>
             </CardContent>
           </Card>
@@ -478,7 +546,7 @@ const Search = () => {
               </Card>
             )}
 
-            {/* Pagination Controls */}
+            {/* Simplified Pagination Controls */}
             {pages && pages > 1 && (
               <div className="flex justify-center mt-6 items-center space-x-2">
                 <Button 
@@ -488,17 +556,9 @@ const Search = () => {
                 >
                   Previous
                 </Button>
-                {Array.from({ length: pages }, (_, i) => i + 1).map(pageNumber => (
-                  <Button 
-                    key={pageNumber} 
-                    onClick={() => setCurrentPage(pageNumber)}
-                    disabled={isLoading}
-                    variant={pageNumber === page ? 'default' : 'outline'}
-                  >
-                    {pageNumber}
-                  </Button>
-                ))}
-                {currentUser?.plan !== 'premium' && <AdComponent />}
+                
+                <span className="px-4">Page {page} of {pages}</span>
+                
                 <Button 
                   onClick={() => setCurrentPage(prev => prev + 1)}
                   disabled={page >= pages || isLoading}

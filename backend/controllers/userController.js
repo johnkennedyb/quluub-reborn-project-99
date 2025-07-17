@@ -121,7 +121,7 @@ exports.getBrowseUsers = async (req, res) => {
       _id: { $ne: req.user._id }, // Exclude current user
     };
     
-    // Always filter by opposite gender
+    // Always filter by opposite gender (men see women, women see men)
     filters.gender = currentUser.gender === 'male' ? 'female' : 'male';
     
     // Additional filters from query
@@ -131,6 +131,18 @@ exports.getBrowseUsers = async (req, res) => {
     
     if (req.query.nationality) {
       filters.nationality = req.query.nationality;
+    }
+
+    if (req.query.build) {
+      filters.build = req.query.build;
+    }
+
+    if (req.query.appearance) {
+      filters.appearance = req.query.appearance;
+    }
+
+    if (req.query.genotype) {
+      filters.genotype = req.query.genotype;
     }
 
     if (req.query.hijab === 'Yes') {
