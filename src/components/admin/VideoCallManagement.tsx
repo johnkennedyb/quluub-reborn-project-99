@@ -46,11 +46,11 @@ const VideoCallManagement = () => {
           </TableHeader>
           <TableBody>
             {calls && calls.length > 0 ? (
-              calls.map((call: AdminCall) => (
+              calls.map((call: AdminCall, index: number) => (
                 <TableRow key={call._id}>
                   <TableCell>{call.callerUser?.fullName || 'Unknown'}</TableCell>
                   <TableCell>{call.receiverUser?.fullName || 'Unknown'}</TableCell>
-                  <TableCell>{format(new Date(call.startTime), 'PPP p')}</TableCell>
+                  <TableCell>{format(new Date(typeof call.startTime === 'string' ? call.startTime : call.startTime.toISOString()), 'PPP p')}</TableCell>
                   <TableCell>{Math.round(call.duration / 60)} mins</TableCell>
                   <TableCell><Badge>{call.status}</Badge></TableCell>
                   <TableCell>

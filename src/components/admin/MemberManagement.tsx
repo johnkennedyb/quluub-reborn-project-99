@@ -167,11 +167,10 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
     }
   };
 
-  const sendPasswordReset = async (userId: string) => {
+  const sendPasswordReset = async (userId: string): Promise<void> => {
     try {
       await apiClient.post(`/admin/users/${userId}/password-reset`);
       toast({ title: 'Success', description: 'Password reset email sent' });
-      return true;
     } catch (error) {
       console.error('Failed to send password reset:', error);
       toast({ title: 'Error', description: 'Failed to send password reset', variant: 'destructive' });
@@ -179,7 +178,7 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
     }
   };
 
-  const sendEmail = async (userId: string, subject: string, message: string) => {
+  const sendEmail = async (userId: string, subject: string, message: string): Promise<void> => {
     try {
       await apiClient.post('/admin/emails/send', {
         recipients: [userId],
@@ -187,7 +186,6 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
         message
       });
       toast({ title: 'Success', description: 'Email sent successfully' });
-      return true;
     } catch (error) {
       console.error('Failed to send email:', error);
       toast({ title: 'Error', description: 'Failed to send email', variant: 'destructive' });
