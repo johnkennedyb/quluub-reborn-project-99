@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { useAdminData } from '@/hooks/useAdminData';
+import apiClient from '@/lib/api-client';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
 
@@ -23,7 +24,20 @@ const formSchema = z.object({
 const PushNotificationManager = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { sendPushNotification, fetchPushNotifications } = useAdminData();
+
+  const fetchPushNotifications = async () => {
+    const response = await apiClient.get('/admin/push-notifications');
+    return response.data;
+  };
+
+  const sendPushNotification = async (data: z.infer<typeof formSchema>) => {
+    const response = await apiClient.post('/admin/push-notifications', {
+      title: data.title,
+      body: data.message,
+      target: data.target
+    });
+    return response.data;
+  };
 
   const { data: notifications, isLoading } = useQuery({
     queryKey: ['pushNotifications'],
@@ -37,7 +51,7 @@ const PushNotificationManager = () => {
       queryClient.invalidateQueries({ queryKey: ['pushNotifications'] });
       form.reset();
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
     },
   });
@@ -141,8 +155,8 @@ const PushNotificationManager = () => {
                 <TableRow>
                   <TableCell colSpan={6} className="text-center">Loading history...</TableCell>
                 </TableRow>
-              ) : (
-                notifications?.map((notification: any) => (
+              ) : notifications && notifications.length > 0 ? (
+                notifications.map((notification: any) => (
                   <TableRow key={notification._id}>
                     <TableCell>{notification.title}</TableCell>
                     <TableCell>{notification.target}</TableCell>
@@ -152,6 +166,10 @@ const PushNotificationManager = () => {
                     <TableCell>{notification.failedCount}</TableCell>
                   </TableRow>
                 ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center">No notification history found.</TableCell>
+                </TableRow>
               )}
             </TableBody>
           </Table>
@@ -162,4 +180,3 @@ const PushNotificationManager = () => {
 };
 
 export default PushNotificationManager;
-

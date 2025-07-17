@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -32,7 +33,7 @@ const UserProfileCard = ({ user }) => {
           </div>
           <div>
             <h3 className="font-semibold">Plan</h3>
-            <Badge variant={user.plan === 'premium' ? 'premium' : 'secondary'}>{user.plan}</Badge>
+            <Badge variant={user.plan === 'premium' ? 'secondary' : 'outline'}>{user.plan}</Badge>
           </div>
           <div>
             <h3 className="font-semibold">Email</h3>

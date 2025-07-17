@@ -1,20 +1,19 @@
 
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAdminData } from '@/hooks/useAdminData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import UserProfileCard from './UserProfileCard';
 import { useToast } from '@/hooks/use-toast';
 import EditUserDialog from './EditUserDialog';
 import SendEmailDialog from './SendEmailDialog';
 import { Search, Edit, Trash2, User, Users, Eye, Mail } from 'lucide-react';
 import ReactSelect from 'react-select';
+import apiClient from '@/lib/api-client';
 
 interface MemberManagementProps {
   stats: any;
@@ -52,7 +51,7 @@ const cityOptions: { [key: string]: { value: string; label: string }[] } = {
 };
 
 const MemberManagement = ({ stats }: MemberManagementProps) => {
-    const [filters, setFilters] = useState<{
+  const [filters, setFilters] = useState<{
     search: string;
     gender: string;
     plan: string;
@@ -74,13 +73,53 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
     limit: 20
   });
 
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    total: 0,
+    hasNextPage: false,
+    hasPrevPage: false
+  });
+
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [userForEmail, setUserForEmail] = useState<any>(null);
 
-  const { users, loading, pagination, refetchData, deleteUser, updateUser, sendPasswordReset, sendEmail } = useAdminData(filters);
   const { toast } = useToast();
+
+  React.useEffect(() => {
+    fetchUsers();
+  }, [filters]);
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    try {
+      // Convert array filters to comma-separated strings for API
+      const apiFilters = {
+        ...filters,
+        country: filters.country.length > 0 ? filters.country.join(',') : undefined,
+        city: filters.city.length > 0 ? filters.city.join(',') : undefined
+      };
+
+      const response = await apiClient.get('/admin/users', { params: apiFilters });
+      setUsers(response.data.users);
+      setPagination({
+        currentPage: response.data.currentPage,
+        totalPages: response.data.totalPages,
+        total: response.data.total,
+        hasNextPage: response.data.hasNextPage,
+        hasPrevPage: response.data.hasPrevPage
+      });
+    } catch (error) {
+      console.error('Failed to fetch users:', error);
+      toast({ title: 'Error', description: 'Failed to load users', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleFilterChange = (key: string, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value, page: 1 }));
@@ -95,20 +134,64 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
     }
   };
 
+  const updateUser = async (userId: string, userData: any) => {
+    setLoading(true);
+    try {
+      await apiClient.put(`/admin/users/${userId}`, userData);
+      toast({ title: 'Success', description: 'User updated successfully' });
+      fetchUsers(); // Refresh the list
+    } catch (error) {
+      console.error('Failed to update user:', error);
+      toast({ title: 'Error', description: 'Failed to update user', variant: 'destructive' });
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
 
-
-  const handleDeleteUser = async (userId: string) => {
+  const deleteUser = async (userId: string) => {
     if (!confirm('Are you sure you want to permanently delete this user and all their associated data? This action cannot be undone.')) {
       return;
     }
 
+    setLoading(true);
     try {
-      await deleteUser(userId);
+      await apiClient.delete(`/admin/users/${userId}`);
       toast({ title: 'Success', description: 'User has been successfully deleted.' });
-      // refetchData is already called within the deleteUser hook on success
+      fetchUsers(); // Refresh the list
     } catch (error: any) {
       console.error('Failed to delete user:', error);
       toast({ title: 'Error', description: error.message || 'An unexpected error occurred.', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const sendPasswordReset = async (userId: string) => {
+    try {
+      await apiClient.post(`/admin/users/${userId}/password-reset`);
+      toast({ title: 'Success', description: 'Password reset email sent' });
+      return true;
+    } catch (error) {
+      console.error('Failed to send password reset:', error);
+      toast({ title: 'Error', description: 'Failed to send password reset', variant: 'destructive' });
+      throw error;
+    }
+  };
+
+  const sendEmail = async (userId: string, subject: string, message: string) => {
+    try {
+      await apiClient.post('/admin/emails/send', {
+        recipients: [userId],
+        subject,
+        message
+      });
+      toast({ title: 'Success', description: 'Email sent successfully' });
+      return true;
+    } catch (error) {
+      console.error('Failed to send email:', error);
+      toast({ title: 'Error', description: 'Failed to send email', variant: 'destructive' });
+      throw error;
     }
   };
 
@@ -153,8 +236,6 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
             </div>
             
             <div className="flex space-x-2">
-
-              
               <Link to={`/admin/user/${user._id}`}>
                 <Button size="sm" variant="outline">
                   <Eye className="h-4 w-4" />
@@ -168,7 +249,7 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
                 <Edit className="h-4 w-4" />
               </Button>
               
-              <Button size="sm" variant="destructive" onClick={() => handleDeleteUser(user._id)}>
+              <Button size="sm" variant="destructive" onClick={() => deleteUser(user._id)}>
                 <Trash2 className="h-4 w-4" />
               </Button>
 
@@ -188,7 +269,7 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
   return (
     <div className="space-y-6">
       {/* Statistics Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Members</CardTitle>
@@ -363,18 +444,13 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
         </CardContent>
       </Card>
 
-
-
       {/* Edit User Dialog */}
       {selectedUser && (
         <EditUserDialog
           user={selectedUser}
           isOpen={editDialogOpen}
           onOpenChange={setEditDialogOpen}
-          onUserUpdate={(userId, data) => {
-            updateUser(userId, data);
-            setEditDialogOpen(false);
-          }}
+          onUserUpdate={updateUser}
           sendPasswordReset={sendPasswordReset}
         />
       )}
@@ -384,10 +460,7 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
           user={userForEmail}
           isOpen={emailDialogOpen}
           onOpenChange={setEmailDialogOpen}
-          onSendEmail={async (userId, subject, message) => {
-            await sendEmail(userId, subject, message);
-            setEmailDialogOpen(false);
-          }}
+          onSendEmail={sendEmail}
         />
       )}
     </div>

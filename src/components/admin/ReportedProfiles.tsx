@@ -1,11 +1,47 @@
+
 import { useAdminData } from '@/hooks/useAdminData';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
 const ReportedProfiles = () => {
-  const { reportedProfiles: reports, loading, dismissReport, updateUserStatus } = useAdminData();
+  const { reportedProfiles: reports, loading, dismissReport } = useAdminData();
+  const { toast } = useToast();
+
+  const handleUpdateUserStatus = async (userId: string, status: string) => {
+    try {
+      // Call the API directly since updateUserStatus doesn't exist in useAdminData
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/users/${userId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        },
+        body: JSON.stringify({ status })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to update user status');
+      }
+      
+      toast({
+        title: 'Success',
+        description: `User status updated to ${status}`,
+      });
+      
+      // Refresh the reports list
+      window.location.reload();
+    } catch (error) {
+      console.error('Error updating user status:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update user status',
+        variant: 'destructive'
+      });
+    }
+  };
 
   if (loading) return <div>Loading reported profiles...</div>;
 
@@ -48,10 +84,10 @@ const ReportedProfiles = () => {
                         <Button variant="outline" size="sm" onClick={() => dismissReport(report._id)}>
                           Dismiss Report
                         </Button>
-                        <Button variant="destructive" size="sm" onClick={() => updateUserStatus(report.reported._id, 'suspended')}>
+                        <Button variant="destructive" size="sm" onClick={() => handleUpdateUserStatus(report.reported._id, 'suspended')}>
                           Suspend User
                         </Button>
-                        <Button variant="destructive" size="sm" onClick={() => updateUserStatus(report.reported._id, 'banned')}>
+                        <Button variant="destructive" size="sm" onClick={() => handleUpdateUserStatus(report.reported._id, 'banned')}>
                           Ban User
                         </Button>
                       </div>
@@ -63,8 +99,6 @@ const ReportedProfiles = () => {
           )}
         </CardContent>
       </Card>
-
-
     </div>
   );
 };

@@ -1,9 +1,25 @@
+
 import React from 'react';
 import { useAdminData } from '@/hooks/useAdminData';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
+
+interface CallUser {
+  fullName: string;
+  _id: string;
+}
+
+interface AdminCall {
+  _id: string;
+  callerUser?: CallUser;
+  receiverUser?: CallUser;
+  startTime: string;
+  duration: number;
+  status: string;
+  recordingUrl?: string;
+}
 
 const VideoCallManagement = () => {
   const { calls, loading } = useAdminData();
@@ -30,17 +46,21 @@ const VideoCallManagement = () => {
           </TableHeader>
           <TableBody>
             {calls && calls.length > 0 ? (
-              calls.map((call) => (
+              calls.map((call: AdminCall) => (
                 <TableRow key={call._id}>
-                  <TableCell>{call.caller.fullName}</TableCell>
-                  <TableCell>{call.receiver.fullName}</TableCell>
+                  <TableCell>{call.callerUser?.fullName || 'Unknown'}</TableCell>
+                  <TableCell>{call.receiverUser?.fullName || 'Unknown'}</TableCell>
                   <TableCell>{format(new Date(call.startTime), 'PPP p')}</TableCell>
                   <TableCell>{Math.round(call.duration / 60)} mins</TableCell>
                   <TableCell><Badge>{call.status}</Badge></TableCell>
                   <TableCell>
-                    <a href={call.recordingUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                      View Recording
-                    </a>
+                    {call.recordingUrl ? (
+                      <a href={call.recordingUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                        View Recording
+                      </a>
+                    ) : (
+                      "No recording"
+                    )}
                   </TableCell>
                 </TableRow>
               ))
