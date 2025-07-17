@@ -467,7 +467,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
         );
 
       case 5:
-        const selectedCountry = countries.find(c => c.name === formData.countryOfResidence);
+        const countryObj = countries.find(c => c.name === formData.countryOfResidence);
         return (
           <div className="space-y-6">
             <div className="space-y-2">
@@ -481,9 +481,9 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                   <SelectValue placeholder="Select your city" />
                 </SelectTrigger>
                 <SelectContent>
-                  {selectedCountry && selectedCountry.cities.map((city) => (
-                    <SelectItem key={city} value={city}>
-                      {city}
+                  {cities.map((city) => (
+                    <SelectItem key={city.name} value={city.name}>
+                      {city.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

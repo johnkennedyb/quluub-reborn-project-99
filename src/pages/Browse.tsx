@@ -45,10 +45,14 @@ const Browse = () => {
   const { user } = useAuth();
 
   useEffect(() => {
-    const fetchUsers = async () => {
+const fetchUsers = async () => {
       try {
         setLoading(true);
-        const fetchedUsers = await userService.getBrowseUsers({ showAll: true });
+        const gender = user?.gender === 'male' ? 'female' : 'male';
+        const fetchedUsers = await userService.getBrowseUsers({ 
+          showAll: true, 
+          genderFilter: gender 
+        });
         console.log("Browse users:", fetchedUsers);
         if (fetchedUsers && fetchedUsers.length > 0) {
           setUsers(fetchedUsers);

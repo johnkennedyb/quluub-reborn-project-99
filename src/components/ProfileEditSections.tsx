@@ -33,7 +33,11 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
 
   const parseEthnicity = () => {
     try {
-      return Array.isArray(parseJsonField(user.ethnicity)) ? parseJsonField(user.ethnicity) : [];
+      if (Array.isArray(user.ethnicity)) {
+        return user.ethnicity;
+      }
+      const parsed = parseJsonField(user.ethnicity);
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }
@@ -66,7 +70,7 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
     country: user.country || "",
     state: user.state || "",
     region: user.region || "",
-    ethnicity: user.ethnicity || "",
+    ethnicity: Array.isArray(user.ethnicity) ? user.ethnicity : [],
     height: user.height || "",
     weight: user.weight || "",
     build: user.build || "",
@@ -222,7 +226,7 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
       ...formData,
       interests: JSON.stringify(selectedInterests),
       traits: JSON.stringify(selectedTraits),
-      ethnicity: JSON.stringify(selectedEthnicity),
+      ethnicity: selectedEthnicity,
       waliDetails: JSON.stringify(formData.waliDetails),
     };
 
