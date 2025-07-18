@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { isPremiumUser } from "@/utils/premiumUtils";
 
 const Browse = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -321,7 +322,7 @@ const Browse = () => {
                   </div>
                 );
 
-                if (user?.plan !== 'premium' && (index + 1) % 5 === 0 && (index + 1) < currentUsers.length) {
+                if (!isPremiumUser(currentUser) && (index + 1) % 5 === 0 && (index + 1) < currentUsers.length) {
                   acc.push(
                     <div key={`ad-${index}`} className="sm:col-span-2 lg:col-span-4 my-4">
                       <AdComponent />
@@ -333,36 +334,25 @@ const Browse = () => {
               }, [] as JSX.Element[])}
             </div>
             
-            <Pagination className="mt-6">
-              <PaginationContent>
-                <PaginationItem>
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
-                    onClick={goToPrevPage} 
-                    disabled={currentPage === 1}
-                    className="cursor-pointer"
-                  >
-                    <PaginationPrevious />
-                  </Button>
-                </PaginationItem>
-                <PaginationItem className="flex items-center px-4">
-                  Page {currentPage} of {totalPages}
-                </PaginationItem>
-
-                <PaginationItem>
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
-                    onClick={goToNextPage} 
-                    disabled={currentPage === totalPages}
-                    className="cursor-pointer"
-                  >
-                    <PaginationNext />
-                  </Button>
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
+            <div className="flex justify-center mt-6 items-center space-x-4">
+              <Button 
+                onClick={goToPrevPage} 
+                disabled={currentPage === 1}
+                variant="outline"
+              >
+                Previous
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button 
+                onClick={goToNextPage} 
+                disabled={currentPage === totalPages}
+                variant="outline"
+              >
+                Next
+              </Button>
+            </div>
           </>
         ) : (
           <Card>

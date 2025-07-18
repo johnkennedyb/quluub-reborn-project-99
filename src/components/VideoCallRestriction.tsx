@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Crown, Video, Clock } from 'lucide-react';
 import { User } from '@/types/user';
+import { isPremiumUser } from '@/utils/premiumUtils';
 
 interface VideoCallRestrictionProps {
   user: User;
@@ -15,7 +16,7 @@ const VideoCallRestriction = ({ user, onStartCall }: VideoCallRestrictionProps) 
   const [callInProgress, setCallInProgress] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(5 * 60); // 5 minutes in seconds
   
-  const isPremium = user.plan === 'premium';
+  const isPremium = isPremiumUser(user);
   
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);

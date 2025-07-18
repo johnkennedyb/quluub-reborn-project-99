@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Heart, X, Star, User, MessageSquare } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import { formatDistanceToNow } from "date-fns";
 
 interface MatchCardProps {
   name: string;
@@ -18,6 +19,7 @@ interface MatchCardProps {
   summary?: string;
   matchDate?: string;
   bio?: string;
+  lastSeen?: Date | string;
   onLike?: () => void;
   onPass?: () => void;
   onMessage?: () => void;
@@ -40,6 +42,7 @@ const MatchCard = ({
   summary,
   matchDate,
   bio,
+  lastSeen,
   onLike, 
   onPass, 
   onMessage,
@@ -117,6 +120,11 @@ const MatchCard = ({
             </h3>
           </Link>
           <p className="text-sm text-muted-foreground">{age} • {location}</p>
+          {lastSeen && (
+            <p className="text-xs text-muted-foreground">
+              Last seen {formatDistanceToNow(new Date(lastSeen), { addSuffix: true })}
+            </p>
+          )}
         </div>
 
         {tags.length > 0 && (
@@ -179,14 +187,6 @@ const MatchCard = ({
               Message
             </Button>
           )}
-          
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleHide}
-          >
-            <X className="h-4 w-4" />
-          </Button>
         </div>
       </CardContent>
     </Card>

@@ -1,19 +1,21 @@
-
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAdminData } from '@/hooks/useAdminData';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
+import { adminService } from "@/lib/api-client";
+import { isPremiumUser, getPlanDisplayName } from "@/utils/premiumUtils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import UserProfileCard from './UserProfileCard';
-import { useToast } from '@/hooks/use-toast';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import EditUserDialog from './EditUserDialog';
 import SendEmailDialog from './SendEmailDialog';
-import { Search, Edit, Trash2, User, Users, Eye, Mail } from 'lucide-react';
+import { Search, Edit, Trash2, Users, Eye, Mail } from 'lucide-react';
 import ReactSelect from 'react-select';
 
 interface MemberManagementProps {
@@ -129,8 +131,8 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
                 <Badge variant={user.gender === 'male' ? 'default' : 'secondary'}>
                   {user.gender}
                 </Badge>
-                <Badge variant={user.plan === 'premium' ? 'default' : 'outline'}>
-                  {user.plan}
+                <Badge variant={isPremiumUser(user) ? 'default' : 'outline'}>
+                  {getPlanDisplayName(user.plan)}
                 </Badge>
                 <Badge variant={user.status === 'active' ? 'default' : 'destructive'}>
                   {user.status}

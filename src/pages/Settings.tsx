@@ -11,10 +11,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/contexts/AuthContext";
 import { userService } from "@/lib/api-client";
 import { paymentService } from "@/lib/api-client";
+import { isPremiumUser, getPlanDisplayName } from "@/utils/premiumUtils";
 
 const Settings = () => {
   const { user, updateUser } = useAuth();
-  const [isPro, setIsPro] = useState(user?.plan === 'premium');
+  const [isPro, setIsPro] = useState(isPremiumUser(user));
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -30,8 +31,17 @@ const Settings = () => {
   const [applyReferralCode, setApplyReferralCode] = useState("");
   const [isLoadingPayment, setIsLoadingPayment] = useState(false);
   const [isUpgrading, setIsUpgrading] = useState(false);
+  const [isCheckingPayment, setIsCheckingPayment] = useState(false);
   const { toast } = useToast();
-  const [currency, setCurrency] = useState<'GBP' | 'NGN'>(user?.country === 'Nigeria' ? 'NGN' : 'GBP');
+  // Automatically detect currency based on user's country
+  const getUserCurrency = () => {
+    if (user?.country === 'Nigeria') {
+      return 'NGN';
+    }
+    return 'GBP'; // Default to GBP for UK and other countries
+  };
+  
+  const [currency] = useState<'GBP' | 'NGN'>(getUserCurrency());
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   const pricing = {
@@ -49,7 +59,169 @@ const Settings = () => {
 
   useEffect(() => {
     fetchReferralStats();
+    checkPaymentSuccess();
   }, []);
+
+  // Check for payment success and refresh user status
+  const checkPaymentSuccess = async () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const paymentSuccess = urlParams.get('payment_success');
+    const provider = urlParams.get('provider');
+    const reference = urlParams.get('trxref') || urlParams.get('reference'); // Paystack reference
+    
+    if (paymentSuccess === 'true') {
+      setIsCheckingPayment(true);
+      
+      // Show immediate success popup
+      toast({
+        title: "🎉 Payment Successful!",
+        description: `Your ${provider === 'stripe' ? 'Stripe' : 'Paystack'} payment was successful. Processing your upgrade...`,
+        variant: "default",
+        duration: 4000,
+      });
+      
+      // Clean up URL parameters immediately to prevent re-processing
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      // Try multiple attempts to verify payment with increasing delays
+      let attempts = 0;
+      const maxAttempts = 5;
+      const baseDelay = 2000; // Start with 2 seconds
+      
+      const attemptVerification = async () => {
+        attempts++;
+        console.log(`Payment verification attempt ${attempts}/${maxAttempts}`);
+        
+        try {
+          // First try to refresh user data
+          const response = await fetch(`${import.meta.env.VITE_API_URL}/auth/profile`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          
+          if (response.ok) {
+            const updatedUser = await response.json();
+            
+            // Check if user is already upgraded to premium
+            if (updatedUser.plan === 'premium') {
+              updateUser(updatedUser);
+              setIsPro(isPremiumUser(updatedUser));
+              setIsCheckingPayment(false);
+              
+              // Show premium upgrade confirmation
+              toast({
+                title: "🚀 Welcome to Premium!",
+                description: "Congratulations! You now have access to all premium features: unlimited requests, ad-free browsing, video calling, and more!",
+                variant: "default",
+                duration: 8000,
+              });
+              return true; // Success
+            }
+          }
+          
+          // If webhook hasn't processed yet, try manual verification
+          if (provider && reference) {
+            const manualResult = await tryManualVerification(provider, reference);
+            if (manualResult) {
+              setIsCheckingPayment(false);
+              return true; // Success
+            }
+          }
+          
+          // If not successful and we have more attempts, try again
+          if (attempts < maxAttempts) {
+            const delay = baseDelay * attempts; // Exponential backoff
+            console.log(`Retrying in ${delay}ms...`);
+            setTimeout(attemptVerification, delay);
+          } else {
+            // All attempts failed
+            setIsCheckingPayment(false);
+            toast({
+              title: "⚠️ Payment Processing",
+              description: "Your payment was successful, but the upgrade is taking longer than expected. Please refresh the page in a few minutes or contact support if the issue persists.",
+              variant: "destructive",
+              duration: 10000,
+            });
+          }
+          
+        } catch (error) {
+          console.error(`Payment verification attempt ${attempts} failed:`, error);
+          
+          if (attempts < maxAttempts) {
+            const delay = baseDelay * attempts;
+            setTimeout(attemptVerification, delay);
+          } else {
+            setIsCheckingPayment(false);
+            toast({
+              title: "❌ Verification Error",
+              description: "There was an error verifying your payment. Please refresh the page or contact support.",
+              variant: "destructive",
+              duration: 10000,
+            });
+          }
+        }
+        
+        return false; // Not successful yet
+      };
+      
+      // Start the verification process
+      attemptVerification();
+    }
+  };
+
+  // Manual payment verification fallback
+  const tryManualVerification = async (provider, reference) => {
+    if (provider === 'paystack' && reference) {
+      try {
+        console.log('Attempting manual payment verification for Paystack...');
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/payments/verify-and-upgrade`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            provider: 'paystack',
+            reference: reference
+          })
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            // Refresh user data
+            const userResponse = await fetch(`${import.meta.env.VITE_API_URL}/auth/profile`, {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              }
+            });
+            
+            if (userResponse.ok) {
+              const updatedUser = await userResponse.json();
+              updateUser(updatedUser);
+              setIsPro(isPremiumUser(updatedUser));
+              
+              toast({
+                title: "🚀 Welcome to Premium!",
+                description: "Payment verified! You now have access to all premium features!",
+                variant: "default",
+                duration: 8000,
+              });
+              return true; // Success
+            }
+          }
+        } else {
+          console.error('Manual verification failed');
+        }
+      } catch (error) {
+        console.error('Error in manual payment verification:', error);
+      }
+    }
+    
+    // For Stripe, we don't have manual verification, so just return false
+    return false;
+  };
 
   const fetchReferralStats = async () => {
     try {
@@ -254,7 +426,7 @@ const Settings = () => {
 
   const handleHideProfile = async () => {
     try {
-      const updatedUser = await userService.updateProfile({ hidden: !user?.hidden });
+      const updatedUser = await userService.updateProfile(user?._id || '', { hidden: !user?.hidden });
       updateUser(updatedUser);
       toast({
         title: updatedUser.hidden ? "Profile Hidden" : "Profile Visible",
@@ -315,6 +487,19 @@ const Settings = () => {
         </Alert>
         
         <h1 className="text-2xl font-bold mb-6">Settings</h1>
+        
+        {/* Payment Processing Banner */}
+        {isCheckingPayment && (
+          <div className="mb-6 p-4 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg">
+            <div className="flex items-center gap-3">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-green-600"></div>
+              <div>
+                <h3 className="font-semibold text-green-800">🎉 Payment Successful!</h3>
+                <p className="text-green-700 text-sm">We're upgrading you to Premium now. This will take just a moment...</p>
+              </div>
+            </div>
+          </div>
+        )}
         
         <div className="space-y-6">
           {/* Referral System */}
@@ -378,8 +563,10 @@ const Settings = () => {
                   Manage My Plan
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant={currency === 'GBP' ? 'default' : 'outline'} size="sm" onClick={() => setCurrency('GBP')}>GBP</Button>
-                  <Button variant={currency === 'NGN' ? 'default' : 'outline'} size="sm" onClick={() => setCurrency('NGN')}>NGN</Button>
+                  <Badge variant="secondary">{currency}</Badge>
+                  <span className="text-sm text-muted-foreground">
+                    {currency === 'NGN' ? 'Nigeria' : 'International'}
+                  </span>
                 </div>
               </CardTitle>
             </CardHeader>
@@ -484,9 +671,9 @@ const Settings = () => {
                       <Button 
                         className="w-full bg-primary hover:bg-primary/90" 
                         onClick={() => handleUpgrade('premium', pricing[currency].premium, currency)}
-                        disabled={isUpgrading}
+                        disabled={isUpgrading || isCheckingPayment}
                       >
-                        {isUpgrading ? "Processing..." : "Upgrade to Premium"}
+                        {isCheckingPayment ? "Verifying Payment..." : isUpgrading ? "Processing..." : "Upgrade to Premium"}
                       </Button>
                     ) : (
                       <Button 

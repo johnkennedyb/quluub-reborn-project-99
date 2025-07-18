@@ -141,6 +141,18 @@ exports.getBrowseUsers = async (req, res) => {
       filters.beard = 'Yes';
     }
     
+    if (req.query.build) {
+      filters.build = req.query.build;
+    }
+    
+    if (req.query.appearance) {
+      filters.appearance = req.query.appearance;
+    }
+    
+    if (req.query.genotype) {
+      filters.genotype = req.query.genotype;
+    }
+    
     console.log("Applying filters:", filters);
     
     // Allow pagination for large datasets
@@ -291,6 +303,58 @@ exports.getFavorites = async (req, res) => {
     res.json({ favorites: user.favorites || [] });
   } catch (error) {
     console.error("Get favorites error:", error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Delete user account
+// @route   DELETE /api/users/account
+// @access  Private
+exports.deleteAccount = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    
+    console.log(`Deleting account for user ${userId}`);
+    
+    // Start a transaction to ensure all related data is deleted
+    const session = await User.startSession();
+    session.startTransaction();
+    
+    try {
+      // Import required models
+      const Relationship = require('../models/Relationship');
+      const Chat = require('../models/Chat');
+      const Notification = require('../models/Notification');
+      const Payment = require('../models/Payment');
+      const Subscription = require('../models/Subscription');
+      const UserActivityLog = require('../models/UserActivityLog');
+      
+      // Delete all related data
+      await Relationship.deleteMany({ $or: [{ user1: userId }, { user2: userId }] }, { session });
+      await Chat.deleteMany({ participants: userId }, { session });
+      await Notification.deleteMany({ recipient: userId }, { session });
+      await Payment.deleteMany({ user: userId }, { session });
+      await Subscription.deleteMany({ user: userId }, { session });
+      await UserActivityLog.deleteMany({ user: userId }, { session });
+      
+      // Finally, delete the user account
+      await User.deleteOne({ _id: userId }, { session });
+      
+      // Commit the transaction
+      await session.commitTransaction();
+      
+      console.log(`Successfully deleted account for user ${userId}`);
+      
+      res.json({ message: 'Account and all associated data have been successfully deleted.' });
+    } catch (error) {
+      // Rollback the transaction on error
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  } catch (error) {
+    console.error('Delete account error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };

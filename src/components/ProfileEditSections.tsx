@@ -33,7 +33,12 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
 
   const parseEthnicity = () => {
     try {
-      return Array.isArray(parseJsonField(user.ethnicity)) ? parseJsonField(user.ethnicity) : [];
+      // Handle both string and array types for ethnicity
+      if (Array.isArray(user.ethnicity)) {
+        return user.ethnicity;
+      }
+      const parsed = parseJsonField(user.ethnicity as string);
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }
@@ -41,7 +46,8 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
 
   const parseTraits = () => {
     try {
-      return Array.isArray(parseJsonField(user.traits)) ? parseJsonField(user.traits) : [];
+      const parsed = parseJsonField(user.traits);
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }
@@ -166,12 +172,32 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
   const nationalityOptions = allEthnicities.map(e => e.label);
   const ethnicityOptions = allEthnicities.map(e => e.value);
 
+  // Comprehensive Interest Categories
+  const recreationalInterests = [
+    "🎲 Board Games", "🃏 Playing Card Games", "👗 Fashion", "🏛️ Museums", "📚 Reading", 
+    "🌴 Tropics", "🪴 Nature Lover", "💐 Flower Lover", "🐱 Cat Lover", "🏔️ Mountain Lover", 
+    "🌅 Sunrise Lover", "🌄 Sunset Lover", "🌌 Star Lover"
+  ];
+
+  const foodTravelInterests = [
+    "🥭 Mango", "🥑 Avocado", "🥔 Potato", "🌶️ Spice", "🥩 Steak", "🍜 Ramen", 
+    "🍣 Sushi", "🍦 Ice Cream", "🍫 Chocolate", "☕ Coffee", "🫖 Tea", "🧋 Bubble Tea", 
+    "🍵 Matcha", "🏝️ Beaches", "🏛️ Architecture", "🕋 Umrah", "⛺ Camping", "🎡 Fun Fairs", 
+    "🎢 Theme Parks", "🚄 Bullet Train", "🚢 Cruises", "🛩️ Jetsetter", "🪂 Skydiving"
+  ];
+
+  const sportsRelaxationInterests = [
+    "🎆 Fireworks", "🏆 Competitions", "⚽ Football", "🏀 Basketball", "🏉 Rugby", 
+    "🏈 American Football", "⚾ Baseball", "🎳 Bowling", "🏏 Cricket", "🏒 Ice Hockey", 
+    "🏓 Ping Pong", "🏸 Badminton", "🥊 Boxing", "🥋 Jiu Jitsu", "🏌️ Golf", 
+    "⛸️ Ice Skating", "🎮 Gaming", "🎨 Painting", "🪡 Sewing", "🛍️ Shopping"
+  ];
+
+  // Combined interest options for easy selection
   const interestOptions = [
-    "Reading", "Traveling", "Cooking", "Sports", "Music", 
-    "Art", "Photography", "Gaming", "Gardening", "Writing",
-    "Hiking", "Fitness", "Movies", "Technology", "Fashion",
-    "Volunteering", "Dancing", "Camping", "Foodie", "History",
-    "Animals", "Cars", "DIY", "Board Games", "Podcasts"
+    ...recreationalInterests,
+    ...foodTravelInterests,
+    ...sportsRelaxationInterests
   ];
 
   const traitOptions = [
@@ -221,7 +247,7 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
       ...formData,
       interests: JSON.stringify(selectedInterests),
       traits: JSON.stringify(selectedTraits),
-      ethnicity: JSON.stringify(selectedEthnicity),
+      ethnicity: selectedEthnicity, // Keep as array for User type compatibility
       waliDetails: JSON.stringify(formData.waliDetails),
     };
 
@@ -286,7 +312,7 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
     const heights = [];
     for (let ft = 4; ft <= 7; ft++) {
       for (let inch = 0; inch < 12; inch++) {
-        if (ft === 7 && inch === 0) break; // Stop before 7ft 0in if needed
+        if (ft === 7 && inch > 11) break; // Stop after 7ft 11in
         heights.push(`${ft}ft ${inch}in`);
       }
     }
@@ -306,7 +332,7 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
       case 0: // Basic Info
         return (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="kunya">Nickname / Kunya</Label>
                 <Input
@@ -352,7 +378,7 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
                 </Popover>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label>Marital Status</Label>
                 <Select value={formData.maritalStatus} onValueChange={(value) => handleInputChange("maritalStatus", value)}>
@@ -408,7 +434,7 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
       case 1: // Location and Ethnicity
         return (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label>Country of Residence</Label>
                 <Select 
@@ -468,7 +494,7 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
                 </Select>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label>Nationality</Label>
                 <Select value={formData.nationality} onValueChange={(value) => handleInputChange("nationality", value)}>
@@ -616,19 +642,72 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
 
       case 4: // Interests
         return (
-          <div>
-            <Label>Interests</Label>
-            <div className="flex flex-wrap gap-2">
-              {interestOptions.map((interest) => (
-                <Badge
-                  key={interest}
-                  variant={selectedInterests.includes(interest) ? "default" : "secondary"}
-                  onClick={() => toggleInterest(interest)}
-                  className="cursor-pointer"
-                >
-                  {interest}
-                </Badge>
-              ))}
+          <div className="space-y-6">
+            <div>
+              <Label className="text-lg font-semibold">Select Your Interests</Label>
+              <p className="text-sm text-muted-foreground mt-1">Choose activities that appeal to you (select multiple)</p>
+            </div>
+            
+            {/* Recreational Activities */}
+            <div className="space-y-3">
+              <h3 className="font-medium text-base flex items-center gap-2">
+                🎯 Recreational Activities
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {recreationalInterests.map((interest) => (
+                  <Badge
+                    key={interest}
+                    variant={selectedInterests.includes(interest) ? "default" : "secondary"}
+                    onClick={() => toggleInterest(interest)}
+                    className="cursor-pointer hover:scale-105 transition-transform"
+                  >
+                    {interest}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            {/* Food and Travel */}
+            <div className="space-y-3">
+              <h3 className="font-medium text-base flex items-center gap-2">
+                🍽️ Food and Travel
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {foodTravelInterests.map((interest) => (
+                  <Badge
+                    key={interest}
+                    variant={selectedInterests.includes(interest) ? "default" : "secondary"}
+                    onClick={() => toggleInterest(interest)}
+                    className="cursor-pointer hover:scale-105 transition-transform"
+                  >
+                    {interest}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            {/* Sports and Relaxation */}
+            <div className="space-y-3">
+              <h3 className="font-medium text-base flex items-center gap-2">
+                🏃‍♂️ Sports and Relaxation
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {sportsRelaxationInterests.map((interest) => (
+                  <Badge
+                    key={interest}
+                    variant={selectedInterests.includes(interest) ? "default" : "secondary"}
+                    onClick={() => toggleInterest(interest)}
+                    className="cursor-pointer hover:scale-105 transition-transform"
+                  >
+                    {interest}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            {/* Selected Count */}
+            <div className="text-sm text-muted-foreground">
+              Selected: {selectedInterests.length} interest{selectedInterests.length !== 1 ? 's' : ''}
             </div>
           </div>
         );
@@ -681,7 +760,7 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
       case 6: // Deen
         return (
           <div className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label>Pattern of Salaah</Label>
                 <Select value={formData.patternOfSalaah} onValueChange={(value) => handleInputChange("patternOfSalaah", value)}>
@@ -768,48 +847,89 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <aside className="w-64 bg-white p-6 border-r flex flex-col justify-between">
-        <div>
-          <h2 className="text-2xl font-bold mb-8 text-primary">Quluub</h2>
-          <nav className="space-y-2">
+    <div className="min-h-screen bg-gray-50">
+      {/* Mobile Navigation */}
+      <div className="lg:hidden bg-white border-b">
+        <div className="p-4">
+          <h2 className="text-xl font-bold text-primary mb-4">Quluub</h2>
+          <div className="flex overflow-x-auto space-x-2 pb-2">
             {sidebarItems.map((item, index) => (
               <Button
                 key={item.label}
                 variant={currentSection === index ? "secondary" : "ghost"}
-                className="w-full justify-start"
+                className="flex-shrink-0 text-xs px-3 py-2"
                 onClick={() => setCurrentSection(index)}
               >
-                <span className="mr-2">{item.icon}</span>
+                <span className="mr-1">{item.icon}</span>
                 {item.label}
               </Button>
             ))}
-          </nav>
+          </div>
         </div>
-        <div className="space-y-2">
-          <Button onClick={handleSave} className="w-full">Save Changes</Button>
-          <Button variant="outline" onClick={onCancel} className="w-full">Cancel</Button>
-        </div>
-      </aside>
-      <main className="flex-1 p-6 overflow-y-auto">
-        <Card>
-          <CardHeader>
-            <CardTitle>{sections[currentSection]}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {renderSection()}
-          </CardContent>
-        </Card>
-        <div className="flex justify-between mt-6">
-          <Button onClick={() => setCurrentSection(s => Math.max(0, s - 1))} disabled={currentSection === 0}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Previous
-          </Button>
+      </div>
 
-          <Button onClick={() => setCurrentSection(s => Math.min(sections.length - 1, s + 1))} disabled={currentSection === sections.length - 1}>
-            Next <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
-        </div>
-      </main>
+      <div className="lg:flex lg:h-screen">
+        {/* Desktop Sidebar */}
+        <aside className="hidden lg:flex lg:w-64 bg-white p-6 border-r flex-col justify-between">
+          <div>
+            <h2 className="text-2xl font-bold mb-8 text-primary">Quluub</h2>
+            <nav className="space-y-2">
+              {sidebarItems.map((item, index) => (
+                <Button
+                  key={item.label}
+                  variant={currentSection === index ? "secondary" : "ghost"}
+                  className="w-full justify-start"
+                  onClick={() => setCurrentSection(index)}
+                >
+                  <span className="mr-2">{item.icon}</span>
+                  {item.label}
+                </Button>
+              ))}
+            </nav>
+          </div>
+          <div className="space-y-2">
+            <Button onClick={handleSave} className="w-full">Save Changes</Button>
+            <Button variant="outline" onClick={onCancel} className="w-full">Cancel</Button>
+          </div>
+        </aside>
+
+        {/* Main Content */}
+        <main className="flex-1 p-4 lg:p-6 lg:overflow-y-auto">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg lg:text-xl">{sections[currentSection]}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {renderSection()}
+            </CardContent>
+          </Card>
+          
+          {/* Navigation Buttons */}
+          <div className="flex justify-between mt-6 gap-4">
+            <Button 
+              onClick={() => setCurrentSection(s => Math.max(0, s - 1))} 
+              disabled={currentSection === 0}
+              className="flex-1 lg:flex-none"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" /> Previous
+            </Button>
+
+            <Button 
+              onClick={() => setCurrentSection(s => Math.min(sections.length - 1, s + 1))} 
+              disabled={currentSection === sections.length - 1}
+              className="flex-1 lg:flex-none"
+            >
+              Next <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Mobile Save/Cancel Buttons */}
+          <div className="lg:hidden space-y-2 mt-6">
+            <Button onClick={handleSave} className="w-full">Save Changes</Button>
+            <Button variant="outline" onClick={onCancel} className="w-full">Cancel</Button>
+          </div>
+        </main>
+      </div>
     </div>
   );
 };

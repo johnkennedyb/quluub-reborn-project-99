@@ -7,7 +7,10 @@ import {
 } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { format } from 'date-fns';
+import { isPremiumUser, getPlanDisplayName } from "@/utils/premiumUtils";
 
 interface ViewProfileDialogProps {
   user: any;
@@ -38,7 +41,7 @@ const ViewProfileDialog = ({ user, isOpen, onOpenChange }: ViewProfileDialogProp
             </div>
             <div className="flex flex-wrap justify-center gap-2">
                 <Badge variant={user.gender === 'male' ? 'default' : 'secondary'}>{user.gender}</Badge>
-                <Badge variant={user.plan === 'premium' || user.plan === 'pro' ? 'default' : 'outline'}>{user.plan}</Badge>
+                <Badge variant={isPremiumUser(user) ? 'default' : 'outline'}>{getPlanDisplayName(user.plan)}</Badge>
                 <Badge variant={user.status === 'active' ? 'default' : 'destructive'}>{user.status}</Badge>
                 {user.hidden && <Badge variant="destructive">Hidden</Badge>}
             </div>

@@ -467,52 +467,9 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
           </div>
         );
 
+
+
       case 5:
-        const selectedCountry = countries.find(c => c.name === formData.countryOfResidence);
-        return (
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="cityOfResidence">City of Residence</Label>
-              <UiSelect
-                value={formData.cityOfResidence}
-                onValueChange={(value) => handleSelectChange("cityOfResidence", value)}
-                disabled={!formData.countryOfResidence}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select your city" />
-                </SelectTrigger>
-                <SelectContent>
-                  {selectedCountry && selectedCountry.cities.map((city) => (
-                    <SelectItem key={city} value={city}>
-                      {city}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </UiSelect>
-            </div>
-
-            <div className="flex justify-between">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handlePrevStep}
-                className="flex items-center gap-1"
-              >
-                <ChevronLeft className="h-4 w-4" /> Previous
-              </Button>
-              <Button
-                type="button"
-                onClick={handleNextStep}
-                disabled={!formData.cityOfResidence}
-                className="flex items-center gap-1"
-              >
-                Next <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        );
-
-      case 6:
         return (
           <div className="space-y-6">
             <div className="space-y-2">
@@ -617,7 +574,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
           </div>
         );
 
-      case 7: // Changed from 8
+      case 6: // Final step - Registration Summary
         return (
           <div className="space-y-6">
             <div className="rounded-lg border p-4 space-y-4">
@@ -690,7 +647,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
     }
   };
   
-  const totalSteps = 7; // Total number of steps
+  const totalSteps = 6; // Total number of steps
 
   return (
     <>

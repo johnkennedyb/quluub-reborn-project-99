@@ -42,8 +42,8 @@ const createCheckoutSession = async (req, res) => {
         userId: userId,
         plan: plan || 'premium', // Default to premium if not provided
       },
-      success_url: `${process.env.CLIENT_URL}/profile?payment_success=true`,
-      cancel_url: `${process.env.CLIENT_URL}/profile?payment_canceled=true`,
+      success_url: `${process.env.CLIENT_URL}/settings?payment_success=true&provider=stripe`,
+      cancel_url: `${process.env.CLIENT_URL}/settings?payment_canceled=true`,
     });
 
     res.json({ id: session.id, url: session.url });
@@ -57,11 +57,19 @@ const createCheckoutSession = async (req, res) => {
 // @route   POST /api/payments/webhook
 // @access  Public
 const handleStripeWebhook = async (req, res) => {
+  console.log('Stripe webhook received:', req.headers['stripe-signature'] ? 'with signature' : 'without signature');
+  
   const sig = req.headers['stripe-signature'];
   let event;
 
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    // Check if webhook secret is configured
+    if (!process.env.STRIPE_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET === 'whsec_YOUR_STRIPE_WEBHOOK_SECRET_HERE') {
+      console.warn('Stripe webhook secret not configured, skipping signature verification');
+      event = req.body;
+    } else {
+      event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    }
   } catch (err) {
     console.error(`Webhook signature verification failed.`, err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
@@ -70,21 +78,36 @@ const handleStripeWebhook = async (req, res) => {
   // Handle the event
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object;
+    console.log('Processing checkout.session.completed:', JSON.stringify(session, null, 2));
     const { userId, plan } = session.metadata;
     const subscriptionId = session.subscription;
+    console.log(`User ID: ${userId}, Plan: ${plan}, Subscription ID: ${subscriptionId}`);
 
     try {
       const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+      console.log('Retrieved subscription from Stripe:', JSON.stringify(subscription, null, 2));
       const user = await User.findById(userId);
       if (user) {
-        user.subscription.status = 'active';
-        user.subscription.plan = plan;
-        user.subscription.stripeSubscriptionId = subscriptionId;
-        user.subscription.stripeCustomerId = session.customer;
-        user.subscription.currentPeriodEnd = new Date(subscription.current_period_end * 1000);
+        console.log(`Found user: ${user.email}, current plan: ${user.plan}`);
+        // Immediately upgrade user to premium
+        user.plan = 'premium';
+        user.premiumExpirationDate = new Date(subscription.current_period_end * 1000);
+        
+        // Update subscription details if subscription field exists
+        if (user.subscription) {
+          user.subscription.status = 'active';
+          user.subscription.plan = plan;
+          user.subscription.stripeSubscriptionId = subscriptionId;
+          user.subscription.stripeCustomerId = session.customer;
+          user.subscription.currentPeriodEnd = new Date(subscription.current_period_end * 1000);
+        }
+        
+        console.log('User object before saving:', JSON.stringify(user, null, 2));
         await user.save();
-        console.log(`Successfully updated subscription for user ${userId}`);
+        console.log(`Successfully upgraded user ${userId} to premium plan`);
         sendPlanPurchasedEmail(user.email, user.fname);
+      } else {
+        console.error(`User with ID ${userId} not found.`);
       }
     } catch (error) {
       console.error('Error in checkout.session.completed:', error);
@@ -107,9 +130,17 @@ const handleStripeWebhook = async (req, res) => {
     try {
       const user = await User.findOne({ 'subscription.stripeCustomerId': customerId });
       if (user) {
-        user.subscription.status = 'expired';
+        // Downgrade user from premium
+        user.plan = 'freemium';
+        user.premiumExpirationDate = null;
+        
+        // Update subscription details if subscription field exists
+        if (user.subscription) {
+          user.subscription.status = 'expired';
+        }
+        
         await user.save();
-        console.log(`Subscription expired for user ${user.email}`);
+        console.log(`Subscription expired for user ${user.email}, downgraded to freemium`);
         sendPlanExpiredEmail(user.email, user.fname);
       }
     } catch (error) {
@@ -161,6 +192,7 @@ const createPaystackPayment = async (req, res) => {
       {
         email: user.email,
         amount: amount,
+        callback_url: `${process.env.CLIENT_URL}/settings?payment_success=true&provider=paystack`,
         metadata: {
           user_id: userId,
           plan: plan,
@@ -183,38 +215,114 @@ const createPaystackPayment = async (req, res) => {
 };
 
 const handlePaystackWebhook = async (req, res) => {
+  console.log('Paystack webhook received:', JSON.stringify(req.body, null, 2));
+  console.log('Paystack webhook headers:', req.headers);
+  
   const secret = process.env.PAYSTACK_SECRET_API_KEY;
   const hash = crypto.createHmac('sha512', secret).update(JSON.stringify(req.body)).digest('hex');
 
   if (hash !== req.headers['x-paystack-signature']) {
     console.error('Paystack webhook signature verification failed.');
+    console.error('Expected hash:', hash);
+    console.error('Received signature:', req.headers['x-paystack-signature']);
     return res.status(400).send('Webhook Error: Invalid signature');
   }
 
   const event = req.body;
+  console.log('Processing Paystack event:', event.event);
 
   if (event.event === 'charge.success') {
     const { email } = event.data.customer;
-    const { plan } = event.data.metadata;
+    const { plan, user_id } = event.data.metadata;
+    console.log(`Processing charge.success for email: ${email}, user_id: ${user_id}, plan: ${plan}`);
 
     try {
-      const user = await User.findOne({ email });
+      const user = await User.findById(user_id);
       if (user) {
-        user.plan = plan;
-        const expirationDate = new Date();
-        expirationDate.setDate(expirationDate.getDate() + 30);
-        user.premiumExpirationDate = expirationDate;
+        console.log(`Found user: ${user.email}, current plan: ${user.plan}`);
         
+        // Immediately upgrade user to premium
+        user.plan = 'premium';
+        const expirationDate = new Date();
+        expirationDate.setMonth(expirationDate.getMonth() + 1); // Set to 1 month from now
+        user.premiumExpirationDate = expirationDate;
+
+        console.log('User object before saving:', JSON.stringify(user, null, 2));
         await user.save();
-        console.log(`Successfully updated plan for user ${user.email} to ${plan}`);
-        sendPlanPurchasedEmail(user.email, user.fname, plan);
+        console.log(`Successfully upgraded user ${user.email} to premium plan, expires: ${expirationDate}`);
+        sendPlanPurchasedEmail(user.email, user.fname);
+      } else {
+        console.error(`User not found with ID: ${user_id}`);
       }
     } catch (error) {
       console.error('Error in Paystack charge.success webhook:', error);
     }
+  } else {
+    console.log(`Ignoring Paystack event: ${event.event}`);
   }
 
   res.sendStatus(200);
+};
+
+// Manual payment verification endpoint (fallback if webhook fails)
+const verifyPaymentAndUpgrade = async (req, res) => {
+  const userId = req.user.id;
+  const { provider, reference } = req.body;
+  
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    let paymentVerified = false;
+
+    if (provider === 'paystack' && reference) {
+      // Verify Paystack payment
+      try {
+        const response = await axios.get(
+          `https://api.paystack.co/transaction/verify/${reference}`,
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.PAYSTACK_SECRET_API_KEY}`,
+            },
+          }
+        );
+        
+        if (response.data.status && response.data.data.status === 'success') {
+          paymentVerified = true;
+          console.log(`Paystack payment verified for user ${userId}, reference: ${reference}`);
+        }
+      } catch (error) {
+        console.error('Error verifying Paystack payment:', error);
+      }
+    }
+
+    if (paymentVerified) {
+      // Upgrade user to premium
+      user.plan = 'premium';
+      const expirationDate = new Date();
+      expirationDate.setMonth(expirationDate.getMonth() + 1);
+      user.premiumExpirationDate = expirationDate;
+      
+      await user.save();
+      console.log(`Manually upgraded user ${user.email} to premium after payment verification`);
+      
+      res.json({ 
+        success: true, 
+        message: 'Payment verified and user upgraded to premium',
+        user: {
+          plan: user.plan,
+          premiumExpirationDate: user.premiumExpirationDate
+        }
+      });
+    } else {
+      res.status(400).json({ message: 'Payment verification failed' });
+    }
+  } catch (error) {
+    console.error('Error in manual payment verification:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
 };
 
 module.exports = { 
@@ -222,6 +330,7 @@ module.exports = {
   handleStripeWebhook, 
   createPaystackPayment,
   handlePaystackWebhook,
-  getAllPayments, 
-  processRefund 
+  getAllPayments,
+  processRefund,
+  verifyPaymentAndUpgrade
 };

@@ -185,7 +185,7 @@ function App() {
 
         {/* User routes */}
         <Route path="/dashboard" element={<PrivateRoute element={<Dashboard />} />} />
-        <Route path="/search" element={<PrivateRoute element={<Browse />} />} />
+        <Route path="/search" element={<PrivateRoute element={<Search />} />} />
         <Route path="/messages" element={<PrivateRoute element={<Messages />} />} />
         <Route path="/profile" element={<PrivateRoute element={<Profile />} />} />
         <Route path="/profile/:userId" element={<PrivateRoute element={<Profile />} />} />

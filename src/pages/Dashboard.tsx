@@ -638,15 +638,6 @@ const Dashboard = () => {
               <UserIcon className="h-6 w-6 text-primary" />
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="flex items-center justify-between p-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Profile Views</p>
-                <p className="text-2xl font-bold">{stats.profileViews}</p>
-              </div>
-              <UserIcon className="h-6 w-6 text-primary" />
-            </CardContent>
-          </Card>
         </div>
         
         {/* Advertisement Section */}

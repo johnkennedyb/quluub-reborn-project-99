@@ -3,11 +3,13 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { chatService } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { ArrowLeft, Video, Send, ExternalLink } from "lucide-react";
+import { ArrowLeft, Video, Send, ExternalLink, Crown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import apiClient from "@/lib/api-client";
 import socket from "@/lib/socket";
+import { zoomService } from "@/lib/zoom-service";
+import { isPremiumUser, hasFeatureAccess, getUpgradeMessage, PREMIUM_FEATURES } from "@/utils/premiumUtils";
 
 interface Message {
   _id: string;
@@ -37,27 +39,39 @@ const Messages = () => {
 
   // Helper function to render message content with clickable links
   const renderMessageContent = (message: string) => {
-    // Check if message contains video call link (updated for Jitsi)
-    const videoCallRegex = /📹 Video call invitation: Join me at (https?:\/\/meet\.jit\.si\/[^\s]+)/;
-    const match = message.match(videoCallRegex);
+    // Check if message contains Zoom video call invitation
+    const zoomCallRegex = /📹 Video call invitation: ([^\n]+)[\s\S]*?Join the meeting: (https?:\/\/[^\s]+)/;
+    const zoomMatch = message.match(zoomCallRegex);
     
-    if (match) {
-      const url = match[1];
+    if (zoomMatch) {
+      const topic = zoomMatch[1];
+      const joinUrl = zoomMatch[2];
+      const passwordMatch = message.match(/Meeting Password: ([^\n]+)/);
+      const meetingIdMatch = message.match(/Meeting ID: ([^\n]+)/);
+      
       return (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-blue-600">
-            <Video className="h-4 w-4" />
-            <span className="font-medium">Video Call Invitation</span>
+        <div className="space-y-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="flex items-center gap-2 text-blue-700">
+            <Video className="h-5 w-5" />
+            <span className="font-semibold">Zoom Video Call Invitation</span>
+            <Crown className="h-4 w-4 text-yellow-500" />
+          </div>
+          <div className="text-sm text-gray-700">
+            <p className="font-medium">{topic}</p>
+            {meetingIdMatch && <p>Meeting ID: {meetingIdMatch[1]}</p>}
+            {passwordMatch && <p>Password: {passwordMatch[1]}</p>}
           </div>
           <Button
-            onClick={() => window.open(url, '_blank')}
-            variant="outline"
+            onClick={() => window.open(joinUrl, '_blank')}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white gap-2"
             size="sm"
-            className="w-full text-left justify-start gap-2"
           >
             <ExternalLink className="h-4 w-4" />
-            Join Video Call
+            Join Zoom Meeting
           </Button>
+          <p className="text-xs text-gray-500 text-center">
+            Premium Feature • Powered by Zoom
+          </p>
         </div>
       );
     }
@@ -215,38 +229,63 @@ const Messages = () => {
       return;
     }
     
-    try {
-      setCallStatus('calling');
-      console.log('Initiating video call with recipient:', recipientId);
-      
-      const response = await apiClient.post('/video-call/initiate', {
-        recipientId: recipientId
-      });
-      
-      console.log('Video call initiated:', response.data);
-      
+    // Check if user has video call access
+    if (!hasFeatureAccess(user, 'VIDEO_CALLS')) {
       toast({
-        title: "Call Initiated",
-        description: "Video call link sent in chat. You can also join directly.",
-      });
-      
-      // Navigate to video call page or open Jitsi directly
-      if (response.data.jitsiRoomUrl) {
-        // Open Jitsi directly in a new tab
-        window.open(response.data.jitsiRoomUrl, '_blank');
-      } else {
-        // Fallback to internal video call page
-        navigate(`/video-call?room=${response.data.roomId}`);
-      }
-      
-    } catch (error: any) {
-      console.error('Error initiating video call:', error);
-      setCallStatus('idle');
-      toast({
-        title: "Call Failed",
-        description: error.response?.data?.message || "Failed to initiate video call",
+        title: "Premium Feature",
+        description: getUpgradeMessage('VIDEO_CALLS'),
         variant: "destructive",
       });
+      // Redirect to upgrade page
+      navigate('/upgrade');
+      return;
+    }
+    
+    try {
+      setCallStatus('calling');
+      console.log('Initiating Zoom video call with recipient:', recipientId);
+      
+      // Create Zoom meeting
+      const meetingData = await zoomService.createMeeting({
+        topic: `Quluub Video Call - ${new Date().toLocaleDateString()}`,
+        duration: 60,
+        waiting_room: true,
+        join_before_host: false
+      });
+      
+      console.log('Zoom meeting created:', meetingData);
+      
+      // Send video call invitation via chat
+      await zoomService.sendVideoCallInvitation(conversationId!, meetingData);
+      
+      toast({
+        title: "Video Call Initiated",
+        description: "Zoom meeting created and invitation sent in chat. You can join directly or wait for the other person.",
+      });
+      
+      // Open Zoom meeting directly for the host
+      window.open(meetingData.start_url, '_blank');
+      
+      setCallStatus('idle');
+      
+    } catch (error: any) {
+      console.error('Error initiating Zoom video call:', error);
+      setCallStatus('idle');
+      
+      if (error.response?.data?.requiresUpgrade) {
+        toast({
+          title: "Premium Required",
+          description: error.response.data.message,
+          variant: "destructive",
+        });
+        navigate('/upgrade');
+      } else {
+        toast({
+          title: "Call Failed",
+          description: error.response?.data?.message || "Failed to initiate video call",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -298,11 +337,22 @@ const Messages = () => {
               variant="ghost" 
               size="icon" 
               onClick={startVideoCall}
-              className="text-green-600 hover:text-green-700 hover:bg-green-50"
-              title="Start Video Call"
+              className={`${isPremiumUser(user) 
+                ? 'text-green-600 hover:text-green-700 hover:bg-green-50' 
+                : 'text-gray-400 hover:text-yellow-600 hover:bg-yellow-50'
+              }`}
+              title={isPremiumUser(user) 
+                ? 'Start Zoom Video Call' 
+                : 'Video Calls - Premium Feature'
+              }
               disabled={!recipientId || callStatus === 'calling'}
             >
-              <Video className="h-5 w-5" />
+              <div className="relative">
+                <Video className="h-5 w-5" />
+                {!isPremiumUser(user) && (
+                  <Crown className="h-3 w-3 text-yellow-500 absolute -top-1 -right-1" />
+                )}
+              </div>
             </Button>
           </div>
         </div>

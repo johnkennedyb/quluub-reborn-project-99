@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { createCheckoutSession, handleStripeWebhook, createPaystackPayment, handlePaystackWebhook } = require('../controllers/paymentController');
+const { createCheckoutSession, handleStripeWebhook, createPaystackPayment, handlePaystackWebhook, verifyPaymentAndUpgrade } = require('../controllers/paymentController');
 const { protect } = require('../middlewares/auth');
 
 // @route   POST /api/payments/create-checkout-session
@@ -22,5 +22,10 @@ router.post('/create-paystack-payment', protect, createPaystackPayment);
 // @desc    Handle Paystack webhooks
 // @access  Public
 router.post('/paystack-webhook', handlePaystackWebhook);
+
+// @route   POST /api/payments/verify-and-upgrade
+// @desc    Manual payment verification and upgrade (fallback)
+// @access  Private
+router.post('/verify-and-upgrade', protect, verifyPaymentAndUpgrade);
 
 module.exports = router;

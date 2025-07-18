@@ -9,7 +9,8 @@ const {
   addToFavorites,
   removeFromFavorites,
   getFavorites,
-  getProfileViewsCount
+  getProfileViewsCount,
+  deleteAccount
 } = require('../controllers/userController');
 const { protect } = require('../middlewares/auth');
 
@@ -32,5 +33,8 @@ router.post('/upgrade-plan', upgradePlan);
 router.post('/favorites/:userId', protect, addToFavorites);
 router.delete('/favorites/:userId', protect, removeFromFavorites);
 router.get('/favorites', protect, getFavorites);
+
+// Account management routes
+router.delete('/account', protect, deleteAccount);
 
 module.exports = router;

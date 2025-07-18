@@ -2,11 +2,14 @@ import React, { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import Navbar from "@/components/Navbar";
 import MatchCard from "@/components/MatchCard";
+import AdComponent from "@/components/AdComponent";
 import { relationshipService } from "@/lib/api-client";
 import { useToast } from "@/components/ui/use-toast";
 import { User } from "@/types/user";
 import { useNavigate } from "react-router-dom";
 import { calculateAge } from "@/utils/dataUtils";
+import { useAuth } from "@/contexts/AuthContext";
+import { isPremiumUser } from "@/utils/premiumUtils";
 
 interface MatchesResponse {
   count: number;
@@ -24,6 +27,7 @@ const Matches = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
 
   useEffect(() => {
     const fetchMatches = async () => {
@@ -102,21 +106,40 @@ const Matches = () => {
           </div>
         ) : matches.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {matches.map((match) => (
-              <div key={match._id}>
-                <MatchCard 
-                  name={`${match.fname} ${match.lname}`}
-                  age={calculateAge(match.dob?.toString()) || 0}
-                  location={match.country || "Location not specified"}
-                  photoUrl=""
-                  matchDate={match.relationship?.createdAt ? formatMatchDate(match.relationship.createdAt) : "Recently"}
-                  tags={extractInterests(match)}
-                  bio={match.summary || "No summary provided"}
-                  onChat={() => handleStartChat(match._id!)}
-                  userId={match._id || ''}
-                />
-              </div>
-            ))}
+            {(() => {
+              const items: JSX.Element[] = [];
+              
+              matches.forEach((match, index) => {
+                // Add match card
+                items.push(
+                  <div key={match._id}>
+                    <MatchCard 
+                      name={`${match.fname} ${match.lname}`}
+                      age={calculateAge(match.dob?.toString()) || 0}
+                      location={match.country || "Location not specified"}
+                      photoUrl=""
+                      matchDate={match.relationship?.createdAt ? formatMatchDate(match.relationship.createdAt) : "Recently"}
+                      tags={extractInterests(match)}
+                      bio={match.summary || "No summary provided"}
+                      lastSeen={match.lastSeen}
+                      onChat={() => handleStartChat(match._id!)}
+                      userId={match._id || ''}
+                    />
+                  </div>
+                );
+                
+                // Add ad card after every 5 matches (only for non-premium users)
+                if (!isPremiumUser(currentUser) && (index + 1) % 5 === 0 && (index + 1) < matches.length) {
+                  items.push(
+                    <div key={`ad-${index}`} className="col-span-1">
+                      <AdComponent />
+                    </div>
+                  );
+                }
+              });
+              
+              return items;
+            })()}
           </div>
         ) : (
           <Card>

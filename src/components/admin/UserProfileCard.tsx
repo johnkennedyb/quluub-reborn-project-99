@@ -2,6 +2,9 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Button } from "@/components/ui/button";
+import { User } from "@/types/user";
+import { isPremiumUser, getPlanDisplayName } from "@/utils/premiumUtils";
 
 const UserProfileCard = ({ user }) => {
   if (!user) return null;
@@ -32,7 +35,7 @@ const UserProfileCard = ({ user }) => {
           </div>
           <div>
             <h3 className="font-semibold">Plan</h3>
-            <Badge variant={user.plan === 'premium' ? 'premium' : 'secondary'}>{user.plan}</Badge>
+            <Badge variant={isPremiumUser(user) ? 'default' : 'outline'}>{getPlanDisplayName(user.plan)}</Badge>
           </div>
           <div>
             <h3 className="font-semibold">Email</h3>

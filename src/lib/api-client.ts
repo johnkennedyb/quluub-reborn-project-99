@@ -181,7 +181,13 @@ export const userService = {
       console.error('Get profile views count error:', error);
       throw error;
     }
-  }
+  },
+
+  deleteAccount: async () => {
+    const response = await apiClient.delete('/users/account');
+    console.log('🗑️ Delete account response:', response);
+    return response;
+  },
 };
 
 // Relationship service

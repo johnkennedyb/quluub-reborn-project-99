@@ -88,6 +88,7 @@ app.use('/api/referrals', referralRoutes);
 app.use('/api/relationships', relationshipRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/video-call', videoCallRoutes);
+app.use('/api/zoom', require('./routes/zoomRoutes'));
 
 app.use(notFound);
 app.use(errorHandler);

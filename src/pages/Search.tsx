@@ -19,6 +19,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { relationshipService } from "@/lib/api-client";
 import { userService } from "@/lib/api-client"; // ensure this is imported
 import AdComponent from '@/components/AdComponent';
+import { isPremiumUser } from "@/utils/premiumUtils";
 
 import { useToast } from "@/components/ui/use-toast";
 import { User } from "@/types/user";
@@ -35,6 +36,9 @@ const Search = () => {
   const [sortBy, setSortBy] = useState("newest");
   const [showHijabOnly, setShowHijabOnly] = useState(false);
   const [showBeardOnly, setShowBeardOnly] = useState(false);
+  const [build, setBuild] = useState("any");
+  const [facialAppearance, setFacialAppearance] = useState("any");
+  const [genotype, setGenotype] = useState("any");
   const [currentPage, setCurrentPage] = useState(1);
   const { user: currentUser } = useAuth();
 
@@ -67,6 +71,18 @@ const Search = () => {
       params.nationality = nationality;
     }
 
+    if (build !== "any") {
+      params.build = build;
+    }
+
+    if (facialAppearance !== "any") {
+      params.appearance = facialAppearance;
+    }
+
+    if (genotype !== "any") {
+      params.genotype = genotype;
+    }
+
     if (showHijabOnly) {
       params.hijab = 'Yes';
     }
@@ -78,7 +94,7 @@ const Search = () => {
     params.page = currentPage;
 
     setFilterParams(params);
-  }, [currentUser, location, nationality, showHijabOnly, showBeardOnly, currentPage]);
+  }, [currentUser, location, nationality, build, facialAppearance, genotype, showHijabOnly, showBeardOnly, currentPage]);
 
   const { users, page, pages, isLoading, error } = useBrowseUsers(filterParams);
   const [pendingConnections, setPendingConnections] = useState<string[]>([]);
@@ -403,6 +419,60 @@ const Search = () => {
                   </Select>
                 </div>
                 
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Build</label>
+                  <Select value={build} onValueChange={setBuild}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Any build" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Any build</SelectItem>
+                      <SelectItem value="Slim">Slim</SelectItem>
+                      <SelectItem value="Average">Average</SelectItem>
+                      <SelectItem value="Athletic">Athletic</SelectItem>
+                      <SelectItem value="Muscular">Muscular</SelectItem>
+                      <SelectItem value="Curvy">Curvy</SelectItem>
+                      <SelectItem value="Heavy">Heavy</SelectItem>
+                      <SelectItem value="Plus Size">Plus Size</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Facial Appearance</label>
+                  <Select value={facialAppearance} onValueChange={setFacialAppearance}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Any appearance" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Any appearance</SelectItem>
+                      <SelectItem value="Very Fair">Very Fair</SelectItem>
+                      <SelectItem value="Fair">Fair</SelectItem>
+                      <SelectItem value="Medium">Medium</SelectItem>
+                      <SelectItem value="Dark">Dark</SelectItem>
+                      <SelectItem value="Very Dark">Very Dark</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Genotype</label>
+                  <Select value={genotype} onValueChange={setGenotype}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Any genotype" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="any">Any genotype</SelectItem>
+                      <SelectItem value="AA">AA</SelectItem>
+                      <SelectItem value="AS">AS</SelectItem>
+                      <SelectItem value="AC">AC</SelectItem>
+                      <SelectItem value="SS">SS</SelectItem>
+                      <SelectItem value="SC">SC</SelectItem>
+                      <SelectItem value="CC">CC</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
                     <Label htmlFor="hijab" className="text-sm font-medium">Hijab</Label>
@@ -440,35 +510,55 @@ const Search = () => {
               </Card>
             ) : sortedUsers.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {sortedUsers.map((user) => {
-                  const age = calculateAge(user.dob) || 0;
+                {(() => {
+                  const items: JSX.Element[] = [];
+                  let profileCount = 0;
                   
-                  if (age < ageRange[0] || age > ageRange[1]) {
-                    return null;
-                  }
+                  sortedUsers.forEach((user, index) => {
+                    const age = calculateAge(user.dob) || 0;
+                    
+                    if (age < ageRange[0] || age > ageRange[1]) {
+                      return;
+                    }
+                    
+                    // Add profile card
+                    items.push(
+                      <MatchCard 
+                        key={user._id}
+                        name={`${user.fname} ${user.lname}`}
+                        username={user.username}
+                        age={age}
+                        location={user.country || "Location not specified"}
+                        summary={user.summary}
+                        matchPercentage={Math.floor(Math.random() * 30) + 70}
+                        tags={extractTags(user)}
+                        userId={user._id}
+                        lastSeen={user.lastSeen}
+                        isFavorited={favorites.includes(user._id!)}
+                        onFavorite={() =>
+                          favorites.includes(user._id!)
+                            ? handleRemoveFromFavorites(user._id!)
+                            : handleAddToFavorites(user._id!)
+                        }
+                        onSendRequest={() => handleSendRequest(user._id!)}
+                        onPass={() => handlePass(user._id!)}
+                      />
+                    );
+                    
+                    profileCount++;
+                    
+                    // Add ad card after every 5 profiles (only for non-premium users)
+                    if (profileCount % 5 === 0 && !isPremiumUser(currentUser)) {
+                      items.push(
+                        <div key={`ad-${profileCount}`} className="col-span-1">
+                          <AdComponent />
+                        </div>
+                      );
+                    }
+                  });
                   
-                  return (
-                    <MatchCard 
-                      key={user._id}
-                      name={`${user.fname} ${user.lname}`}
-                      username={user.username}
-                      age={age}
-                      location={user.country || "Location not specified"}
-                      summary={user.summary}
-                      matchPercentage={Math.floor(Math.random() * 30) + 70}
-                      tags={extractTags(user)}
-                      userId={user._id}
-                      isFavorited={favorites.includes(user._id!)}
-                      onFavorite={() =>
-                        favorites.includes(user._id!)
-                          ? handleRemoveFromFavorites(user._id!)
-                          : handleAddToFavorites(user._id!)
-                      }
-                      onSendRequest={() => handleSendRequest(user._id!)}
-                      onPass={() => handlePass(user._id!)}
-                    />
-                  );
-                })}
+                  return items;
+                })()}
               </div>
             ) : (
               <Card>
@@ -480,7 +570,7 @@ const Search = () => {
 
             {/* Pagination Controls */}
             {pages && pages > 1 && (
-              <div className="flex justify-center mt-6 items-center space-x-2">
+              <div className="flex justify-center mt-6 items-center space-x-4">
                 <Button 
                   onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                   disabled={page <= 1 || isLoading}
@@ -488,17 +578,9 @@ const Search = () => {
                 >
                   Previous
                 </Button>
-                {Array.from({ length: pages }, (_, i) => i + 1).map(pageNumber => (
-                  <Button 
-                    key={pageNumber} 
-                    onClick={() => setCurrentPage(pageNumber)}
-                    disabled={isLoading}
-                    variant={pageNumber === page ? 'default' : 'outline'}
-                  >
-                    {pageNumber}
-                  </Button>
-                ))}
-                {currentUser?.plan !== 'premium' && <AdComponent />}
+                <span className="text-sm text-muted-foreground">
+                  Page {page} of {pages}
+                </span>
                 <Button 
                   onClick={() => setCurrentPage(prev => prev + 1)}
                   disabled={page >= pages || isLoading}
@@ -506,6 +588,11 @@ const Search = () => {
                 >
                   Next
                 </Button>
+              </div>
+            )}
+            {!isPremiumUser(currentUser) && (
+              <div className="flex justify-center mt-4">
+                <AdComponent />
               </div>
             )}
           </div>
