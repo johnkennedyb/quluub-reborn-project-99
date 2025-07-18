@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
@@ -45,14 +44,10 @@ const Browse = () => {
   const { user } = useAuth();
 
   useEffect(() => {
-const fetchUsers = async () => {
+    const fetchUsers = async () => {
       try {
         setLoading(true);
-        const gender = user?.gender === 'male' ? 'female' : 'male';
-        const fetchedUsers = await userService.getBrowseUsers({ 
-          showAll: true, 
-          genderFilter: gender 
-        });
+        const fetchedUsers = await userService.getBrowseUsers({ showAll: true });
         console.log("Browse users:", fetchedUsers);
         if (fetchedUsers && fetchedUsers.length > 0) {
           setUsers(fetchedUsers);
@@ -115,12 +110,6 @@ const fetchUsers = async () => {
   useEffect(() => {
     let result = [...users];
     
-    // Filter by gender - men only see women, women only see men
-    if (user && user.gender) {
-      const oppositeGender = user.gender === 'male' ? 'female' : 'male';
-      result = result.filter(user => user.gender === oppositeGender);
-    }
-    
     if (countryFilter) {
       result = result.filter(user => user.country === countryFilter);
     }
@@ -138,7 +127,7 @@ const fetchUsers = async () => {
     setFilteredUsers(result);
     setTotalPages(Math.ceil(result.length / usersPerPage));
     setCurrentPage(1); // Reset to first page when filters change
-  }, [countryFilter, searchQuery, users, usersPerPage, user]);
+  }, [countryFilter, searchQuery, users, usersPerPage]);
 
   const handleLike = async (userId: string) => {
     if (processingAction) return;
@@ -164,6 +153,14 @@ const fetchUsers = async () => {
     } finally {
       setProcessingAction(false);
     }
+  };
+
+  const handleSkip = (userId: string) => {
+    // In a real app, you might want to track skipped users
+    toast({
+      title: "Skipped",
+      description: "You've skipped this profile",
+    });
   };
 
   const handleMessage = (userId: string) => {
@@ -282,6 +279,15 @@ const fetchUsers = async () => {
                         variant="outline"
                         size="icon"
                         className="h-10 w-10 rounded-full"
+                        onClick={() => handleSkip(user._id || user.id || '')}
+                        disabled={processingAction}
+                      >
+                        <X className="h-5 w-5 text-red-500" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-10 w-10 rounded-full"
                         onClick={() => handleToggleFavorite(user._id || user.id || '')}
                         disabled={processingAction}
                       >
@@ -313,8 +319,7 @@ const fetchUsers = async () => {
                   </div>
                 );
 
-                // Add advertisement after every 5 profiles
-                if ((index + 1) % 5 === 0 && (index + 1) < currentUsers.length) {
+                if (user?.plan !== 'premium' && (index + 1) % 5 === 0 && (index + 1) < currentUsers.length) {
                   acc.push(
                     <div key={`ad-${index}`} className="sm:col-span-2 lg:col-span-4 my-4">
                       <AdComponent />
@@ -326,28 +331,32 @@ const fetchUsers = async () => {
               }, [] as JSX.Element[])}
             </div>
             
-            {/* Simplified pagination with just Prev/Next buttons */}
             <Pagination className="mt-6">
               <PaginationContent>
                 <PaginationItem>
                   <Button 
                     variant="outline" 
+                    size="icon" 
                     onClick={goToPrevPage} 
                     disabled={currentPage === 1}
+                    className="cursor-pointer"
                   >
-                    Previous
+                    <PaginationPrevious />
                   </Button>
                 </PaginationItem>
                 <PaginationItem className="flex items-center px-4">
                   Page {currentPage} of {totalPages}
                 </PaginationItem>
+
                 <PaginationItem>
                   <Button 
                     variant="outline" 
+                    size="icon" 
                     onClick={goToNextPage} 
                     disabled={currentPage === totalPages}
+                    className="cursor-pointer"
                   >
-                    Next
+                    <PaginationNext />
                   </Button>
                 </PaginationItem>
               </PaginationContent>

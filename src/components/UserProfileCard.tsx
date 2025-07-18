@@ -71,7 +71,7 @@ export const UserProfileCard = ({ user, onView, onLike, onMessage }: UserProfile
             {user.status}
           </Badge>
         </div>
-        <p className="text-xs text-muted-foreground">Last seen: {lastSeen}</p>
+        <p className="text-xs text-muted-foreground">Last active: {lastSeen}</p>
       </CardHeader>
       
       <CardContent className="p-4">

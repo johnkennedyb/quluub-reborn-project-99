@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from 'react';
+import { useAdminData } from '@/hooks/useAdminData';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
   Table,
@@ -13,28 +13,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { DollarSign, CreditCard, RefreshCw } from 'lucide-react';
-import apiClient from '@/lib/api-client';
-import { useToast } from '@/hooks/use-toast';
 
 const PaymentHistory = () => {
-  const [payments, setPayments] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
-
-  useEffect(() => {
-    const fetchPayments = async () => {
-      try {
-        const response = await apiClient.get('/admin/payments');
-        setPayments(response.data);
-      } catch (error) {
-        console.error('Error fetching payments:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchPayments();
-  }, []);
+  const { payments, loading, processRefund } = useAdminData();
 
   const getStatusVariant = (status: string): 'default' | 'destructive' | 'secondary' | 'outline' => {
     switch (status) {
@@ -53,26 +34,7 @@ const PaymentHistory = () => {
 
   const handleRefund = async (paymentId: string) => {
     if (confirm('Are you sure you want to process this refund?')) {
-      setLoading(true);
-      try {
-        await apiClient.post(`/admin/payments/${paymentId}/refund`);
-        toast({
-          title: 'Refund Processed',
-          description: 'The payment has been refunded successfully.',
-        });
-        // Refresh payment list
-        const response = await apiClient.get('/admin/payments');
-        setPayments(response.data);
-      } catch (error) {
-        console.error('Error processing refund:', error);
-        toast({
-          title: 'Refund Failed',
-          description: 'There was an error processing the refund.',
-          variant: 'destructive',
-        });
-      } finally {
-        setLoading(false);
-      }
+      await processRefund(paymentId);
     }
   };
 
@@ -103,7 +65,7 @@ const PaymentHistory = () => {
             </TableHeader>
             <TableBody>
               {payments.length > 0 ? (
-                payments.map((payment: any) => (
+                payments.map((payment) => (
                   <TableRow key={payment._id}>
                     <TableCell>
                       <div className="font-medium">{payment.user.fname} {payment.user.lname}</div>
