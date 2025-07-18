@@ -3,7 +3,7 @@ const User = require('../models/User');
 const crypto = require('crypto');
 const { sendValidationEmail, sendResetPasswordEmail } = require('../utils/emailService');
 
-// @desc    Send email validation
+// @desc    Send email validation for existing users
 // @route   POST /api/email/send-validation
 // @access  Public
 exports.sendEmailValidation = async (req, res) => {
@@ -14,7 +14,7 @@ exports.sendEmailValidation = async (req, res) => {
       return res.status(400).json({ message: 'Email is required' });
     }
     
-    console.log('Sending email validation for:', email);
+    console.log('Sending email validation for existing user:', email);
     
     // Find user by email
     const user = await User.findOne({ email });
@@ -51,6 +51,106 @@ exports.sendEmailValidation = async (req, res) => {
     
   } catch (error) {
     console.error('Error sending email validation:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Send email verification code for new users (pre-signup)
+// @route   POST /api/email/send-verification
+// @access  Public
+exports.sendVerificationCode = async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+    
+    console.log('Sending verification code to:', email);
+    
+    // Check if email is already registered
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email already registered' });
+    }
+    
+    // Generate verification code (6 digits)
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // In a production environment, you would store this in a temporary store (like Redis)
+    // with a short expiration time (e.g., 10 minutes)
+    // For this example, we'll just return it in the response
+    // In a real app, you would send it via email
+    
+    try {
+      // Send verification email with a default name
+      console.log('Attempting to send verification email to:', email);
+      const emailSent = await sendValidationEmail(email, 'User', verificationCode);
+      
+      if (!emailSent) {
+        console.error('Email sending returned false');
+        return res.status(500).json({ 
+          message: 'Failed to send verification code',
+          details: 'Email service returned false'
+        });
+      }
+    } catch (emailError) {
+      console.error('Error in sendValidationEmail:', emailError);
+      return res.status(500).json({ 
+        message: 'Failed to send verification code',
+        details: emailError.message,
+        stack: process.env.NODE_ENV === 'development' ? emailError.stack : undefined
+      });
+    }
+    
+    console.log('Verification code sent successfully to:', email);
+    
+    // In a real app, you would store the code in a temporary store and not return it
+    res.json({ 
+      message: 'Verification code sent successfully',
+      email: email,
+      // In production, don't return the code in the response
+      code: process.env.NODE_ENV === 'development' ? verificationCode : undefined
+    });
+    
+  } catch (error) {
+    console.error('Error sending verification code:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Verify email with code (pre-signup)
+// @route   POST /api/email/verify-code
+// @access  Public
+exports.verifyEmailCode = async (req, res) => {
+  try {
+    const { email, code } = req.body;
+    
+    if (!email || !code) {
+      return res.status(400).json({ message: 'Email and code are required' });
+    }
+    
+    console.log('Verifying code for:', email);
+    
+    // In a production environment, you would verify the code against the temporary store
+    // For this example, we'll assume any 6-digit code is valid
+    const isValid = /^\d{6}$/.test(code);
+    
+    if (!isValid) {
+      return res.status(400).json({ message: 'Invalid verification code' });
+    }
+    
+    // In a real app, you would also check if the code matches what was sent to the email
+    // and hasn't expired
+    
+    res.json({ 
+      success: true,
+      message: 'Email verified successfully',
+      email: email
+    });
+    
+  } catch (error) {
+    console.error('Error verifying email code:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };

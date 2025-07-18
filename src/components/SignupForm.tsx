@@ -4,7 +4,7 @@ import Select from "react-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select as UiSelect, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DatePicker } from "@/components/ui/date-picker";
+import { DatePicker } from "@/components/ui/date-picker-new";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
@@ -19,7 +19,7 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
-import { format } from "date-fns";
+import { format, differenceInYears } from "date-fns";
 import { ChevronLeft, ChevronRight, RefreshCcw, Eye, EyeOff } from "lucide-react";
 
 interface SignupFormProps {
@@ -49,12 +49,15 @@ interface Location {
 
 const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
   const [step, setStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [showVerification, setShowVerification] = useState(false);
-  const [verificationCode, setVerificationCode] = useState("");
-  const [suggestedUsername, setSuggestedUsername] = useState("");
+  const [verificationCode, setVerificationCode] = useState<string>('');
+  const [isVerified, setIsVerified] = useState(false);
+  const [error, setError] = useState<string>('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = useState(false);
-
+  const [suggestedUsername, setSuggestedUsername] = useState("");
   const [countries, setCountries] = useState<Location[]>([]);
   const [states, setStates] = useState<Location[]>([]);
   const [cities, setCities] = useState<Location[]>([]);
@@ -153,31 +156,96 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
 
   const handleNextStep = () => {
     setStep(prev => prev + 1);
+    setCurrentStep(prev => prev + 1);
   };
 
   const handlePrevStep = () => {
     setStep(prev => prev - 1);
+    setCurrentStep(prev => prev - 1);
   };
 
   const handleSubmitInitial = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError('');
+
+    // Basic validation
+    if (!formData.email || !formData.firstName || !formData.lastName) {
+      setError('Please fill in all required fields');
+      setIsLoading(false);
+      return;
+    }
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Use the API client instead of direct fetch
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/email/send-verification`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          email: formData.email,
+          firstName: formData.firstName,
+          lastName: formData.lastName 
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('Backend error response:', data);
+        throw new Error(data.details || data.message || 'Failed to send verification code. Please try again.');
+      }
+
+      // In development, log the verification code to the console
+      if (data.code) {
+        console.log('Verification code (development only):', data.code);
+      }
+
       setShowVerification(true);
+    } catch (error: any) {
+      console.error('Error sending verification code:', error);
+      // Show error to user (you might want to use a toast notification)
+      alert(error.message || 'Failed to send verification code. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleVerifyEmail = async () => {
+    if (verificationCode.length !== 6) {
+      setError('Please enter a valid 6-digit verification code');
+      return;
+    }
+
     setIsLoading(true);
+    setError('');
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Use the API client instead of direct fetch
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/email/verify-code`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          code: verificationCode,
+          email: formData.email 
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to verify code. Please try again.');
+      }
+
+      // If verification is successful, proceed to next step
       setShowVerification(false);
       handleNextStep();
+    } catch (error: any) {
+      console.error('Error verifying code:', error);
+      setError(error.message || 'Invalid verification code. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -191,9 +259,35 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
     setIsLoading(true);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      const { username, ...dataToSubmit } = formData;
-      onSignup(dataToSubmit);
+      // Validate all required fields are filled
+      if (!formData.username || !formData.dateOfBirth || !formData.countryOfResidence || 
+          !formData.stateOfResidence || !formData.cityOfResidence || !formData.summary) {
+        alert('Please fill in all required fields');
+        return;
+      }
+
+      // Prepare the data in the format expected by the backend
+      const dataToSubmit = {
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+        fname: formData.firstName,
+        lname: formData.lastName,
+        gender: formData.gender,
+        dateOfBirth: formData.dateOfBirth,
+        ethnicity: formData.ethnicity,
+        countryOfResidence: formData.countryOfResidence,
+        stateOfResidence: formData.stateOfResidence,
+        cityOfResidence: formData.cityOfResidence,
+        summary: formData.summary,
+        parentEmail: formData.email, // Using user's email as parent email by default
+      };
+
+      console.log('Submitting registration data:', dataToSubmit);
+      await onSignup(dataToSubmit);
+    } catch (error) {
+      console.error('Registration error:', error);
+      alert('Registration failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -204,7 +298,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
       case 1:
         return (
           <form onSubmit={handleSubmitInitial} className="space-y-4">
-            <div className="space-y-2">
+            <div className="space-y-1">
               <Label htmlFor="email">Email Address</Label>
               <Input
                 id="email"
@@ -214,7 +308,10 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                 value={formData.email}
                 onChange={handleInputChange}
                 required
+                disabled={isLoading}
+                className={errors.email ? 'border-destructive' : ''}
               />
+              {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
             </div>
 
             <div className="space-y-2">
@@ -307,17 +404,38 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
       case 2:
         return (
           <div className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="dateOfBirth">Date of Birth</Label>
+            <div className="space-y-4">
               <DatePicker
                 date={formData.dateOfBirth || undefined}
-                setDate={handleDateChange}
+                setDate={(date) => setFormData(prev => ({
+                  ...prev,
+                  dateOfBirth: date
+                }))}
+                minAge={18}
+                maxAge={100}
+                error={errors.dateOfBirth}
+                onChange={(date) => {
+                  if (date) {
+                    const age = differenceInYears(new Date(), date);
+                    if (age < 18) {
+                      setErrors(prev => ({
+                        ...prev,
+                        dateOfBirth: 'You must be at least 18 years old'
+                      }));
+                    } else if (age > 100) {
+                      setErrors(prev => ({
+                        ...prev,
+                        dateOfBirth: 'Maximum age is 100 years'
+                      }));
+                    } else {
+                      setErrors(prev => ({
+                        ...prev,
+                        dateOfBirth: ''
+                      }));
+                    }
+                  }
+                }}
               />
-              {formData.dateOfBirth && (
-                <p className="text-sm text-muted-foreground">
-                  Selected: {format(formData.dateOfBirth, "MMMM d, yyyy")}
-                </p>
-              )}
             </div>
 
             <div className="flex justify-between">
@@ -574,7 +692,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
           </div>
         );
 
-      case 6: // Final step - Registration Summary
+      case 7: // Final step - Registration Summary
         return (
           <div className="space-y-6">
             <div className="rounded-lg border p-4 space-y-4">
@@ -647,21 +765,16 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
     }
   };
   
-  const totalSteps = 6; // Total number of steps
+  const totalSteps = 7; // Total number of steps
 
   return (
     <>
-      <div className="text-center mb-4">
-        <h2 className="text-2xl font-bold">
-          {step === 1 ? "Create Account" :
-            step === totalSteps ? "Review Your Information" :
-              `Step ${step -1} of ${totalSteps-1}`}
-        </h2>
-        <p className="text-muted-foreground">
-          {step === 1 ? "Enter your information to create an account" : 
-           step === totalSteps ? "Please confirm your details" : 
-           "Please complete all required fields"}
-        </p>
+      <div className="text-center mb-6">
+        <h2 className="text-2xl font-bold">Welcome to Quluub</h2>
+        <p className="text-muted-foreground">Your Islamic marriage platform</p>
+        <div className="mt-4">
+          Step {currentStep} of {totalSteps}
+        </div>
       </div>
 
       {renderStepContent()}

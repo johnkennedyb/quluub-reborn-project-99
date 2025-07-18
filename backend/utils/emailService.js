@@ -22,18 +22,32 @@ const videoCallNotificationEmail = require('./emailTemplates/videoCallNotificati
 const testEmailTemplate = require('./emailTemplates/testEmail');
 
 // Default configuration - can be updated dynamically
+console.log('Loading email configuration...');
+console.log('SMTP Host:', process.env.SMTP_HOST || 'mail.quluub.com');
+console.log('SMTP Port:', process.env.SMTP_PORT || 465);
+console.log('Mail User:', process.env.MAIL_USER ? '***' : 'Not set');
+
 let emailConfig = {
   host: process.env.SMTP_HOST || 'mail.quluub.com',
   port: parseInt(process.env.SMTP_PORT) || 465,
   secure: true,
   auth: {
-    user: process.env.MAIL_USER || 'mail@quluub.com',
-    pass: process.env.MAIL_PASSWORD || 'Z}!QLm__(e8p?I8J'
+    user: process.env.MAIL_USER || 'admin@quluub.com',
+    pass: process.env.MAIL_PASSWORD || 'Q!mok@JX1?1GProd'
   },
   tls: {
     rejectUnauthorized: false
-  }
+  },
+  debug: true,
+  logger: true
 };
+
+console.log('Email configuration loaded:', {
+  host: emailConfig.host,
+  port: emailConfig.port,
+  secure: emailConfig.secure,
+  hasAuth: !!emailConfig.auth.user
+});
 
 // Email settings
 let emailSettings = {
@@ -47,22 +61,42 @@ let transporter = nodemailer.createTransport(emailConfig);
 
 // Verify transporter configuration
 const verifyTransporter = () => {
+  console.log('\n--- Verifying email transporter configuration ---');
+  console.log('Host:', emailConfig.host);
+  console.log('Port:', emailConfig.port);
+  console.log('Secure:', emailConfig.secure);
+  
   transporter.verify((error, success) => {
     if (error) {
-      console.error('Email transporter verification failed:', error);
+      console.error('❌ Email transporter verification failed:', error.message);
+      if (error.code) console.error('Error code:', error.code);
+      if (error.command) console.error('Failed command:', error.command);
+      if (error.response) {
+        console.error('SMTP Error Response:', {
+          code: error.responseCode,
+          response: error.response
+        });
+      }
+      console.error('Error stack:', error.stack);
     } else {
-      console.log('Email transporter verified successfully');
+      console.log('✅ Email transporter verified successfully');
+      console.log('Server is ready to accept messages');
     }
   });
 };
 
-// Initial verification
+// Verify on startup
+console.log('\n--- Initializing email service ---');
 verifyTransporter();
 
 // Generic email sending function
 const sendEmail = async (to, templateFunction, ...args) => {
+  console.log(`\n--- Attempting to send email to: ${to} ---`);
+  
   try {
     const { subject, html } = templateFunction(...args);
+    console.log('Subject:', subject);
+    
     const mailOptions = {
       from: `"${emailSettings.fromName}" <${emailSettings.fromEmail}>`,
       to,
@@ -70,14 +104,30 @@ const sendEmail = async (to, templateFunction, ...args) => {
       html,
       replyTo: emailSettings.replyTo,
     };
-    await transporter.sendMail(mailOptions);
-    console.log(`Email sent to ${to} with subject: ${subject}`);
+    
+    console.log('Sending email with options:', {
+      from: mailOptions.from,
+      to: mailOptions.to,
+      subject: mailOptions.subject,
+      hasHtml: !!mailOptions.html
+    });
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('✅ Email sent successfully');
+    console.log('Message ID:', info.messageId);
+    console.log('Preview URL:', nodemailer.getTestMessageUrl(info));
+    return true;
+    
   } catch (error) {
-    console.error('--- DETAILED EMAIL SENDING ERROR ---');
-    console.error(`Failed to send email to: ${to}`);
-    console.error(`Subject: ${templateFunction(...args).subject}`);
-    console.error('Nodemailer error object:', JSON.stringify(error, null, 2));
-    console.error('--- END OF EMAIL ERROR ---');
+    console.error('❌ Email sending failed:', error.message);
+    if (error.response) {
+      console.error('SMTP Error:', {
+        code: error.responseCode,
+        response: error.response
+      });
+    }
+    console.error('Error stack:', error.stack);
+    return false;
   }
 };
 
@@ -145,7 +195,8 @@ const sendVideoCallNotificationEmail = (parentEmail, waliName, wardName, brother
 
 const sendValidationEmail = (email, recipientName, validationToken) => {
   const validationUrl = `${process.env.FRONTEND_URL}/validate-email?token=${validationToken}`;
-  sendEmail(email, validateEmailTemplate, recipientName, validationUrl);
+  // Pass both the validation URL and the token (which is the verification code)
+  return sendEmail(email, validateEmailTemplate, recipientName, validationUrl, validationToken);
 };
 
 // New function to send bulk emails

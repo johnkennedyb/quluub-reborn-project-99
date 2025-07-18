@@ -26,8 +26,15 @@ const Auth = () => {
   };
 
   const handleSignup = async (data: any) => {
-    await signup(data);
-    navigate('/dashboard');
+    try {
+      await signup(data);
+      // Show success message and redirect to login
+      alert('Registration successful! Please log in with your credentials.');
+      switchToLogin();
+    } catch (error) {
+      console.error('Signup error:', error);
+      // The error will be handled by the AuthContext
+    }
   };
 
   const switchToSignup = () => setActiveTab("signup");

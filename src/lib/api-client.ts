@@ -91,8 +91,20 @@ export const authService = {
         localStorage.setItem('token', response.data.token);
       }
       return response.data;
-    } catch (error) {
-      console.error('Auth service signup error:', error);
+    } catch (error: any) {
+      console.error('Auth service signup error:');
+      if (error.response) {
+        // The request was made and the server responded with a status code
+        console.error('Status:', error.response.status);
+        console.error('Data:', error.response.data);
+        console.error('Headers:', error.response.headers);
+      } else if (error.request) {
+        // The request was made but no response was received
+        console.error('Request:', error.request);
+      } else {
+        // Something happened in setting up the request
+        console.error('Error:', error.message);
+      }
       throw error;
     }
   },
