@@ -272,6 +272,24 @@ exports.removeFromFavorites = async (req, res) => {
 // @desc    Get user's favorites
 // @route   GET /api/users/favorites
 // @access  Private
+// @desc    Get profile views count
+// @route   GET /api/users/profile-views-count
+// @access  Private
+exports.getProfileViewsCount = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ profileViews: user.profileViews || 0 });
+  } catch (error) {
+    console.error('Get profile views count error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 exports.getFavorites = async (req, res) => {
   try {
     const userId = req.user._id;

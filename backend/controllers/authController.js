@@ -10,7 +10,7 @@ const { sendValidationEmail, sendWelcomeEmail, sendWaliNewJoinerEmail } = requir
 // Regular signup
 const signup = async (req, res) => {
   try {
-    const { username, email, password, fname, lname, gender, parentEmail, ethnicity } = req.body;
+    const { username, email, password, fname, lname, gender, parentEmail, ethnicity, dateOfBirth, countryOfResidence, stateOfResidence, cityOfResidence, summary } = req.body;
 
     console.log('Signup attempt:', { username, email, fname, lname, gender });
 
@@ -46,7 +46,12 @@ const signup = async (req, res) => {
       gender,
       parentEmail: parentEmail || email, // Use parentEmail if provided, otherwise use user email
       type: 'USER',
-      ethnicity: ethnicity || []
+      ethnicity: ethnicity || [],
+      dateOfBirth,
+      country: countryOfResidence,
+      state: stateOfResidence,
+      city: cityOfResidence,
+      summary
     });
 
     if (user) {

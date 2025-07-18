@@ -8,7 +8,8 @@ const {
   upgradePlan,
   addToFavorites,
   removeFromFavorites,
-  getFavorites
+  getFavorites,
+  getProfileViewsCount
 } = require('../controllers/userController');
 const { protect } = require('../middlewares/auth');
 
@@ -22,6 +23,7 @@ router.put('/:id', protect, updateUserProfile);
 // Browse routes
 router.get('/users', protect, getAllUsers);
 router.get('/browse', protect, getBrowseUsers);
+router.get('/profile-views-count', protect, getProfileViewsCount);
 
 // Payment routes
 router.post('/upgrade-plan', upgradePlan);

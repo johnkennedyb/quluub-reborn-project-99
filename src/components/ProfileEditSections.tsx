@@ -104,6 +104,8 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
   const [selectedCountry, setSelectedCountry] = useState<Location | null>(null);
   const [selectedState, setSelectedState] = useState<Location | null>(null);
 
+  const [open, setOpen] = useState(false);
+
   const handleEthnicityChange = (selectedOptions: any) => {
     if (selectedOptions.length <= 2) {
       setSelectedEthnicity(selectedOptions.map((option: any) => option.value));
@@ -143,8 +145,6 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
     }
   }, [selectedState]);
 
-
-
   const sections = [
     "Basic Info",
     "Location and Ethnicity",
@@ -171,12 +171,11 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
   const ethnicityOptions = allEthnicities.map(e => e.value);
 
   const interestOptions = [
-    "Board Games", "Playing Card Games", "Fashion", "Museums", "Reading", "Tropics", "Nature Lover", "Flower Lover",
-    "Cat Lover", "Mountain Lover", "Sunrise Lover", "Sunset Lover", "Star Lover",
-    "Mango", "Avocado", "Potato", "Spice", "Steak", "Ramen", "Sushi", "Ice Cream", "Chocolate", "Coffee",
-    "Tea", "Bubble Tea", "Matcha", "Beaches", "Architecture", "Umrah", "Camping", "Fun Fairs", "Theme Parks",
-    "Bullet Train", "Cruises", "Jetsetter", "Skydiving", "Fireworks", "Competitions", "Football", "Basketball",
-    "Rugby", "American Football", "Baseball", "Bowling"
+    "Reading", "Traveling", "Cooking", "Sports", "Music", 
+    "Art", "Photography", "Gaming", "Gardening", "Writing",
+    "Hiking", "Fitness", "Movies", "Technology", "Fashion",
+    "Volunteering", "Dancing", "Camping", "Foodie", "History",
+    "Animals", "Cars", "DIY", "Board Games", "Podcasts"
   ];
 
   const traitOptions = [
@@ -287,6 +286,25 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
     </div>
   );
 
+  const generateHeightOptions = () => {
+    const heights = [];
+    for (let ft = 4; ft <= 7; ft++) {
+      for (let inch = 0; inch < 12; inch++) {
+        if (ft === 7 && inch === 0) break; // Stop before 7ft 0in if needed
+        heights.push(`${ft}ft ${inch}in`);
+      }
+    }
+    return heights;
+  };
+
+  const generateWeightOptions = () => {
+    const weights = [];
+    for (let kg = 30; kg <= 110; kg += 5) {
+      weights.push(`${kg}kg - ${kg + 4}kg`);
+    }
+    return weights;
+  };
+
   const renderSection = () => {
     switch (currentSection) {
       case 0: // Basic Info
@@ -307,23 +325,32 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
-                      variant="outline"
+                      variant={"outline"}
                       className={cn(
                         "w-full justify-start text-left font-normal",
                         !formData.dob && "text-muted-foreground"
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formData.dob ? format(formData.dob, "dd MMM yyyy") : "Pick a date"}
+                      {formData.dob ? (
+                        format(formData.dob, "PPP")
+                      ) : (
+                        <span>Pick a date</span>
+                      )}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
+                  <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
                       selected={formData.dob}
-                      onSelect={(date) => handleInputChange("dob", date)}
+                      onSelect={(date) => {
+                        handleInputChange("dob", date);
+                        setOpen(false);
+                      }}
                       initialFocus
-                      className="pointer-events-auto"
+                      captionLayout="dropdown-buttons"
+                      fromYear={1900}
+                      toYear={new Date().getFullYear() - 18}
                     />
                   </PopoverContent>
                 </Popover>
@@ -373,10 +400,12 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
                 placeholder="Your occupation and education background..."
               />
             </div>
-            <div>
-            <Label>Parent Email</Label>
-            <Input value={formData.parentEmail} onChange={(e) => handleInputChange("parentEmail", e.target.value)} />
-            </div>
+            {user.gender === 'female' && (
+              <div>
+                <Label>Parent Email</Label>
+                <Input value={formData.parentEmail} onChange={(e) => handleInputChange("parentEmail", e.target.value)} />
+              </div>
+            )}
           </div>
         );
 
@@ -476,85 +505,63 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
       case 2: // Appearance and Co
         return (
           <div className="space-y-6">
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <Label>Height (cm)</Label>
-                <Input value={formData.height} onChange={(e) => handleInputChange("height", e.target.value)} />
-              </div>
-              <div>
-                <Label>Weight (kg)</Label>
-                <Input value={formData.weight} onChange={(e) => handleInputChange("weight", e.target.value)} />
-              </div>
-              <div>
-                <Label>Build</Label>
-                <Select value={formData.build} onValueChange={(value) => handleInputChange("build", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select build" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Slim">Slim</SelectItem>
-                    <SelectItem value="Athletic">Athletic</SelectItem>
-                    <SelectItem value="Average">Average</SelectItem>
-                    <SelectItem value="Few Extra Pounds">A few extra pounds</SelectItem>
-                    <SelectItem value="Big & Tall/Full Figured">Big & Tall/Full Figured</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
             <div>
-              <Label>Appearance</Label>
-              <Select value={formData.appearance} onValueChange={(value) => handleInputChange("appearance", value)}>
+              <Label>Height</Label>
+              <Select value={formData.height} onValueChange={(value) => handleInputChange("height", value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select appearance" />
+                  <SelectValue placeholder="Select height" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Handsome">Handsome</SelectItem>
-                  <SelectItem value="Beautiful">Beautiful</SelectItem>
-                  <SelectItem value="Good Looking">Good Looking</SelectItem>
-                  <SelectItem value="Pretty">Pretty</SelectItem>
-                  <SelectItem value="Ok">Ok</SelectItem>
-                  <SelectItem value="Average">Average</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
+                  {generateHeightOptions().map((height) => (
+                    <SelectItem key={height} value={height}>{height}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
-            {user.gender === 'female' && (
-              <div>
-                <Label>Hijab</Label>
-                <Select value={formData.hijab} onValueChange={(value) => handleInputChange("hijab", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select hijab style" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Niqab">Niqab</SelectItem>
-                    <SelectItem value="Jilbab">Jilbab</SelectItem>
-                    <SelectItem value="Hijab">Hijab</SelectItem>
-                    <SelectItem value="No">No</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            {user.gender === 'male' && (
-              <div>
-                <Label>Beard</Label>
-                <Select value={formData.beard} onValueChange={(value) => handleInputChange("beard", value)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select beard style" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Sunnah">Sunnah</SelectItem>
-                    <SelectItem value="Trimmed">Trimmed</SelectItem>
-                    <SelectItem value="No">No</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-          </div>
-        );
-
-      case 3: // Lifestyle and Traits
-        return (
-          <div className="space-y-6">
+            <div>
+              <Label>Weight</Label>
+              <Select value={formData.weight} onValueChange={(value) => handleInputChange("weight", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select weight range" />
+                </SelectTrigger>
+                <SelectContent>
+                  {generateWeightOptions().map((weight) => (
+                    <SelectItem key={weight} value={weight}>{weight}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Build</Label>
+              <Select value={formData.build} onValueChange={(value) => handleInputChange("build", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select build" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Slim">Slim</SelectItem>
+                  <SelectItem value="Athletic">Athletic</SelectItem>
+                  <SelectItem value="Average">Average</SelectItem>
+                  <SelectItem value="Muscular">Muscular</SelectItem>
+                  <SelectItem value="Curvy">Curvy</SelectItem>
+                  <SelectItem value="Large">Large</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Facial Appearance</Label>
+              <Select value={formData.appearance} onValueChange={(value) => handleInputChange("appearance", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select facial appearance" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Clean Shaven">Clean Shaven</SelectItem>
+                  <SelectItem value="Beard">Beard</SelectItem>
+                  <SelectItem value="Hijab">Hijab</SelectItem>
+                  <SelectItem value="Niqab">Niqab</SelectItem>
+                  <SelectItem value="Jilbab">Jilbab</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div>
               <Label>Genotype</Label>
               <Select value={formData.genotype} onValueChange={(value) => handleInputChange("genotype", value)}>
@@ -564,14 +571,35 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
                 <SelectContent>
                   <SelectItem value="AA">AA</SelectItem>
                   <SelectItem value="AS">AS</SelectItem>
-                  <SelectItem value="AC">AC</SelectItem>
                   <SelectItem value="SS">SS</SelectItem>
+                  <SelectItem value="AC">AC</SelectItem>
                   <SelectItem value="SC">SC</SelectItem>
-                  <SelectItem value="CC">CC</SelectItem>
-                  <SelectItem value="Unknown">I don't know</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <Label>How Covered Are You?</Label>
+              <Select value={formData.dressingCovering} onValueChange={(value) => handleInputChange("dressingCovering", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select coverage" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Fully Covered">Fully Covered</SelectItem>
+                  <SelectItem value="Partially Covered">Partially Covered</SelectItem>
+                  <SelectItem value="Not Covered">Not Covered</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Lifestyle and Hobbies</Label>
+              <Textarea value={formData.islamicPractice} onChange={(e) => handleInputChange("islamicPractice", e.target.value)} placeholder="Describe your lifestyle and hobbies." />
+            </div>
+          </div>
+        );
+
+      case 3: // Lifestyle and Traits
+        return (
+          <div className="space-y-6">
             <div>
               <Label>Traits</Label>
               <div className="flex flex-wrap gap-2">
@@ -613,17 +641,27 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
         return (
           <div className="space-y-6">
             <div>
-              <Label>Open to matches from</Label>
-              <Select value={formData.openToMatches} onValueChange={(value) => handleInputChange("openToMatches", value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select preference" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Anywhere">Anywhere in the world</SelectItem>
-                  <SelectItem value="My Country">My country of residence</SelectItem>
-                  <SelectItem value="My City">My city of residence</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Open to Matches From</Label>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {["Revert", "Widows/Widowers", "Divorcees", "Parents"].map((option) => (
+                  <Badge
+                    key={option}
+                    variant={formData.openToMatches.includes(option) ? "default" : "outline"}
+                    className="cursor-pointer"
+                    onClick={() => {
+                      let updated;
+                      if (formData.openToMatches.includes(option)) {
+                        updated = formData.openToMatches.split(", ").filter(o => o !== option).join(", ");
+                      } else {
+                        updated = formData.openToMatches ? `${formData.openToMatches}, ${option}` : option;
+                      }
+                      handleInputChange("openToMatches", updated);
+                    }}
+                  >
+                    {option}
+                  </Badge>
+                ))}
+              </div>
             </div>
             <div>
               <Label>Dealbreakers</Label>
@@ -655,15 +693,14 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
                     <SelectValue placeholder="Select pattern" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="5 Times">5 times a day</SelectItem>
+                    <SelectItem value="Always">Always</SelectItem>
                     <SelectItem value="Sometimes">Sometimes</SelectItem>
-                    <SelectItem value="Jummah">Only Jummah</SelectItem>
-                    <SelectItem value="Learning">Learning</SelectItem>
+                    <SelectItem value="Never">Never</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label>Are you a revert?</Label>
+                <Label>Revert to Islam</Label>
                 <Select value={formData.revert} onValueChange={(value) => handleInputChange("revert", value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select option" />
@@ -676,18 +713,22 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
               </div>
             </div>
             <div>
-              <Label>When did you start practicing?</Label>
+              <Label>Started Practicing On (easily backdatable)</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
-                    variant="outline"
+                    variant={"outline"}
                     className={cn(
                       "w-full justify-start text-left font-normal",
                       !formData.startedPracticing && "text-muted-foreground"
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formData.startedPracticing ? format(formData.startedPracticing, "dd MMM yyyy") : "Pick a date"}
+                    {formData.startedPracticing ? (
+                      format(formData.startedPracticing, "PPP")
+                    ) : (
+                      <span>Pick a date</span>
+                    )}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">

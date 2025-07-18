@@ -171,6 +171,16 @@ export const userService = {
     console.log('API: Getting user favorites');
     const response = await apiClient.get('/users/favorites');
     return response.data;
+  },
+
+  getProfileViewsCount: async () => {
+    try {
+      const response = await apiClient.get('/users/profile-views-count');
+      return response.data;
+    } catch (error) {
+      console.error('Get profile views count error:', error);
+      throw error;
+    }
   }
 };
 
@@ -250,6 +260,10 @@ export const chatService = {
 
 // Payment service
 export const paymentService = {
+  createStripePayment: async (plan: string, amount: number, currency: string) => {
+    const response = await apiClient.post('/payments/create-checkout-session', { plan, amount, currency });
+    return response.data;
+  },
   createPaystackPayment: (plan: string, amount: number) => {
     console.log('API: Creating Paystack payment for', { plan, amount });
     return apiClient.post('/payments/create-paystack-payment', { plan, amount }).then(res => res.data);

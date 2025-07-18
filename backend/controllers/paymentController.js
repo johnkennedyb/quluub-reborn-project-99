@@ -8,7 +8,7 @@ const { sendPlanPurchasedEmail, sendPlanExpiringEmail, sendPlanExpiredEmail } = 
 // @route   POST /api/payments/create-checkout-session
 // @access  Private
 const createCheckoutSession = async (req, res) => {
-  const { priceId, plan } = req.body;
+  const { plan, amount, currency } = req.body;
   const userId = req.user.id;
 
   try {
@@ -22,7 +22,16 @@ const createCheckoutSession = async (req, res) => {
       payment_method_types: ['card'],
       line_items: [
         {
-          price: priceId,
+          price_data: {
+            currency: currency,
+            product_data: {
+              name: `${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan`,
+            },
+            unit_amount: amount * 100, // Amount in smallest currency unit (e.g., pence)
+            recurring: {
+              interval: 'month',
+            },
+          },
           quantity: 1,
         },
       ],

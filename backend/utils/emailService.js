@@ -73,7 +73,11 @@ const sendEmail = async (to, templateFunction, ...args) => {
     await transporter.sendMail(mailOptions);
     console.log(`Email sent to ${to} with subject: ${subject}`);
   } catch (error) {
-    console.error(`Error sending email to ${to}:`, error);
+    console.error('--- DETAILED EMAIL SENDING ERROR ---');
+    console.error(`Failed to send email to: ${to}`);
+    console.error(`Subject: ${templateFunction(...args).subject}`);
+    console.error('Nodemailer error object:', JSON.stringify(error, null, 2));
+    console.error('--- END OF EMAIL ERROR ---');
   }
 };
 

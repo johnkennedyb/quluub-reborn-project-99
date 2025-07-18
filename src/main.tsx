@@ -1,16 +1,22 @@
 
 import { createRoot } from 'react-dom/client'
-import App from './App.tsx'
+import App, { queryClient } from './App.tsx';
+import { BrowserRouter as Router } from 'react-router-dom';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { AuthProvider } from './contexts/AuthContext';
+import { AdminAuthProvider } from './contexts/AdminAuthContext';
 import './index.css'
 
-// Add more padding at the bottom to account for the fixed navbar
-const AppWithBottomPadding = () => {
-  console.log('App being rendered');
-  return (
-    <div className="content-area pb-20">
-      <App />
-    </div>
-  );
-};
-
-createRoot(document.getElementById("root")!).render(<AppWithBottomPadding />);
+createRoot(document.getElementById('root')!).render(
+  <QueryClientProvider client={queryClient}>
+    <Router>
+      <AuthProvider>
+        <AdminAuthProvider>
+          <div className="content-area pb-20">
+            <App />
+          </div>
+        </AdminAuthProvider>
+      </AuthProvider>
+    </Router>
+  </QueryClientProvider>
+);

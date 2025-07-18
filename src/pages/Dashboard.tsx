@@ -14,7 +14,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { relationshipService, chatService, userService, emailService } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { calculateAge } from "@/utils/dataUtils";
-// import { calculateAge } from "@/utils/dataUtils";
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -31,7 +30,15 @@ const Dashboard = () => {
   const [favoritesList, setFavoritesList] = useState<any[]>([]);
   const [receivedRequestsList, setReceivedRequestsList] = useState<any[]>([]);
   const [sentRequestsList, setSentRequestsList] = useState<any[]>([]);
-  
+  const [isSendingRequest, setIsSendingRequest] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState({
+    matches: 1,
+    favorites: 1,
+    received: 1,
+    sent: 1
+  });
+  const itemsPerPage = 6;
+
   // Fetch relationship stats from the backend
   const { data: relationshipData, isLoading, error, refetch } = useQuery({
     queryKey: ['relationships'],
@@ -49,15 +56,23 @@ const Dashboard = () => {
         // Get unread messages count
         const unreadCount = await chatService.getUnreadCount();
         
+        // Fetch profile views (assuming there's an endpoint for this)
+        const profileViewsResponse = await userService.getProfileViewsCount();
+        
+        // Gender-based filtering
+        const userGender = user?.gender;
+        const oppositeGenderMatches = matchesData?.matches?.filter(match => match.gender !== userGender) || [];
+        const oppositeGenderFavorites = favoritesData?.favorites?.filter(fav => fav.gender !== userGender) || [];
+        
         return {
-          matches: matchesData?.matches?.length || 0,
-          favorites: favoritesData?.favorites?.length || 0,
+          matches: oppositeGenderMatches.length,
+          favorites: oppositeGenderFavorites.length,
           receivedRequests: pendingData?.requests?.length || 0,
           sentRequests: 0, // This would need a separate endpoint if available
-          profileViews: 0, // This would need a separate endpoint if available
+          profileViews: profileViewsResponse?.count || 0,
           unreadMessages: unreadCount || 0,
-          matchesList: matchesData?.matches || [],
-          favoritesList: favoritesData?.favorites || [],
+          matchesList: oppositeGenderMatches,
+          favoritesList: oppositeGenderFavorites,
           receivedRequestsList: pendingData?.requests || [],
           sentRequestsList: [] // This would come from sent requests endpoint
         };
@@ -100,7 +115,7 @@ const Dashboard = () => {
       setReceivedRequestsList(relationshipData.receivedRequestsList);
       setSentRequestsList(relationshipData.sentRequestsList);
     }
-  }, [relationshipData]);
+  }, [relationshipData, toast]);
 
   // Handle resend validation email
    const handleResendEmail = async () => {
@@ -128,7 +143,6 @@ const Dashboard = () => {
       });
     }
   };
-
 
   const handleMessageMatch = (matchId: string) => {
     window.location.href = `/messages?conversation=${matchId}`;
@@ -178,200 +192,380 @@ const Dashboard = () => {
 
   const handleRemoveFromFavorites = async (userId: string) => {
     try {
-      await userService.removeFromFavorites(userId);
-      setFavoritesList(prev => prev.filter(fav => fav._id !== userId));
+      await userService.removeFavorite(userId);
+      // Update the list by removing the user with the given ID
+      setFavoritesList(favoritesList.filter(user => user._id !== userId));
+      // Update the stats
+      setStats(prev => ({ ...prev, favorites: prev.favorites - 1 }));
       toast({
         title: "Removed from favorites",
-        description: "User has been removed from your favorites",
+        description: "User has been removed from your favorites.",
+        variant: "success",
       });
     } catch (error) {
+      console.error("Error removing from favorites:", error);
       toast({
         title: "Error",
-        description: "Failed to remove from favorites",
+        description: "Failed to remove user from favorites.",
         variant: "destructive",
       });
     }
   };
 
+  const handleSendRequestFromFavorites = async (userId: string) => {
+    setIsSendingRequest(userId);
+    try {
+      await relationshipService.sendRequest(userId);
+      // Update the favorites list to show the request has been sent
+      setFavoritesList(favoritesList.map(user => 
+        user._id === userId ? { ...user, requestSent: true } : user
+      ));
+      toast({
+        title: "Request sent",
+        description: "Your request has been sent successfully.",
+        variant: "success",
+      });
+    } catch (error) {
+      console.error("Error sending request from favorites:", error);
+      toast({
+        title: "Error",
+        description: "Failed to send request. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSendingRequest(null);
+    }
+  };
+
   const renderTabContent = () => {
+    const getPaginatedList = (list, page) => {
+      const startIndex = (page - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      return list.slice(startIndex, endIndex);
+    };
+
+    const renderPaginationButtons = (totalItems, tab) => {
+      const totalPages = Math.ceil(totalItems / itemsPerPage);
+      const currentTabPage = currentPage[tab];
+
+      return (
+        <div className="flex justify-center mt-4 space-x-2">
+          <Button
+            variant="outline"
+            onClick={() => setCurrentPage(prev => ({ ...prev, [tab]: prev[tab] - 1 }))}
+            disabled={currentTabPage === 1}
+          >
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setCurrentPage(prev => ({ ...prev, [tab]: prev[tab] + 1 }))}
+            disabled={currentTabPage === totalPages || totalPages === 0}
+          >
+            Next
+          </Button>
+        </div>
+      );
+    };
+
     switch (activeTab) {
-      case "matches":
-        return matchesList.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-            {matchesList.slice(0, 6).map((match) => (
-              <Card key={match._id} className="overflow-hidden">
-                <CardContent className="p-4">
-                  <div className="flex items-center space-x-3 mb-3">
-                    <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center">
-                      <span className="text-lg font-semibold text-primary">
-                        {match.fname?.charAt(0)}{match.lname?.charAt(0)}
-                      </span>
-                    </div>
-                    <div>
-                      <h4 className="font-medium">
-                        {match.fname} {match.lname}
-                        {match.dob}
-                      </h4>
-                      <p className="text-sm text-muted-foreground">
-                        {match.country || "Location not specified"}
-                      </p>
-                    </div>
-                  </div>
-                  {match.summary && (
-                    <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
-                      {match.summary}
-                    </p>
-                  )}
-                  <Button 
-                    size="sm" 
-                    className="w-full"
-                    onClick={() => handleMessageMatch(match._id)}
-                  >
-                    <MessageSquare className="h-4 w-4 mr-2" />
-                    Message
+      case 'matches':
+        if (matchesList.length === 0) {
+          return (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <div className="w-16 h-16 bg-gray-100 rounded-lg mb-4 flex items-center justify-center">
+                  <Heart className="h-8 w-8 text-gray-400" />
+                </div>
+                <p className="text-lg text-center text-muted-foreground">
+                  No matches yet
+                </p>
+                <p className="text-sm text-center text-muted-foreground max-w-md mt-2">
+                  You haven't matched with anyone yet. Check back later or explore potential matches.
+                </p>
+                <Link to="/browse" className="mt-4">
+                  <Button>
+                    Explore Potential Matches
                   </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <div className="py-12 text-center">
-            <div className="w-16 h-16 bg-gray-100 rounded-lg mx-auto mb-4 flex items-center justify-center">
-              <Heart className="h-8 w-8 text-gray-400" />
-            </div>
-            <p className="text-lg text-muted-foreground">No matches yet</p>
-            <Button 
-              variant="outline" 
-              className="mt-4"
-              onClick={() => window.location.href = '/search'}
-            >
-              Browse potential matches
-            </Button>
-          </div>
-        );
+                </Link>
+              </CardContent>
+            </Card>
+          );
+        }
 
-      case "favorites":
-        return favoritesList.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-            {favoritesList.map((favorite) => (
-              <Card key={favorite._id} className="overflow-hidden">
-                <CardContent className="p-4">
-                  <div className="flex items-center space-x-3 mb-3">
-                    <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center">
-                      <span className="text-lg font-semibold text-primary">
-                        {favorite.fname?.charAt(0)}{favorite.lname?.charAt(0)}
-                      </span>
-                    </div>
-                    <div>
-                      <h4 className="font-medium">
-                        {favorite.fname} {favorite.lname}
-                        {favorite.dob && `, ${calculateAge(favorite.dob)}`}
-                      </h4>
-                      <p className="text-sm text-muted-foreground">
-                        {favorite.country || "Location not specified"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => handleRemoveFromFavorites(favorite._id)}
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <div className="py-12 text-center">
-            <div className="w-16 h-16 bg-gray-100 rounded-lg mx-auto mb-4 flex items-center justify-center">
-              <Star className="h-8 w-8 text-gray-400" />
-            </div>
-            <p className="text-lg text-muted-foreground">No favorites yet</p>
-            <Button 
-              variant="outline" 
-              className="mt-4"
-              onClick={() => window.location.href = '/search'}
-            >
-              Browse to add favorites
-            </Button>
-          </div>
-        );
-
-      case "received":
-        return receivedRequestsList.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-            {receivedRequestsList.map((request) => (
-              <Card key={request._id} className="overflow-hidden">
-                <CardContent className="p-4">
-                  <div className="flex items-center space-x-3 mb-3">
-                    <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center">
-                      <span className="text-lg font-semibold text-primary">
-                        {request.fname?.charAt(0)}{request.lname?.charAt(0)}
-                      </span>
-                    </div>
-                    <div>
-                      <h4 className="font-medium">
-                        {request.fname} {request.lname}
-                        {request.dob && `, ${calculateAge(request.dob)}`}
-                      </h4>
-                      <p className="text-sm text-muted-foreground">
-                        {request.country || "Location not specified"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      size="sm" 
-                      className="flex-1"
-                      onClick={() => handleAcceptRequest(request.relationship.id)}
-                    >
-                      <UserCheck className="h-4 w-4 mr-2" />
-                      Accept
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => handleRejectRequest(request.relationship.id)}
-                    >
-                      <UserX className="h-4 w-4 mr-2" />
-                      Reject
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <div className="py-12 text-center">
-            <div className="w-16 h-16 bg-gray-100 rounded-lg mx-auto mb-4 flex items-center justify-center">
-              <UserIcon className="h-8 w-8 text-gray-400" />
-            </div>
-            <p className="text-lg text-muted-foreground">No connection requests</p>
-          </div>
-        );
-
-      case "sent":
         return (
-          <div className="py-12 text-center">
-            <div className="w-16 h-16 bg-gray-100 rounded-lg mx-auto mb-4 flex items-center justify-center">
-              <UserIcon className="h-8 w-8 text-gray-400" />
+          <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {getPaginatedList(matchesList, currentPage.matches).map((match) => (
+                <Card key={match._id} className="overflow-hidden">
+                  <CardContent className="p-0">
+                    <div className="relative h-48 bg-gray-200">
+                      {match.profilePhoto ? (
+                        <img 
+                          src={match.profilePhoto} 
+                          alt={`${match.fname} ${match.lname}`} 
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src = "/default-avatar.png";
+                            e.currentTarget.alt = "Image not found";
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gray-300">
+                          <UserIcon className="h-16 w-16 text-gray-500" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-4">
+                      <h3 className="text-lg font-semibold mb-1">{match.fname} {match.lname}</h3>
+                      <div className="text-sm text-muted-foreground mb-3">
+                        {match.ethnicity || "N/A"} • {match.height || "N/A"}
+                      </div>
+                      <div className="flex space-x-2">
+                        <Link to={`/profile/${match._id}`}>
+                          <Button variant="outline" size="sm">Profile</Button>
+                        </Link>
+                        <Button 
+                          variant="default" 
+                          size="sm"
+                          onClick={() => handleMessageMatch(match._id)}
+                        >
+                          <MessageSquare className="h-4 w-4 mr-1" /> Message
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
-            <p className="text-lg text-muted-foreground">No sent requests to display</p>
+            {renderPaginationButtons(matchesList.length, 'matches')}
+          </div>
+        );
+
+      case 'favorites':
+        if (favoritesList.length === 0) {
+          return (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <div className="w-16 h-16 bg-gray-100 rounded-lg mb-4 flex items-center justify-center">
+                  <Star className="h-8 w-8 text-gray-400" />
+                </div>
+                <p className="text-lg text-center text-muted-foreground">
+                  No favorites yet
+                </p>
+                <p className="text-sm text-center text-muted-foreground max-w-md mt-2">
+                  Add people to your favorites to easily find them later.
+                </p>
+                <Link to="/browse" className="mt-4">
+                  <Button>
+                    Explore Potential Matches
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          );
+        }
+
+        return (
+          <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {getPaginatedList(favoritesList, currentPage.favorites).map((fav) => (
+                <Card key={fav._id} className="overflow-hidden">
+                  <CardContent className="p-0">
+                    <div className="relative h-48 bg-gray-200">
+                      {fav.profilePhoto ? (
+                        <img 
+                          src={fav.profilePhoto} 
+                          alt={`${fav.fname} ${fav.lname}`} 
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src = "/default-avatar.png";
+                            e.currentTarget.alt = "Image not found";
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gray-300">
+                          <UserIcon className="h-16 w-16 text-gray-500" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-4">
+                      <h3 className="text-lg font-semibold mb-1">{fav.fname} {fav.lname}</h3>
+                      <div className="text-sm text-muted-foreground mb-3">
+                        {fav.ethnicity || "N/A"} • {fav.height || "N/A"}
+                      </div>
+                      <div className="flex space-x-2 flex-wrap gap-y-2">
+                        <Link to={`/profile/${fav._id}`}>
+                          <Button variant="outline" size="sm">Profile</Button>
+                        </Link>
+                        <Button 
+                          variant="default" 
+                          size="sm"
+                          disabled={isSendingRequest === fav._id || fav.requestSent}
+                          onClick={() => handleSendRequestFromFavorites(fav._id)}
+                        >
+                          {isSendingRequest === fav._id ? "Sending..." : fav.requestSent ? "Request Sent" : "Send Request"}
+                        </Button>
+                        <Button 
+                          variant="destructive" 
+                          size="sm"
+                          onClick={() => handleRemoveFromFavorites(fav._id)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            {renderPaginationButtons(favoritesList.length, 'favorites')}
+          </div>
+        );
+
+      case 'received':
+        if (receivedRequestsList.length === 0) {
+          return (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <div className="w-16 h-16 bg-gray-100 rounded-lg mb-4 flex items-center justify-center">
+                  <UserCheck className="h-8 w-8 text-gray-400" />
+                </div>
+                <p className="text-lg text-center text-muted-foreground">
+                  No received requests
+                </p>
+                <p className="text-sm text-center text-muted-foreground max-w-md mt-2">
+                  You haven't received any connection requests yet. Check back later.
+                </p>
+              </CardContent>
+            </Card>
+          );
+        }
+
+        return (
+          <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {getPaginatedList(receivedRequestsList, currentPage.received).map((requester) => (
+                <Card key={requester._id} className="overflow-hidden">
+                  <CardContent className="p-0">
+                    <div className="relative h-48 bg-gray-200">
+                      {requester.profile_pic ? (
+                        <img 
+                          src={requester.profile_pic} 
+                          alt={`${requester.fname} ${requester.lname}`} 
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src = "/default-avatar.png";
+                            e.currentTarget.alt = "Image not found";
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gray-300">
+                          <UserIcon className="h-16 w-16 text-gray-500" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-4">
+                      <h3 className="text-lg font-semibold mb-1">{requester.fname} {requester.lname}</h3>
+                      <div className="text-sm text-muted-foreground mb-3">
+                        {requester.ethnicity || "N/A"} • {requester.height || "N/A"}
+                      </div>
+                      <div className="flex space-x-2 flex-wrap gap-y-2">
+                        <Link to={`/profile/${requester._id}`}>
+                          <Button variant="outline" size="sm">Profile</Button>
+                        </Link>
+                        <Button 
+                          variant="default" 
+                          size="sm"
+                          onClick={() => handleAcceptRequest(requester.relationship.id)}
+                        >
+                          Accept
+                        </Button>
+                        <Button 
+                          variant="destructive" 
+                          size="sm"
+                          onClick={() => handleRejectRequest(requester.relationship.id)}
+                        >
+                          Reject
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            {renderPaginationButtons(receivedRequestsList.length, 'received')}
+          </div>
+        );
+
+      case 'sent':
+        if (sentRequestsList.length === 0) {
+          return (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <div className="w-16 h-16 bg-gray-100 rounded-lg mb-4 flex items-center justify-center">
+                  <UserX className="h-8 w-8 text-gray-400" />
+                </div>
+                <p className="text-lg text-center text-muted-foreground">
+                  No sent requests
+                </p>
+                <p className="text-sm text-center text-muted-foreground max-w-md mt-2">
+                  You haven't sent any connection requests yet. Explore potential matches to connect with others.
+                </p>
+                <Link to="/browse" className="mt-4">
+                  <Button>
+                    Explore Potential Matches
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          );
+        }
+
+        return (
+          <div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {getPaginatedList(sentRequestsList, currentPage.sent).map((requestee) => (
+                <Card key={requestee._id} className="overflow-hidden">
+                  <CardContent className="p-0">
+                    <div className="relative h-48 bg-gray-200">
+                      {requestee.profilePhoto ? (
+                        <img 
+                          src={requestee.profilePhoto} 
+                          alt={`${requestee.fname} ${requestee.lname}`} 
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src = "/default-avatar.png";
+                            e.currentTarget.alt = "Image not found";
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gray-300">
+                          <UserIcon className="h-16 w-16 text-gray-500" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-4">
+                      <h3 className="text-lg font-semibold mb-1">{requestee.fname} {requestee.lname}</h3>
+                      <div className="text-sm text-muted-foreground mb-3">
+                        Request sent
+                      </div>
+                      <div className="flex space-x-2">
+                        <Link to={`/profile/${requestee._id}`}>
+                          <Button variant="outline" size="sm">Profile</Button>
+                        </Link>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            {renderPaginationButtons(sentRequestsList.length, 'sent')}
           </div>
         );
 
       default:
-        return (
-          <div className="py-12 text-center">
-            <p className="text-lg text-muted-foreground">No data available</p>
-          </div>
-        );
+        return null;
     }
   };
 
@@ -398,53 +592,59 @@ const Dashboard = () => {
 )}
 
         {/* Stats Overview */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6 mt-6">
           <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-lg font-medium">Matches</h3>
-                <Heart className="h-5 w-5 text-teal-500" />
+            <CardContent className="flex items-center justify-between p-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Matches</p>
+                <p className="text-2xl font-bold">{stats.matches}</p>
               </div>
-              <p className="text-2xl font-bold">{stats.matches}</p>
-              <p className="text-xs text-muted-foreground mt-1">= 0% this week</p>
+              <Heart className="h-6 w-6 text-primary" />
             </CardContent>
           </Card>
-          
           <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-lg font-medium">Favorites</h3>
-                <Star className="h-5 w-5 text-yellow-500" />
+            <CardContent className="flex items-center justify-between p-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Favorites</p>
+                <p className="text-2xl font-bold">{stats.favorites}</p>
               </div>
-              <p className="text-2xl font-bold">{stats.favorites}</p>
-              <p className="text-xs text-muted-foreground mt-1">Added to favorites</p>
+              <Star className="h-6 w-6 text-primary" />
             </CardContent>
           </Card>
-          
           <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-lg font-medium">Received Requests</h3>
-                <svg className="h-5 w-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <rect width="18" height="18" x="3" y="3" rx="2" strokeWidth="2"></rect>
-                  <path d="M9 12h6m-3-3v6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path>
-                </svg>
+            <CardContent className="flex items-center justify-between p-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Received Requests</p>
+                <p className="text-2xl font-bold">{stats.receivedRequests}</p>
               </div>
-              <p className="text-2xl font-bold">{stats.receivedRequests}</p>
-              <Link to="/alerts" className="text-xs text-blue-500 hover:underline">View requests</Link>
+              <UserCheck className="h-6 w-6 text-primary" />
             </CardContent>
           </Card>
-          
           <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-lg font-medium">Sent Requests</h3>
-                <svg className="h-5 w-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path d="M5 12h14M19 12l-4-4m0 8l4-4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path>
-                </svg>
+            <CardContent className="flex items-center justify-between p-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Sent Requests</p>
+                <p className="text-2xl font-bold">{stats.sentRequests}</p>
               </div>
-              <p className="text-2xl font-bold">{stats.sentRequests}</p>
-              <p className="text-xs text-muted-foreground mt-1">= 0% this week</p>
+              <UserX className="h-6 w-6 text-primary" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="flex items-center justify-between p-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Profile Views</p>
+                <p className="text-2xl font-bold">{stats.profileViews}</p>
+              </div>
+              <UserIcon className="h-6 w-6 text-primary" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="flex items-center justify-between p-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Profile Views</p>
+                <p className="text-2xl font-bold">{stats.profileViews}</p>
+              </div>
+              <UserIcon className="h-6 w-6 text-primary" />
             </CardContent>
           </Card>
         </div>

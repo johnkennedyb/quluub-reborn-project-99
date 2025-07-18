@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
@@ -45,7 +44,7 @@ const Browse = () => {
   const { user } = useAuth();
 
   useEffect(() => {
-const fetchUsers = async () => {
+    const fetchUsers = async () => {
       try {
         setLoading(true);
         const gender = user?.gender === 'male' ? 'female' : 'male';
@@ -220,7 +219,7 @@ const fetchUsers = async () => {
   };
 
   // Get unique countries for the filter
-  const uniqueCountries = [...new Set(users.filter(user => user.country).map(user => user.country))];
+  const uniqueCountries = [...new Set(users.map(user => user.country).filter(Boolean))];
 
   // Get current users
   const indexOfLastUser = currentPage * usersPerPage;
@@ -249,12 +248,14 @@ const fetchUsers = async () => {
             <Filter className="h-4 w-4" />
             <Select value={countryFilter} onValueChange={setCountryFilter}>
               <SelectTrigger className="w-[160px]">
-                <SelectValue placeholder="Filter by country" />
+                <SelectValue placeholder="Country" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="">All Countries</SelectItem>
                 {uniqueCountries.map(country => (
-                  <SelectItem key={country} value={country!}>{country}</SelectItem>
+                  <SelectItem key={country} value={country}>
+                    {country}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>

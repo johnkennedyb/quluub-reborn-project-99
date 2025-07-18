@@ -58,6 +58,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
   const [countries, setCountries] = useState<Location[]>([]);
   const [states, setStates] = useState<Location[]>([]);
   const [cities, setCities] = useState<Location[]>([]);
+  const [isDataLoading, setIsDataLoading] = useState(true);
 
   const [selectedCountry, setSelectedCountry] = useState<Location | null>(null);
   const [selectedState, setSelectedState] = useState<Location | null>(null);
@@ -85,7 +86,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
   }, [formData.password]);
 
   useEffect(() => {
-    if (formData.firstName && step === 7) {
+    if (formData.firstName && step === 6) { // Changed to step 6
       const firstPart = formData.firstName.toLowerCase().replace(/\s+/g, '');
       const randomNum = Math.floor(Math.random() * 10000);
 
@@ -94,7 +95,14 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
   }, [formData.firstName, step]);
 
   useEffect(() => {
-    setCountries(getAllCountries());
+    try {
+      const countryData = getAllCountries();
+      setCountries(countryData);
+    } catch (error) {
+      console.error("Failed to load country data:", error);
+    } finally {
+      setIsDataLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -376,6 +384,9 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
         );
 
       case 4:
+        if (isDataLoading) {
+          return <div className="text-center p-8">Loading location data...</div>;
+        }
         return (
           <div className="space-y-6">
             <div className="space-y-2">
@@ -446,72 +457,17 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
             </div>
 
             <div className="flex justify-between">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handlePrevStep}
-                className="flex items-center gap-1"
-              >
-                <ChevronLeft className="h-4 w-4" /> Previous
+              <Button type="button" variant="outline" onClick={handlePrevStep}>
+                <ChevronLeft className="h-4 w-4 mr-1" /> Back
               </Button>
-              <Button
-                type="button"
-                onClick={handleNextStep}
-                disabled={!formData.countryOfResidence}
-                className="flex items-center gap-1"
-              >
-                Next <ChevronRight className="h-4 w-4" />
+              <Button type="button" onClick={handleNextStep} disabled={!formData.cityOfResidence}>
+                Next <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             </div>
           </div>
         );
 
       case 5:
-        const countryObj = countries.find(c => c.name === formData.countryOfResidence);
-        return (
-          <div className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="cityOfResidence">City of Residence</Label>
-              <UiSelect
-                value={formData.cityOfResidence}
-                onValueChange={(value) => handleSelectChange("cityOfResidence", value)}
-                disabled={!formData.countryOfResidence}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select your city" />
-                </SelectTrigger>
-                <SelectContent>
-                  {cities.map((city) => (
-                    <SelectItem key={city.name} value={city.name}>
-                      {city.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </UiSelect>
-            </div>
-
-            <div className="flex justify-between">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handlePrevStep}
-                className="flex items-center gap-1"
-              >
-                <ChevronLeft className="h-4 w-4" /> Previous
-              </Button>
-              <Button
-                type="button"
-                onClick={handleNextStep}
-                disabled={!formData.cityOfResidence}
-                className="flex items-center gap-1"
-              >
-                Next <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        );
-
-      case 6:
         return (
           <div className="space-y-6">
             <div className="space-y-2">
@@ -548,7 +504,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
           </div>
         );
 
-      case 7:
+      case 6:
         return (
           <div className="space-y-6">
             <div className="space-y-2">
@@ -616,7 +572,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
           </div>
         );
 
-      case 8:
+      case 7: // Changed from 8
         return (
           <div className="space-y-6">
             <div className="rounded-lg border p-4 space-y-4">
@@ -647,7 +603,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Location:</span>
-                  <span className="font-medium">{formData.cityOfResidence}, {formData.countryOfResidence}</span>
+                  <span className="font-medium">{formData.cityOfResidence}, {formData.stateOfResidence}, {formData.countryOfResidence}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Gender:</span>
@@ -688,18 +644,20 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
         return null;
     }
   };
+  
+  const totalSteps = 7; // Total number of steps
 
   return (
     <>
       <div className="text-center mb-4">
         <h2 className="text-2xl font-bold">
           {step === 1 ? "Create Account" :
-            step === 8 ? "Review Your Information" :
-              `Step ${step - 1} of 7`}
+            step === totalSteps ? "Review Your Information" :
+              `Step ${step -1} of ${totalSteps-1}`}
         </h2>
         <p className="text-muted-foreground">
           {step === 1 ? "Enter your information to create an account" : 
-           step === 8 ? "Please confirm your details" : 
+           step === totalSteps ? "Please confirm your details" : 
            "Please complete all required fields"}
         </p>
       </div>

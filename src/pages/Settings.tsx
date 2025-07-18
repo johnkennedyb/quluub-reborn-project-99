@@ -31,7 +31,8 @@ const Settings = () => {
   const [isLoadingPayment, setIsLoadingPayment] = useState(false);
   const [isUpgrading, setIsUpgrading] = useState(false);
   const { toast } = useToast();
-  const [currency, setCurrency] = useState<'GBP' | 'NGN'>('GBP');
+  const [currency, setCurrency] = useState<'GBP' | 'NGN'>(user?.country === 'Nigeria' ? 'NGN' : 'GBP');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   const pricing = {
     GBP: {
@@ -154,47 +155,38 @@ const Settings = () => {
     });
   };
 
-    const handleUpgrade = async () => {
+    const handleUpgrade = async (plan: string, amount: string, currency: 'GBP' | 'NGN') => {
     setIsUpgrading(true);
     try {
+      const numericAmount = parseFloat(amount);
+      if (isNaN(numericAmount)) {
+        toast({ title: "Invalid Amount", description: "The payment amount is not valid.", variant: "destructive" });
+        setIsUpgrading(false);
+        return;
+      }
+
       if (currency === 'GBP') {
-        // Use the new Stripe backend endpoint
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/payments/create-checkout-session`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          },
-          body: JSON.stringify({ 
-            priceId: 'price_1Q5CNeBbkcQFdkf0i8BryMoN', // Premium discounted price
-            plan: 'premium'
-          }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to create Stripe checkout session');
+        const response = await paymentService.createStripePayment(plan, numericAmount, currency.toLowerCase());
+        if (response.url) {
+          window.location.href = response.url;
         }
-
-        const session = await response.json();
-        window.location.href = session.url;
-      } else {
-        // Use the existing Paystack service for NGN
-        const plan = 'premium';
-        const amount = parseInt(pricing.NGN.premium, 10) * 100; // Convert to kobo
-        const { url } = await paymentService.createPaystackPayment(plan, amount);
-        window.location.href = url;
+      } else if (currency === 'NGN') {
+        const amountInKobo = numericAmount * 100;
+        const response = await paymentService.createPaystackPayment(plan, amountInKobo);
+        if (response.url) {
+          window.location.href = response.url;
+        }
       }
     } catch (error) {
       console.error('Payment error:', error);
       toast({
-        title: "Payment Error",
-        description: (error as Error).message || "Failed to initiate payment. Please try again.",
-        variant: "destructive",
+        title: 'Payment Error',
+        description: (error as Error).message || 'Failed to initiate payment. Please try again.',
+        variant: 'destructive',
       });
+    } finally {
       setIsUpgrading(false);
     }
-    // No finally block needed as we only want to stop loading on error. On success, the page redirects.
   };
 
   const handlePasswordChange = async () => {
@@ -262,18 +254,49 @@ const Settings = () => {
 
   const handleHideProfile = async () => {
     try {
-      await userService.updateProfile(user?._id || '', { hidden: !user?.hidden });
-      updateUser({ hidden: !user?.hidden });
+      const updatedUser = await userService.updateProfile({ hidden: !user?.hidden });
+      updateUser(updatedUser);
       toast({
-        title: user?.hidden ? "Profile shown" : "Profile hidden",
-        description: user?.hidden ? "Your profile is now visible to others." : "Your profile is now hidden from others.",
+        title: updatedUser.hidden ? "Profile Hidden" : "Profile Visible",
+        description: updatedUser.hidden ? "Your profile is now hidden from search results." : "Your profile is now visible in search results.",
+        variant: "success",
       });
     } catch (error) {
+      console.error("Error updating profile visibility:", error);
       toast({
         title: "Error",
         description: "Failed to update profile visibility.",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!window.confirm("Are you sure you want to delete your account? This action cannot be undone.")) {
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    try {
+      await userService.deleteAccount();
+      toast({
+        title: "Account Deleted",
+        description: "Your account has been successfully deleted.",
+        variant: "success",
+      });
+      // Log out the user and redirect to home page
+      localStorage.removeItem('token');
+      updateUser(null);
+      window.location.href = '/';
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete account. Please try again or contact support.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeletingAccount(false);
     }
   };
 
@@ -337,7 +360,7 @@ const Settings = () => {
                       value={applyReferralCode}
                       onChange={(e) => setApplyReferralCode(e.target.value)}
                     />
-                    <Button onClick={handleApplyReferral} size="sm">
+                    <Button onClick={() => handleApplyReferral()} size="sm">
                       Apply
                     </Button>
                   </div>
@@ -460,10 +483,10 @@ const Settings = () => {
                     {!isPro ? (
                       <Button 
                         className="w-full bg-primary hover:bg-primary/90" 
-                        onClick={handleUpgrade}
-                        disabled={isLoadingPayment}
+                        onClick={() => handleUpgrade('premium', pricing[currency].premium, currency)}
+                        disabled={isUpgrading}
                       >
-                        {isLoadingPayment ? "Processing..." : "Upgrade to Premium"}
+                        {isUpgrading ? "Processing..." : "Upgrade to Premium"}
                       </Button>
                     ) : (
                       <Button 
@@ -589,8 +612,13 @@ const Settings = () => {
                 
                 <div>
                   <h3 className="font-medium mb-2">Please be sure!</h3>
-                  <Button variant="outline" className="w-full border-red-300 text-red-500 hover:bg-red-50">
-                    Delete my account
+                  <Button 
+                    variant="outline" 
+                    className="w-full border-red-300 text-red-500 hover:bg-red-50"
+                    onClick={handleDeleteAccount}
+                    disabled={isDeletingAccount}
+                  >
+                    {isDeletingAccount ? 'Deleting...' : 'Delete my account'}
                   </Button>
                 </div>
               </div>

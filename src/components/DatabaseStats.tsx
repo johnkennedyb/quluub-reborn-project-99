@@ -26,13 +26,15 @@ interface DatabaseStatsProps {
   activeUsers: number;
   totalMatches: number;
   unreadMessages: number;
+  profileViews: number;
 }
 
 export const DatabaseStats = ({
   totalUsers,
   activeUsers,
   totalMatches,
-  unreadMessages
+  unreadMessages,
+  profileViews
 }: DatabaseStatsProps) => {
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -40,6 +42,7 @@ export const DatabaseStats = ({
       <StatsCard title="Active Users" value={activeUsers} description="Active in last 30 days" />
       <StatsCard title="Total Matches" value={totalMatches} description="Successful connections" />
       <StatsCard title="Unread Messages" value={unreadMessages} description="Pending communications" />
+      <StatsCard title="Profile Views" value={profileViews} description="Times your profile was viewed" />
     </div>
   );
 };

@@ -4,6 +4,7 @@ import { useParams } from "react-router-dom";
 import TopNavbar from "@/components/TopNavbar";
 import Navbar from "@/components/Navbar";
 import ProfileEditSections from "@/components/ProfileEditSections";
+import UserProfileView from "@/components/UserProfileView";
 import { userService } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
@@ -111,12 +112,7 @@ const Profile = () => {
   return (
     <div className="min-h-screen bg-gray-50 pt-16">
       <TopNavbar />
-      <div className="container py-6">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold">{profileUser.fname} {profileUser.lname}</h2>
-          <p className="text-muted-foreground">{profileUser.country}</p>
-        </div>
-      </div>
+      <UserProfileView user={profileUser} />
       <Navbar />
     </div>
   );

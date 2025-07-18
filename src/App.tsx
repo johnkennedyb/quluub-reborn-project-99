@@ -38,25 +38,11 @@ import UserProfilePage from "@/pages/admin/UserProfilePage";
 // Socket
 import { io, Socket } from "socket.io-client";
 
-// Create React Query client
-const queryClient = new QueryClient();
 
-// Root wrapper
-function AppWrapper() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <AdminAuthProvider>
-          <Router>
-            <App />
-          </Router>
-        </AdminAuthProvider>
-      </AuthProvider>
-    </QueryClientProvider>
-  );
-}
 
 // App Component
+export const queryClient = new QueryClient();
+
 function App() {
   const navigate = useNavigate();
     const { user } = useAuth();
@@ -199,12 +185,11 @@ function App() {
 
         {/* User routes */}
         <Route path="/dashboard" element={<PrivateRoute element={<Dashboard />} />} />
-        <Route path="/browse" element={<PrivateRoute element={<Browse />} />} />
+        <Route path="/search" element={<PrivateRoute element={<Browse />} />} />
         <Route path="/messages" element={<PrivateRoute element={<Messages />} />} />
         <Route path="/profile" element={<PrivateRoute element={<Profile />} />} />
         <Route path="/profile/:userId" element={<PrivateRoute element={<Profile />} />} />
         <Route path="/settings" element={<PrivateRoute element={<Settings />} />} />
-        <Route path="/search" element={<PrivateRoute element={<Search />} />} />
         <Route path="/alerts" element={<PrivateRoute element={<Alerts />} />} />
 
         {/* Admin routes */}
@@ -231,4 +216,4 @@ function App() {
   );
 }
 
-export default AppWrapper;
+export default App;

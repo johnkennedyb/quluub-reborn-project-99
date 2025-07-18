@@ -281,12 +281,12 @@ const Alerts = () => {
           </div>
           
           {showNotifications && (
-            <div className="space-y-4">
+            <div className="space-y-4 mt-4">
               {notifications.length > 0 ? (
                 notifications.map((notification) => (
-                  <Alert 
+                  <Alert
                     key={notification.id}
-                    variant={notification.read ? "default" : "default"}
+                    variant={notification.read ? "outline" : "default"}
                     className={notification.read ? "bg-background" : "bg-primary/5 border-primary/20"}
                   >
                     <div className="flex justify-between items-start">
