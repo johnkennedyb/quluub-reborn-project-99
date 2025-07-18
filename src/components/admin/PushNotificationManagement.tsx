@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -10,7 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import apiClient from '@/lib/api-client';
+// This hook will be updated later to include push notification functions
+import { useAdminData } from '@/hooks/useAdminData';
 
 const formSchema = z.object({
   title: z.string().min(5, 'Title must be at least 5 characters long.'),
@@ -19,9 +19,8 @@ const formSchema = z.object({
 });
 
 const PushNotificationManagement = () => {
-  const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const [pushNotifications, setPushNotifications] = useState([]);
+    const { toast } = useToast();
+  const { sendPushNotification, pushNotifications, loading } = useAdminData();
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -32,47 +31,14 @@ const PushNotificationManagement = () => {
     },
   });
 
-  React.useEffect(() => {
-    const fetchNotifications = async () => {
-      setLoading(true);
-      try {
-        const response = await apiClient.get('/admin/push-notifications');
-        setPushNotifications(response.data);
-      } catch (error) {
-        console.error('Failed to fetch notifications:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchNotifications();
-  }, []);
-
-  const sendPushNotification = async (values: z.infer<typeof formSchema>) => {
-    setLoading(true);
+  const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
-      await apiClient.post('/admin/push-notifications', {
-        title: values.title,
-        body: values.message,
-        target: values.target
-      });
-      
+      await sendPushNotification(values);
       toast({ title: 'Success', description: 'Push notification sent successfully!' });
       form.reset();
-      
-      // Refresh notifications
-      const response = await apiClient.get('/admin/push-notifications');
-      setPushNotifications(response.data);
     } catch (error) {
-      console.error('Error sending notification:', error);
       toast({ title: 'Error', description: 'Failed to send push notification.', variant: 'destructive' });
-    } finally {
-      setLoading(false);
     }
-  };
-
-  const handleSubmit = async (values: z.infer<typeof formSchema>) => {
-    await sendPushNotification(values);
   };
 
   return (
@@ -132,7 +98,7 @@ const PushNotificationManagement = () => {
                   </FormItem>
                 )}
               />
-              <Button type="submit" disabled={loading}>Send Notification</Button>
+              <Button type="submit">Send Notification</Button>
             </form>
           </Form>
         </CardContent>
@@ -147,10 +113,10 @@ const PushNotificationManagement = () => {
             {loading && <p>Loading history...</p>}
             {pushNotifications && pushNotifications.length > 0 ? (
               <ul className="space-y-2">
-                {pushNotifications.map((notification: any) => (
+                {pushNotifications.map((notification) => (
                   <li key={notification._id} className="p-3 bg-gray-50 rounded-md border">
                     <p className="font-semibold">{notification.title}</p>
-                    <p className="text-sm text-gray-600">{notification.body || notification.message}</p>
+                    <p className="text-sm text-gray-600">{notification.message}</p>
                     <div className="text-xs text-gray-400 mt-2 flex justify-between">
                       <span>Target: {notification.target}</span>
                       <span>Sent: {new Date(notification.sentAt).toLocaleString()}</span>
