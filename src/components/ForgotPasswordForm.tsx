@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Mail } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { apiClient } from "@/lib/api-client";
+import apiClient from "@/lib/api-client";
 
 interface ForgotPasswordFormProps {
   onBackToLogin: () => void;
