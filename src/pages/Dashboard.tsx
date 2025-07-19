@@ -16,9 +16,37 @@ import { useToast } from "@/hooks/use-toast";
 import { calculateAge } from "@/utils/dataUtils";
 
 const Dashboard = () => {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("matches");
+
+  // Simple email resend function
+  const handleResendEmail = async () => {
+    try {
+      const response = await fetch('/api/email/resend-validation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (response.ok) {
+        toast({
+          title: "Email Sent",
+          description: "Validation email has been resent to your email address.",
+        });
+      } else {
+        throw new Error('Failed to resend email');
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to resend validation email. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
   const [stats, setStats] = useState({
     matches: 0,
     favorites: 0,
@@ -215,6 +243,64 @@ const Dashboard = () => {
   const handleSendRequestFromFavorites = async (userId: string) => {
     setIsSendingRequest(userId);
     try {
+      // Check verification status and update user context
+      const checkVerificationStatus = async () => {
+        try {
+          const response = await fetch('/api/email/status', {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.emailVerified && user && !user.emailVerified) {
+              // Update user context to reflect verification status
+              updateUser({ emailVerified: true });
+              toast({
+                title: "✅ Email Verified!",
+                description: "Your email has been successfully verified.",
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Failed to check verification status:', error);
+        }
+      };
+
+      // Handle resend email validation
+      const handleResendEmail = async () => {
+        try {
+          const response = await fetch('/api/email/resend-validation', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+          
+          if (response.ok) {
+            toast({
+              title: "Email Sent",
+              description: "Validation email has been resent to your email address.",
+            });
+            
+            // Check verification status after a short delay
+            setTimeout(checkVerificationStatus, 2000);
+          } else {
+            throw new Error('Failed to resend email');
+          }
+        } catch (error) {
+          toast({
+            title: "Error",
+            description: "Failed to resend validation email. Please try again.",
+            variant: "destructive",
+          });
+        }
+      };
+
       await relationshipService.sendRequest(userId);
       // Update the favorites list to show the request has been sent
       setFavoritesList(favoritesList.map(user => 

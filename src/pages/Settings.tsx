@@ -62,6 +62,34 @@ const Settings = () => {
     checkPaymentSuccess();
   }, []);
 
+  // Handle resend email validation
+  const handleResendEmail = async () => {
+    try {
+      const response = await fetch('/api/email/resend-validation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (response.ok) {
+        toast({
+          title: "Email Sent",
+          description: "Validation email has been resent to your email address.",
+        });
+      } else {
+        throw new Error('Failed to resend email');
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to resend validation email. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Check for payment success and refresh user status
   const checkPaymentSuccess = async () => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -476,15 +504,22 @@ const Settings = () => {
     <div className="min-h-screen bg-gray-50 pb-20">
       <div className="container py-6">
         {/* Email validation banner */}
-        <Alert className="mb-6 bg-yellow-50 border-yellow-200">
-          <AlertDescription className="flex items-center gap-2">
-            <span className="bg-yellow-400 text-white p-1 rounded-full">!</span>
-            Please validate your email address to continue
-            <Button variant="outline" size="sm" className="ml-auto bg-blue-600 text-white hover:bg-blue-700">
-              Resend validation mail
-            </Button>
-          </AlertDescription>
-        </Alert>
+        {user && !user.emailVerified && (
+          <Alert className="mb-6 bg-yellow-50 border-yellow-200">
+            <AlertDescription className="flex items-center gap-2">
+              <span className="bg-yellow-400 text-white p-1 rounded-full">!</span>
+              Please validate your email address to continue
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="ml-auto bg-blue-600 text-white hover:bg-blue-700"
+                onClick={handleResendEmail}
+              >
+                Resend validation mail
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
         
         <h1 className="text-2xl font-bold mb-6">Settings</h1>
         
