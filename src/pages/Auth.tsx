@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import LoginForm from '@/components/LoginForm';
 import SignupForm from '@/components/SignupForm';
+import ForgotPasswordForm from '@/components/ForgotPasswordForm';
 import { getGoogleAuthUrl } from '@/config/google-oauth';
 
 const Auth = () => {
@@ -14,6 +15,7 @@ const Auth = () => {
   const { login, signup } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("login");
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
 
   const handleGoogleAuth = () => {
     setIsLoading(true);
@@ -37,8 +39,16 @@ const Auth = () => {
     }
   };
 
-  const switchToSignup = () => setActiveTab("signup");
-  const switchToLogin = () => setActiveTab("login");
+  const switchToSignup = () => {
+    setActiveTab("signup");
+    setShowForgotPassword(false);
+  };
+  const switchToLogin = () => {
+    setActiveTab("login");
+    setShowForgotPassword(false);
+  };
+  const showForgotPasswordForm = () => setShowForgotPassword(true);
+  const hideForgotPasswordForm = () => setShowForgotPassword(false);
 
   return (
     <div 
@@ -57,10 +67,15 @@ const Auth = () => {
           <CardDescription>Your Islamic marriage platform</CardDescription>
         </CardHeader>
         <CardContent>
-          {activeTab === 'login' ? (
+          {showForgotPassword ? (
+            <ForgotPasswordForm 
+              onBackToLogin={hideForgotPasswordForm}
+            />
+          ) : activeTab === 'login' ? (
             <LoginForm 
               onLogin={handleLogin}
               onSwitchToSignup={switchToSignup}
+              onForgotPassword={showForgotPasswordForm}
             />
           ) : (
             <SignupForm 

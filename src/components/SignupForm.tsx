@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select as UiSelect, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DatePicker } from "@/components/ui/date-picker-new";
+import DatePickerImproved from "@/components/ui/date-picker-improved";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
@@ -405,8 +406,8 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
         return (
           <div className="space-y-6">
             <div className="space-y-4">
-              <DatePicker
-                date={formData.dateOfBirth || undefined}
+              <DatePickerImproved
+                date={formData.dateOfBirth || null}
                 setDate={(date) => setFormData(prev => ({
                   ...prev,
                   dateOfBirth: date

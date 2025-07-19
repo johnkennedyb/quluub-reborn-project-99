@@ -16,9 +16,10 @@ import { AlertCircle, Eye, EyeOff } from "lucide-react";
 interface LoginFormProps {
   onLogin: (username: string, password: string) => void;
   onSwitchToSignup: () => void;
+  onForgotPassword?: () => void;
 }
 
-const LoginForm = ({ onLogin, onSwitchToSignup }: LoginFormProps) => {
+const LoginForm = ({ onLogin, onSwitchToSignup, onForgotPassword }: LoginFormProps) => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -63,9 +64,13 @@ const LoginForm = ({ onLogin, onSwitchToSignup }: LoginFormProps) => {
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label htmlFor="password">Password</Label>
-          <a href="#" className="text-xs text-primary hover:underline">
+          <button 
+            type="button"
+            onClick={onForgotPassword}
+            className="text-xs text-primary hover:underline focus:outline-none"
+          >
             Forgot password?
-          </a>
+          </button>
         </div>
         <div className="relative">
           <Input 
