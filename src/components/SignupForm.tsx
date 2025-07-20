@@ -275,13 +275,12 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
         fname: formData.firstName,
         lname: formData.lastName,
         gender: formData.gender,
-        dateOfBirth: formData.dateOfBirth,
+        dateOfBirth: formData.dateOfBirth!,
         ethnicity: formData.ethnicity,
         countryOfResidence: formData.countryOfResidence,
         stateOfResidence: formData.stateOfResidence,
         cityOfResidence: formData.cityOfResidence,
         summary: formData.summary,
-        parentEmail: formData.email, // Using user's email as parent email by default
       };
 
       console.log('Submitting registration data:', dataToSubmit);
@@ -407,15 +406,15 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
           <div className="space-y-6">
             <div className="space-y-4">
               <DatePickerImproved
-                date={formData.dateOfBirth || null}
-                setDate={(date) => setFormData(prev => ({
-                  ...prev,
-                  dateOfBirth: date
-                }))}
-                minAge={18}
-                maxAge={100}
-                error={errors.dateOfBirth}
-                onChange={(date) => {
+                date={formData.dateOfBirth}
+                setDate={(date) => {
+                  // Update form data
+                  setFormData(prev => ({
+                    ...prev,
+                    dateOfBirth: date
+                  }));
+                  
+                  // Handle validation
                   if (date) {
                     const age = differenceInYears(new Date(), date);
                     if (age < 18) {
@@ -434,8 +433,16 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                         dateOfBirth: ''
                       }));
                     }
+                  } else {
+                    setErrors(prev => ({
+                      ...prev,
+                      dateOfBirth: ''
+                    }));
                   }
                 }}
+                minAge={18}
+                maxAge={100}
+                error={errors.dateOfBirth}
               />
             </div>
 
@@ -451,7 +458,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
               <Button
                 type="button"
                 onClick={handleNextStep}
-                disabled={!formData.dateOfBirth}
+                disabled={!formData.dateOfBirth || !!errors.dateOfBirth}
                 className="flex items-center gap-1"
               >
                 Next <ChevronRight className="h-4 w-4" />

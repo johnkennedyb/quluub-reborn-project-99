@@ -6,6 +6,7 @@ import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { chatService } from "@/lib/api-client";
+import VideoCallLinkButton from "@/components/VideoCall/VideoCallLinkButton";
 
 interface ChatMessage {
   id: string;
@@ -207,40 +208,46 @@ const MaterialChatInterface: React.FC<MaterialChatInterfaceProps> = ({ setChatCo
         )}
       </Box>
 
-      <Space.Compact style={{ width: "100%" }}>
-        <Input
-          placeholder="Type a message..."
-          value={msg}
-          onChange={handleInputChange}
-          onKeyPress={handleKeyPress}
-          disabled={hasMetOrExceededPlan}
-          status={hasMetOrExceededWordCountPerMessage ? "error" : ""}
-          style={{ 
-            borderRadius: "20px",
-            height: "45px",
-            fontSize: "14px"
-          }}
+      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+        <VideoCallLinkButton 
+          recipientId={userId!}
+          recipientName="User"
         />
-        <Button
-          type="primary"
-          onClick={handleSend}
-          disabled={
-            msg.length < 5 ||
-            hasMetOrExceededPlan ||
-            hasMetOrExceededWordCountPerMessage ||
-            mutation.isPending
-          }
-          loading={mutation.isPending}
-          style={{
-            borderRadius: "20px",
-            height: "45px",
-            backgroundColor: "#75c0f9",
-            borderColor: "#75c0f9"
-          }}
-        >
-          Send
-        </Button>
-      </Space.Compact>
+        <Space.Compact style={{ width: "100%" }}>
+          <Input
+            placeholder="Type a message..."
+            value={msg}
+            onChange={handleInputChange}
+            onKeyPress={handleKeyPress}
+            disabled={hasMetOrExceededPlan}
+            status={hasMetOrExceededWordCountPerMessage ? "error" : ""}
+            style={{ 
+              borderRadius: "20px",
+              height: "45px",
+              fontSize: "14px"
+            }}
+          />
+          <Button
+            type="primary"
+            onClick={handleSend}
+            disabled={
+              msg.length < 5 ||
+              hasMetOrExceededPlan ||
+              hasMetOrExceededWordCountPerMessage ||
+              mutation.isPending
+            }
+            loading={mutation.isPending}
+            style={{
+              borderRadius: "20px",
+              height: "45px",
+              backgroundColor: "#75c0f9",
+              borderColor: "#75c0f9"
+            }}
+          >
+            Send
+          </Button>
+        </Space.Compact>
+      </div>
 
       {(hasMetOrExceededWordCountPerMessage || hasMetOrExceededPlan) && (
         <Typography

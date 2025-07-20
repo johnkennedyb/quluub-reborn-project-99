@@ -10,6 +10,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
+import { VideoCallProvider } from "@/contexts/VideoCallContext";
+import VideoCallRoom from "@/components/VideoCall/VideoCallRoom";
 
 // Components
 import PrivateRoute from "@/components/PrivateRoute";
@@ -170,8 +172,9 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Routes>
+    <VideoCallProvider>
+      <div className="min-h-screen bg-background">
+        <Routes>
         {/* Public routes */}
         <Route path="/" element={<Index />} />
         <Route path="/auth" element={<Auth />} />
@@ -180,8 +183,9 @@ function App() {
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin/signup" element={<AdminSignup />} />
 
-        {/* Private video call route - authentication required */}
+        {/* Private video call routes - authentication required */}
         <Route path="/video-call" element={<PrivateRoute element={<VideoCall />} />} />
+        <Route path="/video-call/:callId" element={<PrivateRoute element={<VideoCallRoom />} />} />
 
         {/* User routes */}
         <Route path="/dashboard" element={<PrivateRoute element={<Dashboard />} />} />
@@ -196,9 +200,9 @@ function App() {
                 <Route path="/admin" element={<AdminRoute element={<AdminDashboard />} />} />
         <Route path="/admin/user/:userId" element={<AdminRoute element={<UserProfilePage />} />} />
 
-        {/* 404 fallback */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+          {/* 404 fallback */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
 
       {/* Incoming video call modal */}
       <VideoCallNotificationModal
@@ -211,8 +215,9 @@ function App() {
         onDecline={handleDeclineCall}
       />
 
-      <Toaster />
-    </div>
+        <Toaster />
+      </div>
+    </VideoCallProvider>
   );
 }
 

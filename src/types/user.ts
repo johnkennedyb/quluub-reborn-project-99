@@ -75,7 +75,6 @@ export interface SignupData {
   countryOfResidence: string;
   cityOfResidence: string;
   summary: string;
-  parentEmail?: string;
 }
 
 export interface AuthResponse {

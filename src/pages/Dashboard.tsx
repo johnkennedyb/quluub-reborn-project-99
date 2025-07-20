@@ -192,7 +192,7 @@ const Dashboard = () => {
 
   const handleRemoveFromFavorites = async (userId: string) => {
     try {
-      await userService.removeFavorite(userId);
+      await userService.removeFromFavorites(userId);
       // Update the list by removing the user with the given ID
       setFavoritesList(favoritesList.filter(user => user._id !== userId));
       // Update the stats
@@ -573,23 +573,7 @@ const Dashboard = () => {
     <div className="min-h-screen bg-gray-50 pt-16 pb-20">
       <TopNavbar />
       <div className="container py-6">
-        {/* Email validation banner */}
-       {user && !user.emailVerified && (
-  <Alert className="mb-6 bg-yellow-50 border-yellow-200">
-    <AlertDescription className="flex items-center gap-2">
-      <span className="bg-yellow-400 text-white p-1 rounded-full">!</span>
-      Please validate your email address to continue
-      <Button
-        variant="outline"
-        size="sm"
-        className="ml-auto bg-blue-600 text-white hover:bg-blue-700"
-        onClick={handleResendEmail}
-      >
-        Resend validation mail
-      </Button>
-    </AlertDescription>
-  </Alert>
-)}
+
 
         {/* Stats Overview */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6 mt-6">

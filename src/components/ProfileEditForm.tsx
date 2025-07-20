@@ -8,17 +8,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DatePicker } from "@/components/ui/date-picker";
+import DatePickerImproved from "@/components/ui/date-picker-improved";
 import { userService } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { User } from "@/types/user";
 import { parseJsonField } from "@/utils/dataUtils";
+import { differenceInYears } from "date-fns";
 
 // Define form schema
 const profileSchema = z.object({
   fname: z.string().min(1, "First name is required"),
   lname: z.string().min(1, "Last name is required"),
-  parentEmail: z.string().email("Valid parent email is required"),
+
   kunya: z.string().optional(),
   dob: z.date().optional(),
   nationality: z.string().optional(),
@@ -59,7 +60,7 @@ const ProfileEditForm = ({ user, onSaved }: ProfileEditFormProps) => {
     defaultValues: {
       fname: user.fname || "",
       lname: user.lname || "",
-      parentEmail: user.parentEmail || "",
+
       kunya: user.kunya || "",
       dob: user.dob ? new Date(user.dob) : undefined,
       nationality: user.nationality || "",
@@ -69,7 +70,7 @@ const ProfileEditForm = ({ user, onSaved }: ProfileEditFormProps) => {
       appearance: user.appearance || "",
       maritalStatus: user.maritalStatus || "",
       noOfChildren: user.noOfChildren || "",
-      ethnicity: user.ethnicity || "",
+      ethnicity: Array.isArray(user.ethnicity) ? user.ethnicity.join(', ') : (user.ethnicity || ""),
       patternOfSalaah: user.patternOfSalaah || "",
       genotype: user.genotype || "",
       summary: user.summary || "",
@@ -89,7 +90,7 @@ const ProfileEditForm = ({ user, onSaved }: ProfileEditFormProps) => {
     form.reset({
       fname: user.fname || "",
       lname: user.lname || "",
-      parentEmail: user.parentEmail || "",
+
       kunya: user.kunya || "",
       dob: user.dob ? new Date(user.dob) : undefined,
       nationality: user.nationality || "",
@@ -99,7 +100,7 @@ const ProfileEditForm = ({ user, onSaved }: ProfileEditFormProps) => {
       appearance: user.appearance || "",
       maritalStatus: user.maritalStatus || "",
       noOfChildren: user.noOfChildren || "",
-      ethnicity: user.ethnicity || "",
+      ethnicity: Array.isArray(user.ethnicity) ? user.ethnicity.join(', ') : (user.ethnicity || ""),
       patternOfSalaah: user.patternOfSalaah || "",
       genotype: user.genotype || "",
       summary: user.summary || "",
@@ -197,26 +198,7 @@ const ProfileEditForm = ({ user, onSaved }: ProfileEditFormProps) => {
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="parentEmail"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Parent Email <span className="text-red-500">*</span></FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="email" 
-                      placeholder="Parent's email address (required for video calls and chat monitoring)" 
-                      {...field} 
-                    />
-                  </FormControl>
-                  <FormMessage />
-                  <p className="text-sm text-muted-foreground">
-                    This email will receive notifications and access links for video calls and chat monitoring.
-                  </p>
-                </FormItem>
-              )}
-            />
+
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
@@ -238,11 +220,36 @@ const ProfileEditForm = ({ user, onSaved }: ProfileEditFormProps) => {
                 name="dob"
                 render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel>Date of Birth</FormLabel>
-                    <DatePicker
-                      date={field.value}
-                      setDate={field.onChange}
+                    <DatePickerImproved
+                      date={field.value || null}
+                      setDate={(date) => {
+                        field.onChange(date);
+                        
+                        // Handle validation like in signup form
+                        if (date) {
+                          const age = differenceInYears(new Date(), date);
+                          if (age < 18) {
+                            form.setError('dob', {
+                              type: 'manual',
+                              message: 'You must be at least 18 years old'
+                            });
+                          } else if (age > 100) {
+                            form.setError('dob', {
+                              type: 'manual',
+                              message: 'Maximum age is 100 years'
+                            });
+                          } else {
+                            form.clearErrors('dob');
+                          }
+                        } else {
+                          form.clearErrors('dob');
+                        }
+                      }}
                       disabled={isSubmitting}
+                      minAge={18}
+                      maxAge={100}
+                      label="Date of Birth"
+                      helperText="Please select your date of birth. This is required for age verification."
                     />
                     <FormMessage />
                   </FormItem>

@@ -92,7 +92,7 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
     dealbreakers: user.dealbreakers || "",
     icebreakers: user.icebreakers || "",
     waliDetails: parseWaliDetails(),
-    parentEmail: user.parentEmail || "",
+
   });
 
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
@@ -425,7 +425,7 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
             {user.gender === 'female' && (
               <div>
                 <Label>Parent Email</Label>
-                <Input value={formData.parentEmail} onChange={(e) => handleInputChange("parentEmail", e.target.value)} />
+
               </div>
             )}
           </div>

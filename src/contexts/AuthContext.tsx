@@ -36,6 +36,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             const currentUser = await authService.getCurrentUser();
             if (currentUser) {
               console.log('User authenticated:', currentUser.username);
+              // Store user data in localStorage for WebRTC service
+              localStorage.setItem('user', JSON.stringify(currentUser));
               setUser(currentUser);
             } else {
               console.log('No user data returned despite having token');
@@ -64,6 +66,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const response = await authService.login(credentials);
       console.log('Login successful:', response.user.username);
+      // Store user data in localStorage for WebRTC service
+      localStorage.setItem('user', JSON.stringify(response.user));
       setUser(response.user);
       return response.user;
     } catch (error) {
@@ -79,6 +83,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const response = await authService.signup(data);
       console.log('Signup successful:', response.user.username);
+      // Store user data in localStorage for WebRTC service
+      localStorage.setItem('user', JSON.stringify(response.user));
       setUser(response.user);
       return response.user;
     } catch (error) {
@@ -91,6 +97,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = () => {
     authService.logout();
+    // Remove user data from localStorage
+    localStorage.removeItem('user');
     setUser(null);
     console.log('User logged out');
   };
@@ -98,6 +106,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const updateUser = (userData: Partial<User>) => {
     if (user) {
       const updatedUser = { ...user, ...userData };
+      // Update user data in localStorage
+      localStorage.setItem('user', JSON.stringify(updatedUser));
       setUser(updatedUser);
       console.log('User updated:', updatedUser);
     }

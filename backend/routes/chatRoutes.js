@@ -10,7 +10,8 @@ const {
   updateChat,
   getAllChatReceived,
   contactWali,
-  initiateVideoCall
+  initiateVideoCall,
+  sendVideoCallInvitation
 } = require('../controllers/chatController');
 const { protect } = require('../middlewares/auth');
 
@@ -20,9 +21,11 @@ const router = express.Router();
 router.get('/conversations', protect, getConversations);
 router.get('/messages/:userId', protect, getMessages);
 router.post('/send', protect, sendMessage);
+router.post('/send-invitation/:conversationId', protect, sendVideoCallInvitation);
 router.get('/unread', protect, getUnreadCount);
 router.post('/contact-wali', protect, contactWali);
 router.post('/video-call', protect, initiateVideoCall);
+router.post('/initiate-video-call', protect, initiateVideoCall);
 
 // Legacy routes for compatibility
 router.get('/chat', protect, getChat);

@@ -15,14 +15,30 @@ let accessTokenCache = {
 
 // Get Zoom OAuth access token
 const getZoomAccessToken = async () => {
+  console.log('🔐 Getting Zoom access token...', {
+    hasCachedToken: !!accessTokenCache.token,
+    tokenExpired: accessTokenCache.expiresAt ? accessTokenCache.expiresAt <= Date.now() : 'no-expiry',
+    credentialsPresent: {
+      clientId: !!ZOOM_CLIENT_ID,
+      clientSecret: !!ZOOM_CLIENT_SECRET,
+      accountId: !!ZOOM_ACCOUNT_ID
+    }
+  });
+  
   // Check if we have a valid cached token
   if (accessTokenCache.token && accessTokenCache.expiresAt > Date.now()) {
+    console.log('✅ Using cached Zoom token');
     return accessTokenCache.token;
   }
 
   try {
+    if (!ZOOM_CLIENT_ID || !ZOOM_CLIENT_SECRET || !ZOOM_ACCOUNT_ID) {
+      throw new Error('Missing Zoom API credentials in environment variables');
+    }
+    
     const credentials = Buffer.from(`${ZOOM_CLIENT_ID}:${ZOOM_CLIENT_SECRET}`).toString('base64');
     
+    console.log('🌐 Making Zoom OAuth request...');
     const response = await axios.post('https://zoom.us/oauth/token', 
       `grant_type=account_credentials&account_id=${ZOOM_ACCOUNT_ID}`,
       {
@@ -35,6 +51,11 @@ const getZoomAccessToken = async () => {
 
     const { access_token, expires_in } = response.data;
     
+    console.log('✅ Zoom access token obtained successfully', {
+      tokenLength: access_token?.length,
+      expiresIn: expires_in
+    });
+    
     // Cache the token
     accessTokenCache = {
       token: access_token,
@@ -43,7 +64,12 @@ const getZoomAccessToken = async () => {
 
     return access_token;
   } catch (error) {
-    console.error('Error getting Zoom access token:', error.response?.data || error.message);
+    console.error('❌ Error getting Zoom access token:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message
+    });
     throw new Error('Failed to authenticate with Zoom API');
   }
 };
@@ -52,16 +78,34 @@ const getZoomAccessToken = async () => {
 // @route   POST /api/zoom/create-meeting
 // @access  Private (Premium users only)
 exports.createMeeting = async (req, res) => {
+  console.log('🎥 Zoom Meeting Creation Request:', {
+    userId: req.user._id,
+    requestBody: req.body,
+    hasZoomCredentials: {
+      clientId: !!ZOOM_CLIENT_ID,
+      clientSecret: !!ZOOM_CLIENT_SECRET,
+      accountId: !!ZOOM_ACCOUNT_ID
+    }
+  });
+  
   try {
     const userId = req.user._id;
     
     // Check if user is premium
     const user = await User.findById(userId);
     if (!user) {
+      console.log('❌ User not found:', userId);
       return res.status(404).json({ message: 'User not found' });
     }
     
+    console.log('👤 User plan check:', {
+      userId: user._id,
+      currentPlan: user.plan,
+      isPremium: user.plan === 'premium' || user.plan === 'pro'
+    });
+    
     if (user.plan !== 'premium' && user.plan !== 'pro') {
+      console.log('❌ User not premium - access denied');
       return res.status(403).json({ 
         message: 'Video calls are available for Premium users only. Upgrade your plan to access this feature.',
         requiresUpgrade: true 
@@ -77,7 +121,9 @@ exports.createMeeting = async (req, res) => {
       join_before_host = false
     } = req.body;
     
+    console.log('🔑 Getting Zoom access token...');
     const accessToken = await getZoomAccessToken();
+    console.log('✅ Access token obtained, creating meeting...');
     
     const meetingData = {
       topic,
@@ -106,7 +152,13 @@ exports.createMeeting = async (req, res) => {
       meetingData.password = password;
     }
     
-    console.log('Creating Zoom meeting with data:', meetingData);
+    console.log('📅 Creating Zoom meeting with data:', {
+      topic: meetingData.topic,
+      type: meetingData.type,
+      duration: meetingData.duration,
+      hasStartTime: !!meetingData.start_time,
+      hasPassword: !!meetingData.password
+    });
     
     const response = await axios.post(
       `${ZOOM_API_BASE_URL}/users/me/meetings`,

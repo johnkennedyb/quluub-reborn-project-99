@@ -1,6 +1,7 @@
 const asyncHandler = require('express-async-handler');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
+const { sendEmail } = require('../utils/emailService');
 
 // @desc    Get user notifications
 // @route   GET /api/notifications
@@ -48,6 +49,72 @@ exports.sendGlobalNotification = asyncHandler(async (req, res) => {
   await Notification.insertMany(notifications);
 
   res.status(201).json({ message: `Notification sent to ${users.length} users.` });
+});
+
+// @desc    Send a call notification to a user
+// @route   POST /api/notifications/send-call-notification
+// @access  Private
+exports.sendCallNotification = asyncHandler(async (req, res) => {
+  const { recipientId, callData } = req.body;
+  
+  if (!recipientId || !callData || !callData.meetingUrl) {
+    res.status(400);
+    throw new Error('Recipient ID and call data with meeting URL are required');
+  }
+
+  // Get the recipient user
+  const recipient = await User.findById(recipientId);
+  if (!recipient) {
+    res.status(404);
+    throw new Error('Recipient not found');
+  }
+
+  // Create notification
+  const notification = await Notification.create({
+    user: recipientId,
+    title: '📞 Incoming Video Call',
+    message: `You have an incoming video call from ${callData.callerName || 'a user'}`,
+    type: 'video_call',
+    data: {
+      meetingUrl: callData.meetingUrl,
+      meetingId: callData.meetingId,
+      timestamp: callData.timestamp || new Date().toISOString()
+    },
+    read: false
+  });
+
+  // Send email notification if recipient has email
+  if (recipient.email) {
+    try {
+      const emailData = {
+        to: recipient.email,
+        subject: `📞 You have an incoming video call from ${callData.callerName || 'a user'}`,
+        template: 'call_notification',
+        context: {
+          callerName: callData.callerName || 'Someone',
+          meetingUrl: callData.meetingUrl,
+          recipientName: `${recipient.fname || ''} ${recipient.lname || ''}`.trim() || 'there'
+        }
+      };
+
+      await sendEmail(emailData);
+      console.log(`📧 Call notification email sent to ${recipient.email}`);
+    } catch (emailError) {
+      console.error('❌ Failed to send call notification email:', emailError);
+      // Don't fail the request if email sending fails
+    }
+  }
+
+  // Emit real-time notification
+  if (req.io) {
+    req.io.to(recipientId.toString()).emit('new_notification', notification);
+  }
+
+  res.status(200).json({
+    success: true,
+    message: 'Call notification sent successfully',
+    notification
+  });
 });
 
 exports.markAsRead = asyncHandler(async (req, res) => {

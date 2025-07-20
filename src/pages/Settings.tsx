@@ -475,16 +475,6 @@ const Settings = () => {
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       <div className="container py-6">
-        {/* Email validation banner */}
-        <Alert className="mb-6 bg-yellow-50 border-yellow-200">
-          <AlertDescription className="flex items-center gap-2">
-            <span className="bg-yellow-400 text-white p-1 rounded-full">!</span>
-            Please validate your email address to continue
-            <Button variant="outline" size="sm" className="ml-auto bg-blue-600 text-white hover:bg-blue-700">
-              Resend validation mail
-            </Button>
-          </AlertDescription>
-        </Alert>
         
         <h1 className="text-2xl font-bold mb-6">Settings</h1>
         

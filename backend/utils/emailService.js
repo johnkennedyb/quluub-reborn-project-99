@@ -191,7 +191,7 @@ const sendEncourageUnhideEmail = (email, recipientName) => sendEmail(email, enco
 const sendSuggestedAccountsEmail = (email, recipientName) => sendEmail(email, suggestedAccountsEmail, recipientName);
 const sendContactWaliEmail = (email, brotherName) => sendEmail(email, contactWaliEmail, brotherName);
 const sendWaliViewChatEmail = (email, waliName, wardName, brotherName, chatLink) => sendEmail(email, waliViewChatEmail, waliName, wardName, brotherName, chatLink);
-const sendVideoCallNotificationEmail = (parentEmail, waliName, wardName, brotherName, callUrl) => sendEmail(parentEmail, videoCallNotificationEmail, waliName, wardName, brotherName, callUrl);
+const sendVideoCallNotificationEmail = (parentEmail, waliName, wardName, brotherName, callDetails, reportLink) => sendEmail(parentEmail, videoCallNotificationEmail, waliName, wardName, brotherName, callDetails, reportLink);
 
 const sendValidationEmail = (email, recipientName, validationToken) => {
   const validationUrl = `${process.env.FRONTEND_URL}/validate-email?token=${validationToken}`;

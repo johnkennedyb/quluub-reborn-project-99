@@ -1,32 +1,23 @@
-import { useEffect, useRef, useState, useContext } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Clock, Users, PhoneOff } from "lucide-react";
-import { loadJitsiScript, createJitsiMeeting } from "@/lib/jitsi";
+import { ArrowLeft, Video, MessageCircle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import apiClient from "@/lib/api-client";
+import WherebyCallButton from "@/components/VideoCall/WherebyCallButton";
+import WherebyEmbeddedCall from "@/components/VideoCall/WherebyEmbeddedCall";
 
 const VideoCall = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { search } = useLocation();
-    const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const params = new URLSearchParams(search);
-  const roomId = params.get("room");
+  const recipientId = params.get("with");
+  const meetingUrl = params.get("meeting");
 
-  const jitsiContainerRef = useRef<HTMLDivElement>(null);
-  const jitsiApiRef = useRef<any>(null);
-  const initializingRef = useRef(false);
-  const callTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  const [callState, setCallState] = useState<
-    "loading" | "connecting" | "connected" | "error" | "ended"
-  >("loading");
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [callDuration, setCallDuration] = useState(0);
-  const [participantCount, setParticipantCount] = useState(0);
-  const [timeRemaining, setTimeRemaining] = useState(300); // 5 minutes in seconds
+  const [currentMeetingUrl, setCurrentMeetingUrl] = useState<string | null>(meetingUrl);
+  const [recipientInfo, setRecipientInfo] = useState<any>(null);
 
   // Redirect to auth if not authenticated
   useEffect(() => {
@@ -41,327 +32,193 @@ const VideoCall = () => {
     }
   }, [isAuthenticated, navigate, toast]);
 
-  // Redirect if no room ID
+  // Redirect if no recipient ID
   useEffect(() => {
-    if (!roomId) {
+    if (!recipientId) {
       toast({
-        title: "Invalid Room",
-        description: "No room ID provided",
+        title: "Invalid Call",
+        description: "No recipient specified for video call",
         variant: "destructive",
       });
       navigate("/dashboard");
       return;
     }
-  }, [roomId, navigate, toast]);
+  }, [recipientId, navigate, toast]);
 
+  // Fetch recipient info
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (callState === "connected") {
-      interval = setInterval(() => {
-        setCallDuration((prev) => prev + 1);
-        setTimeRemaining((prev) => {
-          if (prev <= 1) {
-            handleCallTimeout();
-            return 0;
+    const fetchRecipientInfo = async () => {
+      try {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/users/${recipientId}`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
-          return prev - 1;
         });
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [callState]);
-
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs
-      .toString()
-      .padStart(2, "0")}`;
-  };
-
-  const handleCallTimeout = async () => {
-    toast({
-      title: "Call Time Limit Reached",
-      description: "Your 5-minute call has ended",
-      variant: "destructive",
-    });
-    
-    // Update call status to completed
-    try {
-      await apiClient.put('/video-call/status', {
-        roomId,
-        status: 'completed'
-      });
-    } catch (error) {
-      console.error('Error updating call status:', error);
-    }
-    
-    handleEndCall();
-  };
-
-  const cleanupJitsiCall = () => {
-    if (jitsiApiRef.current) {
-      try {
-        jitsiApiRef.current.dispose();
+        if (response.ok) {
+          const data = await response.json();
+          setRecipientInfo(data);
+        }
       } catch (error) {
-        console.error('Error disposing Jitsi call:', error);
+        console.error('Error fetching recipient info:', error);
       }
-      jitsiApiRef.current = null;
-    }
-    if (callTimerRef.current) {
-      clearTimeout(callTimerRef.current);
-      callTimerRef.current = null;
-    }
-    initializingRef.current = false;
-  };
-
-  const initializeJitsiCall = async () => {
-    if (!roomId || !jitsiContainerRef.current || initializingRef.current || jitsiApiRef.current || !user) {
-      return;
-    }
-
-    try {
-      initializingRef.current = true;
-      setCallState("connecting");
-      
-      // Check if call exists and get call info
-      try {
-        const callResponse = await apiClient.get(`/video-call/room/${roomId}`);
-        console.log('Call info:', callResponse.data);
-      } catch (error: any) {
-        if (error.response?.status === 404) {
-          console.log('Call not found, this might be a direct room join');
-        } else {
-          console.error('Error fetching call info:', error);
-        }
-      }
-      
-      // Load Jitsi script
-      await loadJitsiScript();
-      
-      const displayName = `${user.fname} ${user.lname}`;
-      
-      const jitsiApi = createJitsiMeeting({
-        roomName: roomId,
-        parentNode: jitsiContainerRef.current,
-        userInfo: {
-          displayName: displayName,
-        },
-        configOverwrite: {
-          startWithAudioMuted: false,
-          startWithVideoMuted: false,
-          enableWelcomePage: false,
-          prejoinPageEnabled: false,
-          requireDisplayName: false,
-          disableProfile: true,
-          hideDisplayName: false,
-          enableUserRolesBasedOnToken: false,
-        },
-      });
-
-      jitsiApiRef.current = jitsiApi;
-
-      // Set up event listeners
-      jitsiApi.addEventListener('videoConferenceJoined', async () => {
-        console.log('Joined Jitsi call as:', displayName);
-        setCallState("connected");
-        setParticipantCount(1);
-        
-        // Update call status to ongoing
-        try {
-          await apiClient.put('/video-call/status', {
-            roomId,
-            status: 'ongoing'
-          });
-        } catch (error) {
-          console.error('Error updating call status to ongoing:', error);
-        }
-        
-        toast({
-          title: "Call Connected",
-          description: "You have 5 minutes for this call",
-        });
-        initializingRef.current = false;
-      });
-
-      jitsiApi.addEventListener('videoConferenceLeft', async () => {
-        console.log('Left Jitsi call');
-        
-        // Update call status
-        try {
-          await apiClient.put('/video-call/status', {
-            roomId,
-            status: 'completed'
-          });
-        } catch (error) {
-          console.error('Error updating call status:', error);
-        }
-        
-        handleEndCall();
-      });
-
-      jitsiApi.addEventListener('participantJoined', (participant: any) => {
-        console.log('Participant joined:', participant);
-        setParticipantCount(prev => prev + 1);
-      });
-
-      jitsiApi.addEventListener('participantLeft', (participant: any) => {
-        console.log('Participant left:', participant);
-        setParticipantCount(prev => Math.max(0, prev - 1));
-      });
-
-      jitsiApi.addEventListener('readyToClose', () => {
-        console.log('Jitsi ready to close');
-        handleEndCall();
-      });
-
-    } catch (error: any) {
-      console.error('Error initializing Jitsi call:', error);
-      setCallState("error");
-      setErrorMessage(error.message || "Failed to initialize video call");
-      toast({
-        title: "Initialization Error",
-        description: "Failed to initialize the video call. No Jitsi registration required.",
-        variant: "destructive",
-      });
-      initializingRef.current = false;
-    }
-  };
-
-  const handleEndCall = () => {
-    setCallState("ended");
-    cleanupJitsiCall();
-    navigate("/dashboard");
-  };
-
-  useEffect(() => {
-    if (isAuthenticated && user && roomId) {
-      initializeJitsiCall();
-    }
-
-    return () => {
-      cleanupJitsiCall();
     };
-  }, [roomId, isAuthenticated, user]);
 
-  // Don't render if not authenticated
-  if (!isAuthenticated || !user) {
-    return null;
+    if (recipientId) {
+      fetchRecipientInfo();
+    }
+  }, [recipientId]);
+
+  const handleCallInitiated = (meetingUrl: string) => {
+    setCurrentMeetingUrl(meetingUrl);
+    toast({
+      title: "Call Initiated",
+      description: "Professional video call started with Whereby",
+    });
+  };
+
+  const handleChatRedirect = () => {
+    navigate(`/messages?chat=${recipientId}`);
+  };
+
+  // If we have a meeting URL, show the embedded call
+  if (currentMeetingUrl && recipientInfo) {
+    return (
+      <WherebyEmbeddedCall 
+        recipientId={recipientId!}
+        recipientName={`${recipientInfo.fname} ${recipientInfo.lname}`}
+        recipientAvatar={recipientInfo.profilePicture}
+        isOpen={true}
+        onClose={() => {
+          setCurrentMeetingUrl(null);
+          navigate("/dashboard");
+        }}
+        onCallEnded={() => {
+          setCurrentMeetingUrl(null);
+          navigate("/dashboard");
+        }}
+      />
+    );
   }
 
-  const getStatusMessage = () => {
-    switch (callState) {
-      case "loading": return "Loading video call...";
-      case "connecting": return "Connecting to call... (No Jitsi account needed)";
-      case "connected": return "Connected";
-      case "error": return errorMessage || "An error occurred";
-      case "ended": return "Call ended";
-      default: return "Initializing...";
-    }
-  };
-
-  const getStatusColor = () => {
-    switch (callState) {
-      case "connected": return "text-green-400";
-      case "error": return "text-red-400";
-      case "ended": return "text-gray-400";
-      case "loading":
-      case "connecting": return "text-yellow-400";
-      default: return "text-white";
-    }
-  };
-
-  const getTimeRemainingColor = () => {
-    if (timeRemaining <= 60) return "text-red-400";
-    if (timeRemaining <= 120) return "text-yellow-400";
-    return "text-green-400";
-  };
-
   return (
-    <div className="h-screen w-screen bg-gray-900 text-white flex flex-col">
-      {/* Top bar */}
-      <div className="p-4 flex items-center justify-between bg-gray-800 z-10">
-        <div className="flex items-center">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/dashboard")}>
-            <ArrowLeft className="h-5 w-5" />
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <Button 
+            variant="ghost" 
+            onClick={() => navigate("/dashboard")}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
           </Button>
-          <h2 className="ml-4 text-xl font-medium">Video Call</h2>
-          {callState === "connected" && (
-            <div className="ml-4 flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                <span className="text-sm">{formatDuration(callDuration)}</span>
-              </div>
-              <div className={`flex items-center gap-2 ${getTimeRemainingColor()}`}>
-                <Clock className="h-4 w-4" />
-                <span className="text-sm font-bold">
-                  {formatDuration(timeRemaining)} left
-                </span>
+          
+          <h1 className="text-2xl font-bold text-gray-900">
+            Professional Video Call
+          </h1>
+          
+          <div className="w-24" /> {/* Spacer for centering */}
+        </div>
+
+        {/* Main Content */}
+        <div className="bg-white rounded-xl shadow-lg p-8">
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Video className="text-blue-600" size={40} />
+            </div>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">
+              Start Video Call
+            </h2>
+            <p className="text-gray-600 max-w-md mx-auto">
+              Initiate a professional, secure video call with Islamic compliance monitoring
+            </p>
+          </div>
+
+          {/* Recipient Info */}
+          {recipientInfo && (
+            <div className="bg-gray-50 rounded-lg p-6 mb-8">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Call Recipient</h3>
+              <div className="flex items-center gap-4">
+                {recipientInfo.profilePicture ? (
+                  <img 
+                    src={recipientInfo.profilePicture} 
+                    alt={`${recipientInfo.fname} ${recipientInfo.lname}`}
+                    className="w-16 h-16 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-16 h-16 bg-gray-300 rounded-full flex items-center justify-center">
+                    <span className="text-gray-600 font-semibold text-lg">
+                      {recipientInfo.fname?.[0]}{recipientInfo.lname?.[0]}
+                    </span>
+                  </div>
+                )}
+                <div>
+                  <p className="font-semibold text-gray-900">
+                    {recipientInfo.fname} {recipientInfo.lname}
+                  </p>
+                  <p className="text-gray-600">@{recipientInfo.username}</p>
+                </div>
               </div>
             </div>
           )}
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            <span className="text-sm">{participantCount}</span>
-          </div>
-          <span className={`text-sm ${getStatusColor()}`}>
-            {getStatusMessage()}
-          </span>
-        </div>
-      </div>
 
-      {/* Jitsi container */}
-      <div className="flex-1 relative">
-        <div 
-          ref={jitsiContainerRef} 
-          className="w-full h-full"
-          style={{ minHeight: '500px' }}
-        />
-
-        {/* Loading overlay */}
-        {(callState === "loading" || callState === "connecting") && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-20">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white mx-auto mb-4"></div>
-              <p className={`text-lg ${getStatusColor()}`}>
-                {getStatusMessage()}
-              </p>
-              <p className="text-sm text-gray-300 mt-2">
-                Authenticated users only • 5 minute limit • Rejoin anytime
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Error overlay */}
-        {callState === "error" && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/70 z-20">
-            <div className="text-center">
-              <p className="text-lg text-red-400 mb-4">
-                {errorMessage || "An error occurred"}
-              </p>
-              <Button onClick={() => navigate("/dashboard")} variant="outline">
-                Go Back to Dashboard
+          {/* Call Actions */}
+          <div className="space-y-4">
+            {recipientId && recipientInfo && (
+              <WherebyCallButton
+                recipientId={recipientId}
+                recipientName={`${recipientInfo.fname} ${recipientInfo.lname}`}
+                recipientAvatar={recipientInfo.profilePicture}
+                onCallStarted={() => handleCallInitiated('meeting-url-placeholder')}
+                variant="primary"
+                size="lg"
+              />
+            )}
+            
+            {/* Chat Option */}
+            <div className="flex justify-center">
+              <Button
+                variant="outline"
+                onClick={handleChatRedirect}
+                className="flex items-center gap-2"
+              >
+                <MessageCircle size={20} />
+                Continue in Chat Instead
               </Button>
             </div>
           </div>
-        )}
-      </div>
 
-      {/* Controls */}
-      <div className="p-4 bg-gray-800 flex items-center justify-center">
-        <Button
-          variant="destructive"
-          size="icon"
-          onClick={handleEndCall}
-          className="h-12 w-12 rounded-full"
-        >
-          <PhoneOff className="h-5 w-5" />
-        </Button>
+          {/* Features */}
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
+            <div className="text-center p-4 bg-green-50 rounded-lg">
+              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                <span className="text-green-600">🔒</span>
+              </div>
+              <p className="font-medium">End-to-End Encrypted</p>
+            </div>
+            <div className="text-center p-4 bg-blue-50 rounded-lg">
+              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                <span className="text-blue-600">📹</span>
+              </div>
+              <p className="font-medium">Auto Recording</p>
+            </div>
+            <div className="text-center p-4 bg-purple-50 rounded-lg">
+              <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-2">
+                <span className="text-purple-600">👁️</span>
+              </div>
+              <p className="font-medium">Wali Supervision</p>
+            </div>
+          </div>
+
+          {/* Compliance Notice */}
+          <div className="mt-8 bg-amber-50 border border-amber-200 rounded-lg p-4">
+            <p className="text-sm text-amber-800 text-center">
+              <strong>📹 Islamic Compliance:</strong> This call will be automatically recorded 
+              and sent to your Wali for proper supervision and oversight.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,24 +1,24 @@
 const express = require('express');
 const router = express.Router();
-const { createMeeting, getMeeting, deleteMeeting } = require('../controllers/zoomController');
+const { createRoom, getRoom, deleteRoom } = require('../controllers/wherebyController');
 const { protect } = require('../middlewares/authMiddleware');
 
-// All Zoom routes require authentication
+// All Whereby routes require authentication
 router.use(protect);
 
-// @route   POST /api/zoom/create-meeting
-// @desc    Create a new Zoom meeting
+// @route   POST /api/whereby/create-room
+// @desc    Create a new Whereby room
 // @access  Private (Premium users only)
-router.post('/create-meeting', createMeeting);
+router.post('/create-room', createRoom);
 
-// @route   GET /api/zoom/meeting/:meetingId
-// @desc    Get meeting details
+// @route   GET /api/whereby/room/:meetingId
+// @desc    Get room details
 // @access  Private (Premium users only)
-router.get('/meeting/:meetingId', getMeeting);
+router.get('/room/:meetingId', getRoom);
 
-// @route   DELETE /api/zoom/meeting/:meetingId
-// @desc    Delete a meeting
+// @route   DELETE /api/whereby/room/:meetingId
+// @desc    Delete a room
 // @access  Private (Premium users only)
-router.delete('/meeting/:meetingId', deleteMeeting);
+router.delete('/room/:meetingId', deleteRoom);
 
 module.exports = router;

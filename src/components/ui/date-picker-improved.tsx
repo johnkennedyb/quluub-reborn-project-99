@@ -35,10 +35,23 @@ export function DatePickerImproved({
   const minYear = currentYear - maxAge;
   const maxYear = currentYear - minAge;
   
-  // Extract current values
-  const selectedDay = date ? date.getDate() : null;
-  const selectedMonth = date ? date.getMonth() + 1 : null; // getMonth() returns 0-11
-  const selectedYear = date ? date.getFullYear() : null;
+  // Use internal state to track individual components
+  const [selectedDay, setSelectedDay] = React.useState<number | null>(date ? date.getDate() : null);
+  const [selectedMonth, setSelectedMonth] = React.useState<number | null>(date ? date.getMonth() + 1 : null);
+  const [selectedYear, setSelectedYear] = React.useState<number | null>(date ? date.getFullYear() : null);
+  
+  // Update internal state when date prop changes
+  React.useEffect(() => {
+    if (date) {
+      setSelectedDay(date.getDate());
+      setSelectedMonth(date.getMonth() + 1);
+      setSelectedYear(date.getFullYear());
+    } else {
+      setSelectedDay(null);
+      setSelectedMonth(null);
+      setSelectedYear(null);
+    }
+  }, [date]);
   
   // Generate options
   const days = Array.from({ length: 31 }, (_, i) => i + 1);
@@ -63,8 +76,8 @@ export function DatePickerImproved({
     return new Date(year, month, 0).getDate();
   };
   
-  // Update date when any component changes
-  const updateDate = (day: number | null, month: number | null, year: number | null) => {
+  // Create date when all components are selected
+  const createDateIfComplete = (day: number | null, month: number | null, year: number | null) => {
     if (day && month && year) {
       // Validate day exists in the selected month/year
       const daysInMonth = getDaysInMonth(month, year);
@@ -73,25 +86,25 @@ export function DatePickerImproved({
       const newDate = new Date(year, month - 1, validDay); // month is 0-indexed in Date constructor
       setDate(newDate);
       onChange?.(newDate);
-    } else {
-      setDate(null);
-      onChange?.(null);
     }
   };
   
   const handleDayChange = (value: string) => {
     const day = parseInt(value);
-    updateDate(day, selectedMonth, selectedYear);
+    setSelectedDay(day);
+    createDateIfComplete(day, selectedMonth, selectedYear);
   };
   
   const handleMonthChange = (value: string) => {
     const month = parseInt(value);
-    updateDate(selectedDay, month, selectedYear);
+    setSelectedMonth(month);
+    createDateIfComplete(selectedDay, month, selectedYear);
   };
   
   const handleYearChange = (value: string) => {
     const year = parseInt(value);
-    updateDate(selectedDay, selectedMonth, year);
+    setSelectedYear(year);
+    createDateIfComplete(selectedDay, selectedMonth, year);
   };
   
   // Calculate age for display
@@ -115,7 +128,7 @@ export function DatePickerImproved({
           <div>
             <Label className="text-xs text-muted-foreground">Day</Label>
             <Select 
-              value={selectedDay?.toString() || ""} 
+              value={selectedDay ? selectedDay.toString() : undefined} 
               onValueChange={handleDayChange}
               disabled={disabled}
             >
@@ -136,7 +149,7 @@ export function DatePickerImproved({
           <div>
             <Label className="text-xs text-muted-foreground">Month</Label>
             <Select 
-              value={selectedMonth?.toString() || ""} 
+              value={selectedMonth ? selectedMonth.toString() : undefined} 
               onValueChange={handleMonthChange}
               disabled={disabled}
             >
@@ -157,7 +170,7 @@ export function DatePickerImproved({
           <div>
             <Label className="text-xs text-muted-foreground">Year</Label>
             <Select 
-              value={selectedYear?.toString() || ""} 
+              value={selectedYear ? selectedYear.toString() : undefined} 
               onValueChange={handleYearChange}
               disabled={disabled}
             >
