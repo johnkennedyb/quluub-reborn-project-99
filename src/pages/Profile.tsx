@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import TopNavbar from "@/components/TopNavbar";
 import Navbar from "@/components/Navbar";
@@ -18,42 +18,55 @@ const Profile = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const { toast } = useToast();
   
-  const isOwnProfile = !userId || (currentUser?._id === userId);
-  const displayUserId = userId || currentUser?._id;
+  // Memoize computed values to prevent unnecessary re-renders
+  const isOwnProfile = useMemo(() => !userId || (currentUser?._id === userId), [userId, currentUser?._id]);
+  const displayUserId = useMemo(() => userId || currentUser?._id, [userId, currentUser?._id]);
+  
+  // Memoize the fetch function to prevent recreation on every render
+  const fetchUserProfile = useCallback(async () => {
+    if (!displayUserId) return;
+    
+    try {
+      setLoading(true);
+      
+      // For own profile, use current user data if available to avoid API call
+      if (isOwnProfile && currentUser) {
+        setProfileUser(currentUser);
+        setLoading(false);
+        return;
+      }
+      
+      // Only make API call for other users' profiles or when current user data is not available
+      const userData = await userService.getProfile(displayUserId);
+      setProfileUser(userData || null);
+      
+    } catch (error) {
+      console.error("Failed to fetch profile:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load user profile",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [displayUserId, isOwnProfile, currentUser, toast]);
   
   useEffect(() => {
-    const fetchUserProfile = async () => {
-      if (!displayUserId) return;
-      
-      try {
-        setLoading(true);
-        const userData = isOwnProfile
-          ? currentUser
-          : await userService.getProfile(displayUserId);
-          
-        setProfileUser(userData || null);
-        console.log("Profile user data:", userData);
-      } catch (error) {
-        console.error("Failed to fetch profile:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load user profile",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     fetchUserProfile();
-  }, [displayUserId, isOwnProfile, currentUser, toast]);
+  }, [fetchUserProfile]);
 
-  const handleProfileSave = async (updatedData: Partial<User>) => {
+  const handleProfileSave = useCallback(async (updatedData: Partial<User>) => {
     if (!profileUser?._id) return;
     
     try {
+      // Optimistically update UI first for better UX
+      const optimisticUpdate = { ...profileUser, ...updatedData };
+      setProfileUser(optimisticUpdate);
+      
+      // Make API call
       await userService.updateProfile(profileUser._id, updatedData);
-      setProfileUser(prev => prev ? { ...prev, ...updatedData } : null);
+      
       setIsEditMode(false);
       toast({
         title: "Profile Updated",
@@ -61,13 +74,17 @@ const Profile = () => {
       });
     } catch (error) {
       console.error("Failed to update profile:", error);
+      
+      // Revert optimistic update on error
+      setProfileUser(profileUser);
+      
       toast({
         title: "Error",
         description: "Failed to update profile. Please try again.",
         variant: "destructive",
       });
     }
-  };
+  }, [profileUser, toast]);
 
   if (loading) {
     return (

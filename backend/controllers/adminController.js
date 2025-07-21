@@ -190,27 +190,54 @@ const getUserDetails = async (req, res) => {
 // @access  Private/Admin
 const updateUser = async (req, res) => {
   try {
+    console.log('Admin updateUser called with ID:', req.params.id);
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+    
     const user = await User.findById(req.params.id);
     if (user) {
-      user.fname = req.body.fname || user.fname;
-      user.lname = req.body.lname || user.lname;
-      user.email = req.body.email || user.email;
-      user.plan = req.body.plan || user.plan;
-      user.status = req.body.status || user.status;
-      if (req.body.emailVerified !== undefined) {
-        user.emailVerified = req.body.emailVerified;
-      }
-      user.city = req.body.city || user.city;
-      user.country = req.body.country || user.country;
-      user.gender = req.body.gender || user.gender;
-      user.dob = req.body.dob || user.dob;
+      console.log('User found:', user.email);
+      
+      // Update fields safely
+      if (req.body.fname !== undefined) user.fname = req.body.fname;
+      if (req.body.lname !== undefined) user.lname = req.body.lname;
+      if (req.body.email !== undefined) user.email = req.body.email;
+      if (req.body.plan !== undefined) user.plan = req.body.plan;
+      if (req.body.status !== undefined) user.status = req.body.status;
+      if (req.body.emailVerified !== undefined) user.emailVerified = req.body.emailVerified;
+      if (req.body.city !== undefined) user.city = req.body.city;
+      if (req.body.country !== undefined) user.country = req.body.country;
+      if (req.body.gender !== undefined) user.gender = req.body.gender;
+      if (req.body.dob !== undefined) user.dob = req.body.dob;
+      
+      console.log('About to save user with updates:', {
+        fname: user.fname,
+        lname: user.lname,
+        email: user.email,
+        plan: user.plan,
+        status: user.status,
+        emailVerified: user.emailVerified
+      });
+      
       const updatedUser = await user.save();
+      console.log('User updated successfully');
       res.json(updatedUser);
     } else {
+      console.log('User not found with ID:', req.params.id);
       res.status(404).json({ message: 'User not found' });
     }
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    console.error('Error in updateUser:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    if (error.errors) {
+      console.error('Validation errors:', error.errors);
+    }
+    res.status(500).json({ 
+      message: 'Server error', 
+      error: error.message,
+      details: error.errors || 'No additional details'
+    });
   }
 };
 

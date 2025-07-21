@@ -5,17 +5,91 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
+// Simple in-memory cache for profile data
+const profileCache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Helper function to clear profile cache
+const clearProfileCache = (userId) => {
+  const keys = Array.from(profileCache.keys());
+  keys.forEach(key => {
+    if (key.startsWith(`profile_${userId}_`)) {
+      profileCache.delete(key);
+    }
+  });
+};
+
+// Periodic cache cleanup to prevent memory leaks
+setInterval(() => {
+  const now = Date.now();
+  const keysToDelete = [];
+  
+  for (const [key, value] of profileCache.entries()) {
+    if (now - value.timestamp > CACHE_TTL) {
+      keysToDelete.push(key);
+    }
+  }
+  
+  keysToDelete.forEach(key => profileCache.delete(key));
+  
+  if (keysToDelete.length > 0) {
+    console.log(`🧹 Cleaned up ${keysToDelete.length} expired profile cache entries`);
+  }
+}, CACHE_TTL); // Run cleanup every 5 minutes
+
 // @desc    Get current user profile
 // @route   GET /api/users/profile
 // @access  Private
 exports.getUserProfile = async (req, res) => {
   try {
     const userId = req.params.userId || req.user._id;
-    const user = await User.findById(userId).select('-password');
+    const isOwnProfile = userId === req.user._id.toString();
+    const cacheKey = `profile_${userId}_${isOwnProfile ? 'own' : 'public'}`;
+    
+    // Check cache first (skip cache for own profile to ensure fresh data)
+    if (!isOwnProfile && profileCache.has(cacheKey)) {
+      const cached = profileCache.get(cacheKey);
+      if (Date.now() - cached.timestamp < CACHE_TTL) {
+        res.set({
+          'Cache-Control': 'private, max-age=600',
+          'X-Cache': 'HIT'
+        });
+        return res.json(cached.data);
+      } else {
+        profileCache.delete(cacheKey);
+      }
+    }
+    
+    // Optimize field selection based on profile type
+    let selectFields = '-password -resetPasswordToken -resetPasswordTokenExpiration -validationToken';
+    
+    // For viewing others' profiles, exclude sensitive fields
+    if (!isOwnProfile) {
+      selectFields += ' -email -phoneNumber -parentEmail -waliDetails -favorites -blockedUsers -reportedUsers';
+    }
+    
+    const user = await User.findById(userId)
+      .select(selectFields)
+      .lean(); // Use lean() for faster queries
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
+
+    // Cache public profiles only
+    if (!isOwnProfile) {
+      profileCache.set(cacheKey, {
+        data: user,
+        timestamp: Date.now()
+      });
+    }
+
+    // Set cache headers for better performance
+    res.set({
+      'Cache-Control': isOwnProfile ? 'private, max-age=300' : 'private, max-age=600',
+      'ETag': `"${user._id}-${user.updatedAt || user.createdAt}"`,
+      'X-Cache': 'MISS'
+    });
 
     res.json(user);
   } catch (error) {
@@ -69,6 +143,9 @@ exports.updateUserProfile = async (req, res) => {
     
     // Save user
     const updatedUser = await user.save();
+    
+    // Clear profile cache for this user to ensure fresh data
+    clearProfileCache(req.params.id);
     
     res.json({
       _id: updatedUser._id,

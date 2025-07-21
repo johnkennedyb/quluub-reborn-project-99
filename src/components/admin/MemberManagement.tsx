@@ -15,7 +15,7 @@ import UserProfileCard from './UserProfileCard';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import EditUserDialog from './EditUserDialog';
 import SendEmailDialog from './SendEmailDialog';
-import { Search, Edit, Trash2, Users, Eye, Mail } from 'lucide-react';
+import { Search, Edit, Trash2, Users, Eye, Mail, User } from 'lucide-react';
 import ReactSelect from 'react-select';
 
 interface MemberManagementProps {
@@ -116,8 +116,75 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
 
   const renderUserCard = (user: any) => (
     <Card key={user._id} className="mb-4">
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between">
+      <CardContent className="p-3 sm:p-4">
+        {/* Mobile Layout */}
+        <div className="block sm:hidden">
+          <div className="flex items-start space-x-3 mb-3">
+            <Avatar className="h-10 w-10">
+              <AvatarFallback className="text-xs">
+                {user.fname?.[0]}{user.lname?.[0]}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-sm truncate">{user.fname} {user.lname}</h3>
+              <p className="text-xs text-gray-500 truncate">{user.email}</p>
+              <div className="flex flex-wrap gap-1 mt-2">
+                <Badge variant={user.gender === 'male' ? 'default' : 'secondary'} className="text-xs px-1.5 py-0.5">
+                  {user.gender}
+                </Badge>
+                <Badge variant={isPremiumUser(user) ? 'default' : 'outline'} className="text-xs px-1.5 py-0.5">
+                  {getPlanDisplayName(user.plan)}
+                </Badge>
+                <Badge variant={user.status === 'active' ? 'default' : 'destructive'} className="text-xs px-1.5 py-0.5">
+                  {user.status}
+                </Badge>
+                {user.hidden && <Badge variant="destructive" className="text-xs px-1.5 py-0.5">Hidden</Badge>}
+              </div>
+            </div>
+          </div>
+          
+          <div className="space-y-2 mb-3">
+            <div className="text-xs text-gray-500">
+              {user.age && <span>{user.age} years</span>}
+              {user.country && <span> • {user.country}</span>}
+            </div>
+            <div className="text-xs text-gray-500">
+              Matches: {user.matchCount} • Messages: {user.messageCount}
+            </div>
+            <div className="text-xs text-gray-500">
+              {user.lastSeenAgo !== null ? `Last seen ${user.lastSeenAgo}d ago` : 'Never logged in'}
+            </div>
+          </div>
+          
+          <div className="flex justify-between gap-2">
+            <Link to={`/admin/user/${user._id}`} className="flex-1">
+              <Button size="sm" variant="outline" className="w-full text-xs h-8">
+                <Eye className="h-3 w-3 mr-1" />
+                View
+              </Button>
+            </Link>
+            <Button size="sm" variant="outline" className="flex-1 text-xs h-8" onClick={() => {
+              setSelectedUser(user);
+              setEditDialogOpen(true);
+            }}>
+              <Edit className="h-3 w-3 mr-1" />
+              Edit
+            </Button>
+            <Button size="sm" variant="outline" className="flex-1 text-xs h-8" onClick={() => {
+              setUserForEmail(user);
+              setEmailDialogOpen(true);
+            }}>
+              <Mail className="h-3 w-3 mr-1" />
+              Mail
+            </Button>
+            <Button size="sm" variant="destructive" className="text-xs h-8 px-2" onClick={() => handleDeleteUser(user._id)}>
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Desktop Layout */}
+        <div className="hidden sm:flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Avatar>
               <AvatarFallback>
@@ -155,8 +222,6 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
             </div>
             
             <div className="flex space-x-2">
-
-              
               <Link to={`/admin/user/${user._id}`}>
                 <Button size="sm" variant="outline">
                   <Eye className="h-4 w-4" />
@@ -247,7 +312,7 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
           <CardTitle>Member Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 pb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 pb-4">
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <Input
@@ -275,7 +340,7 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
                 <SelectItem value="all">All Plans</SelectItem>
                 <SelectItem value="premium">Premium</SelectItem>
                 <SelectItem value="pro">Pro</SelectItem>
-                <SelectItem value="free">Free</SelectItem>
+                <SelectItem value="freemium">Freemium</SelectItem>
               </SelectContent>
             </Select>
             <Select value={filters.status} onValueChange={(value) => handleFilterChange('status', value)}>
@@ -303,25 +368,51 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
               </SelectContent>
             </Select>
 
-            <ReactSelect
-              isMulti
-              options={countryOptions}
-              className="basic-multi-select"
-              classNamePrefix="select"
-              placeholder="Filter by country..."
-              onChange={(selected) => handleMultiSelectChange('country', selected)}
-            />
+            <div className="col-span-1 sm:col-span-2 lg:col-span-1">
+              <ReactSelect
+                isMulti
+                options={countryOptions}
+                className="basic-multi-select"
+                classNamePrefix="select"
+                placeholder="Filter by country..."
+                onChange={(selected) => handleMultiSelectChange('country', selected)}
+                styles={{
+                  control: (base) => ({
+                    ...base,
+                    minHeight: '40px',
+                    fontSize: '14px'
+                  }),
+                  multiValue: (base) => ({
+                    ...base,
+                    fontSize: '12px'
+                  })
+                }}
+              />
+            </div>
 
-            <ReactSelect
-              isMulti
-              options={filters.country.flatMap(country => cityOptions[country] || [])}
-              className="basic-multi-select"
-              classNamePrefix="select"
-              placeholder="Filter by city..."
-              value={(filters.country.flatMap(country => cityOptions[country] || [])).filter(option => filters.city.includes(option.value))}
-              onChange={(selected) => handleMultiSelectChange('city', selected)}
-              isDisabled={filters.country.length === 0}
-            />
+            <div className="col-span-1 sm:col-span-2 lg:col-span-1">
+              <ReactSelect
+                isMulti
+                options={filters.country.flatMap(country => cityOptions[country] || [])}
+                className="basic-multi-select"
+                classNamePrefix="select"
+                placeholder="Filter by city..."
+                value={(filters.country.flatMap(country => cityOptions[country] || [])).filter(option => filters.city.includes(option.value))}
+                onChange={(selected) => handleMultiSelectChange('city', selected)}
+                isDisabled={filters.country.length === 0}
+                styles={{
+                  control: (base) => ({
+                    ...base,
+                    minHeight: '40px',
+                    fontSize: '14px'
+                  }),
+                  multiValue: (base) => ({
+                    ...base,
+                    fontSize: '12px'
+                  })
+                }}
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -339,16 +430,17 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
               {users.map(renderUserCard)}
               
               {/* Pagination */}
-              <div className="flex justify-between items-center mt-6">
+              <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4">
                 <Button
                   variant="outline"
                   disabled={!pagination.hasPrevPage}
                   onClick={() => setFilters(prev => ({ ...prev, page: prev.page - 1 }))}
+                  className="w-full sm:w-auto"
                 >
                   Previous
                 </Button>
                 
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-gray-500 order-first sm:order-none">
                   Page {pagination.currentPage} of {pagination.totalPages}
                 </span>
                 
@@ -356,6 +448,7 @@ const MemberManagement = ({ stats }: MemberManagementProps) => {
                   variant="outline"
                   disabled={!pagination.hasNextPage}
                   onClick={() => setFilters(prev => ({ ...prev, page: prev.page + 1 }))}
+                  className="w-full sm:w-auto"
                 >
                   Next
                 </Button>

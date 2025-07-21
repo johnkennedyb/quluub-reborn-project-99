@@ -21,10 +21,9 @@ const {
   dismissReport,
   sendAdminPushNotification,
   getAdminPushNotifications,
-  getPaymentHistory,
-  processRefund,
   getPremiumUsers
 } = require('../controllers/adminController');
+const { getAllPayments, processRefund } = require('../controllers/paymentController');
 const { protect, admin } = require('../middlewares/authMiddleware');
 const { sendPushNotification } = require('../controllers/adminController');
 const cache = require('../middlewares/cache');
@@ -70,7 +69,7 @@ router.route('/email-config').get(getEmailConfig).post(saveEmailConfig);
 router.post('/send-email', (req, res) => res.json({ message: 'Email sent successfully' }));
 
 // Payments
-router.get('/payments', getPaymentHistory);
+router.get('/payments', getAllPayments);
 router.post('/payments/:id/refund', processRefund);
 
 // Push Notifications

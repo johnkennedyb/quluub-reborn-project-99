@@ -21,7 +21,7 @@ const formSchema = z.object({
   fname: z.string().min(2, 'First name must be at least 2 characters'),
   lname: z.string().min(2, 'Last name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
-  plan: z.enum(['free', 'premium']),
+  plan: z.enum(['freemium', 'premium']),
   status: z.enum(['active', 'inactive', 'suspended', 'banned']),
   isVerified: z.boolean(),
   city: z.string().optional(),
@@ -40,7 +40,7 @@ const EditUserDialog = ({ user, isOpen, onOpenChange, onUserUpdate, sendPassword
       fname: user?.fname || '',
       lname: user?.lname || '',
       email: user?.email || '',
-      plan: user?.plan || 'free',
+      plan: user?.plan || 'freemium',
       status: user?.status || 'active',
       isVerified: user?.isVerified || false,
       city: user?.city || '',
@@ -56,7 +56,7 @@ const EditUserDialog = ({ user, isOpen, onOpenChange, onUserUpdate, sendPassword
         fname: user.fname || '',
         lname: user.lname || '',
         email: user.email || '',
-        plan: user.plan || 'free',
+        plan: user.plan || 'freemium',
         status: user.status || 'active',
         isVerified: user.isVerified || false,
         city: user.city || '',
@@ -189,7 +189,7 @@ const EditUserDialog = ({ user, isOpen, onOpenChange, onUserUpdate, sendPassword
                       <SelectTrigger><SelectValue placeholder="Select a plan" /></SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="free">Free</SelectItem>
+                      <SelectItem value="freemium">Freemium</SelectItem>
                       <SelectItem value="premium">Premium</SelectItem>
                     </SelectContent>
                   </Select>

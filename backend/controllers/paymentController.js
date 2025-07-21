@@ -1,4 +1,4 @@
-const stripe = require('stripe')(process.env.STRIPE_SECRET_API_KEY);
+const stripe = process.env.STRIPE_SECRET_API_KEY ? require('stripe')(process.env.STRIPE_SECRET_API_KEY) : null;
 const axios = require('axios');
 const crypto = require('crypto');
 const User = require('../models/User');
@@ -12,6 +12,10 @@ const createCheckoutSession = async (req, res) => {
   const userId = req.user.id;
 
   try {
+    if (!stripe) {
+      return res.status(500).json({ message: 'Stripe not configured' });
+    }
+
     const user = await User.findById(userId);
 
     if (!user) {
@@ -59,6 +63,11 @@ const createCheckoutSession = async (req, res) => {
 const handleStripeWebhook = async (req, res) => {
   console.log('Stripe webhook received:', req.headers['stripe-signature'] ? 'with signature' : 'without signature');
   
+  if (!stripe) {
+    console.warn('Stripe not configured, skipping webhook processing');
+    return res.status(200).send('Stripe not configured');
+  }
+
   const sig = req.headers['stripe-signature'];
   let event;
 
@@ -104,7 +113,26 @@ const handleStripeWebhook = async (req, res) => {
         
         console.log('User object before saving:', JSON.stringify(user, null, 2));
         await user.save();
-        console.log(`Successfully upgraded user ${userId} to premium plan`);
+        console.log(`Successfully upgraded user ${userId} to premium plan, expires: ${user.premiumExpirationDate}`);
+        
+        // Create payment record
+        const Payment = require('../models/Payment');
+        try {
+          const paymentRecord = new Payment({
+            user: userId,
+            amount: session.amount_total / 100, // Convert from cents
+            currency: session.currency.toUpperCase(),
+            status: 'succeeded',
+            transactionId: session.id,
+            paymentGateway: 'Stripe',
+            plan: plan || 'premium'
+          });
+          await paymentRecord.save();
+          console.log('Payment record created successfully');
+        } catch (paymentError) {
+          console.error('Error creating payment record:', paymentError);
+        }
+        
         sendPlanPurchasedEmail(user.email, user.fname);
       } else {
         console.error(`User with ID ${userId} not found.`);
@@ -156,9 +184,15 @@ const handleStripeWebhook = async (req, res) => {
 // @access  Private/Admin
 const getAllPayments = async (req, res) => {
   try {
-    // This is a placeholder. In a real application, you would fetch payments from your database.
-    res.json({ message: 'Function not implemented. This will show all payments.' });
+    const Payment = require('../models/Payment');
+    const payments = await Payment.find({})
+      .populate('user', 'fname lname email')
+      .sort({ createdAt: -1 })
+      .limit(100); // Limit to last 100 payments
+    
+    res.json(payments);
   } catch (error) {
+    console.error('Error fetching payments:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -250,6 +284,25 @@ const handlePaystackWebhook = async (req, res) => {
         console.log('User object before saving:', JSON.stringify(user, null, 2));
         await user.save();
         console.log(`Successfully upgraded user ${user.email} to premium plan, expires: ${expirationDate}`);
+        
+        // Create payment record
+        const Payment = require('../models/Payment');
+        try {
+          const paymentRecord = new Payment({
+            user: user_id,
+            amount: event.data.amount / 100, // Convert from kobo to naira
+            currency: event.data.currency.toUpperCase(),
+            status: 'succeeded',
+            transactionId: event.data.reference,
+            paymentGateway: 'Paystack',
+            plan: plan || 'premium'
+          });
+          await paymentRecord.save();
+          console.log('Payment record created successfully');
+        } catch (paymentError) {
+          console.error('Error creating payment record:', paymentError);
+        }
+        
         sendPlanPurchasedEmail(user.email, user.fname);
       } else {
         console.error(`User not found with ID: ${user_id}`);
