@@ -21,11 +21,13 @@ const {
   dismissReport,
   sendAdminPushNotification,
   getAdminPushNotifications,
-  getPremiumUsers
+  getPremiumUsers,
+  getPaymentHistory,
+  getPotentialMatches,
+  sendPushNotification
 } = require('../controllers/adminController');
 const { getAllPayments, processRefund } = require('../controllers/paymentController');
 const { protect, admin } = require('../middlewares/authMiddleware');
-const { sendPushNotification } = require('../controllers/adminController');
 const cache = require('../middlewares/cache');
 const multer = require('multer');
 const path = require('path');
@@ -47,7 +49,7 @@ router.put('/users/:id/status', updateUserAccountStatus);
 router.put('/users/:id/plan', updateUserPlan);
 router.post('/users/:id/verify-email', verifyUserEmail);
 router.post('/users/:id/reset-password', sendPasswordResetLink);
-router.get('/users/:id/potential-matches', (req, res) => res.json({ matches: [] }));
+router.get('/users/:id/potential-matches', getPotentialMatches);
 router.post('/users/:id/impersonate', (req, res) => res.json({ token: 'test-impersonation-token', user: { username: 'impersonated' } }));
 router.post('/users/:id/send-suggestions', (req, res) => res.json({ message: 'Suggestions sent' }));
 router.post('/users/:id/test-push', (req, res) => res.json({ message: 'Test push sent' }));
@@ -63,7 +65,7 @@ router.post('/reports/:id/action', (req, res) => res.json({ message: 'Action tak
 // Email marketing
 router.post('/bulk-email', emailAttachmentUpload.array('attachments', 5), handleSendBulkEmail);
 router.post('/test-email', sendTestEmail);
-router.post('/push-notifications', sendPushNotification);
+router.post('/push-notifications', sendAdminPushNotification);
 router.get('/email-metrics', getEmailMetrics);
 router.route('/email-config').get(getEmailConfig).post(saveEmailConfig);
 router.post('/send-email', (req, res) => res.json({ message: 'Email sent successfully' }));

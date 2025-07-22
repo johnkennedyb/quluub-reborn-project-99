@@ -134,9 +134,10 @@ interface UserFilters {
   gender?: string;
   plan?: string;
   status?: string;
-  country?: string;
-  city?: string;
+  country?: string | string[];
+  city?: string | string[];
   inactiveFor?: string;
+  hidden?: string;
   page?: number;
   limit?: number;
   sortBy?: string;
@@ -282,7 +283,8 @@ export const useAdminData = (filters: UserFilters = defaultUserFilters, callFilt
   const fetchReportedProfiles = useCallback(async () => {
     try {
       const response = await apiClient.get('/admin/reported-profiles');
-      setReportedProfiles(response.data || []);
+      // Backend returns { reports: [...], pagination: {...} }
+      setReportedProfiles(response.data.reports || []);
     } catch (err) {
       console.error('Failed to fetch reported profiles', err);
       toast({ title: 'Error', description: 'Could not fetch reported profiles.', variant: 'destructive' });
@@ -302,7 +304,8 @@ export const useAdminData = (filters: UserFilters = defaultUserFilters, callFilt
   const fetchPayments = useCallback(async () => {
     try {
       const response = await apiClient.get('/admin/payments');
-      setPayments(response.data || []);
+      // Backend returns { payments: [], pagination: {} }
+      setPayments(response.data?.payments || []);
     } catch (err) {
       console.error('Failed to fetch payments', err);
       toast({ title: 'Error', description: 'Could not fetch payments.', variant: 'destructive' });
@@ -528,11 +531,32 @@ export const useAdminData = (filters: UserFilters = defaultUserFilters, callFilt
     }
   }, [apiClient, toast]);
 
-  const stopImpersonation = useCallback(() => {
-    localStorage.removeItem('impersonationToken');
-    localStorage.removeItem('impersonatingUser');
+  const stopImpersonation = () => {
+    localStorage.removeItem('impersonatedUser');
     window.location.reload();
-  }, []);
+  };
+
+  const processRefund = useCallback(async (paymentId: string) => {
+    try {
+      setIsSubmitting(true);
+      const response = await apiClient.post(`/admin/payments/${paymentId}/refund`);
+      
+      if (response.data.success) {
+        // Refresh payments data after successful refund
+        const paymentsResponse = await apiClient.get('/admin/payments');
+        setPayments(paymentsResponse.data.payments || []);
+        return { success: true, message: 'Refund processed successfully' };
+      } else {
+        throw new Error(response.data.message || 'Failed to process refund');
+      }
+    } catch (error: any) {
+      console.error('Error processing refund:', error);
+      setError(error.response?.data?.message || error.message || 'Failed to process refund');
+      return { success: false, message: error.response?.data?.message || error.message || 'Failed to process refund' };
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [apiClient, setIsSubmitting, setPayments, setError]);
 
   const sendEmail = useCallback(async (emailData: { to: string; subject: string; message: string }) => {
     try {
@@ -582,5 +606,6 @@ export const useAdminData = (filters: UserFilters = defaultUserFilters, callFilt
     updateUserPlan,
     sendTestPushNotification,
     stopImpersonation,
+    processRefund,
   };
 };

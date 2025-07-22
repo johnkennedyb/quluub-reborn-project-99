@@ -37,35 +37,48 @@ const EditUserDialog = ({ user, isOpen, onOpenChange, onUserUpdate, sendPassword
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      fname: user?.fname || '',
-      lname: user?.lname || '',
-      email: user?.email || '',
-      plan: user?.plan || 'freemium',
-      status: user?.status || 'active',
-      isVerified: user?.isVerified || false,
-      city: user?.city || '',
-      country: user?.country || '',
-      gender: user?.gender || 'male',
-      dob: user?.dob ? new Date(user.dob).toISOString().split('T')[0] : '',
+      fname: '',
+      lname: '',
+      email: '',
+      plan: 'freemium',
+      status: 'active',
+      isVerified: false,
+      city: '',
+      country: '',
+      gender: 'male',
+      dob: '',
     },
   });
 
   useEffect(() => {
-    if (user) {
+    if (user && isOpen) {
+      // Format date properly for input field
+      let formattedDob = '';
+      if (user.dob) {
+        try {
+          const dobDate = new Date(user.dob);
+          if (!isNaN(dobDate.getTime())) {
+            formattedDob = dobDate.toISOString().split('T')[0];
+          }
+        } catch (error) {
+          console.error('Error formatting date:', error);
+        }
+      }
+      
       form.reset({
         fname: user.fname || '',
         lname: user.lname || '',
         email: user.email || '',
         plan: user.plan || 'freemium',
         status: user.status || 'active',
-        isVerified: user.isVerified || false,
+        isVerified: user.emailVerified || user.isVerified || false,
         city: user.city || '',
         country: user.country || '',
         gender: user.gender || 'male',
-        dob: user.dob ? new Date(user.dob).toISOString().split('T')[0] : '',
+        dob: formattedDob,
       });
     }
-  }, [user, form]);
+  }, [user, form, isOpen]);
 
   const handleSaveChanges = async (values: z.infer<typeof formSchema>) => {
     const planChanged = values.plan !== user.plan;
@@ -85,15 +98,25 @@ const EditUserDialog = ({ user, isOpen, onOpenChange, onUserUpdate, sendPassword
     }
 
     try {
-      await onUserUpdate(user._id, values);
+      // Ensure date is properly formatted before sending
+      const updateData = {
+        ...values,
+        dob: values.dob ? new Date(values.dob).toISOString() : null
+      };
+      
+      console.log('Sending update data:', updateData);
+      await onUserUpdate(user._id, updateData);
       toast({ title: 'Success', description: 'User details updated successfully.' });
       onOpenChange(false);
-    } catch (error) {
-      toast({ title: 'Error', description: 'Could not update user details.', variant: 'destructive' });
+    } catch (error: any) {
+      console.error('Error updating user:', error);
+      toast({ 
+        title: 'Error', 
+        description: error.response?.data?.message || 'Could not update user details.', 
+        variant: 'destructive' 
+      });
     }
   };
-
-
 
   const handleResetPassword = async () => {
     if (!confirm('Are you sure you want to send a password reset link to this user?')) return;

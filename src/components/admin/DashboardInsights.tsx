@@ -161,15 +161,19 @@ const DashboardInsights = ({ stats }: DashboardInsightsProps) => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex justify-between items-center">
-                        <span className="text-sm">Inactive {'>'} 1 Month</span>
+            <span className="text-sm">Inactive {'>'} 1 Month</span>
             <Badge variant="secondary">{formatNumber(stats.inactiveUsers || 0)}</Badge>
           </div>
           <div className="flex justify-between items-center">
-                        <span className="text-sm">Inactive {'>'} 3 Months</span>
+            <span className="text-sm">Inactive {'>'} 3 Months</span>
             <Badge variant="secondary">{formatNumber(stats.inactiveQuarter || 0)}</Badge>
           </div>
           <div className="flex justify-between items-center">
-                        <span className="text-sm">Inactive {'>'} 1 Year</span>
+            <span className="text-sm">Inactive {'>'} 6 Months</span>
+            <Badge variant="secondary">{formatNumber(stats.inactiveSixMonths || 0)}</Badge>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-sm">Inactive {'>'} 1 Year</span>
             <Badge variant="secondary">{formatNumber(stats.inactiveYear || 0)}</Badge>
           </div>
         </CardContent>

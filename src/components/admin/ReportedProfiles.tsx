@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 
 const ReportedProfiles = () => {
-  const { reportedProfiles: reports, loading, dismissReport, updateUserStatus } = useAdminData();
+  const { reportedProfiles: reports, loading, dismissReport, updateUserAccountStatus } = useAdminData();
 
   if (loading) return <div>Loading reported profiles...</div>;
 
@@ -48,10 +48,10 @@ const ReportedProfiles = () => {
                         <Button variant="outline" size="sm" onClick={() => dismissReport(report._id)}>
                           Dismiss Report
                         </Button>
-                        <Button variant="destructive" size="sm" onClick={() => updateUserStatus(report.reported._id, 'suspended')}>
+                        <Button variant="destructive" size="sm" onClick={() => updateUserAccountStatus(report.reported._id, 'suspended')}>
                           Suspend User
                         </Button>
-                        <Button variant="destructive" size="sm" onClick={() => updateUserStatus(report.reported._id, 'banned')}>
+                        <Button variant="destructive" size="sm" onClick={() => updateUserAccountStatus(report.reported._id, 'banned')}>
                           Ban User
                         </Button>
                       </div>

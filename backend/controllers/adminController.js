@@ -32,7 +32,7 @@ const getStats = async (req, res) => {
     const femaleMembers = await User.countDocuments({ gender: 'female' });
     const premiumMembers = await User.countDocuments({ plan: 'premium' });
     const proMembers = await User.countDocuments({ plan: 'pro' });
-    const hiddenProfiles = await User.countDocuments({ isHidden: true });
+    const hiddenProfiles = await User.countDocuments({ hidden: true });
     const recentRegistrations = await User.countDocuments({ createdAt: { $gte: oneWeekAgo } });
     const monthlyRegistrations = await User.countDocuments({ createdAt: { $gte: oneMonthAgo } });
 
@@ -41,11 +41,35 @@ const getStats = async (req, res) => {
     const activeThisWeek = await User.countDocuments({ lastSeen: { $gte: oneWeekAgo } });
     const activeThisMonth = await User.countDocuments({ lastSeen: { $gte: oneMonthAgo } });
 
-    // Inactivity Stats
-    const inactiveUsers = await User.countDocuments({ lastSeen: { $lt: oneMonthAgo } });
-    const inactiveQuarter = await User.countDocuments({ lastSeen: { $lt: threeMonthsAgo } });
-    const inactiveSixMonths = await User.countDocuments({ lastSeen: { $lt: sixMonthsAgo } });
-    const inactiveYear = await User.countDocuments({ lastSeen: { $lt: oneYearAgo } });
+    // Inactivity Stats - Handle users with null/undefined lastSeen
+    const inactiveUsers = await User.countDocuments({ 
+      $or: [
+        { lastSeen: { $lt: oneMonthAgo } },
+        { lastSeen: { $exists: false } },
+        { lastSeen: null }
+      ]
+    });
+    const inactiveQuarter = await User.countDocuments({ 
+      $or: [
+        { lastSeen: { $lt: threeMonthsAgo } },
+        { lastSeen: { $exists: false } },
+        { lastSeen: null }
+      ]
+    });
+    const inactiveSixMonths = await User.countDocuments({ 
+      $or: [
+        { lastSeen: { $lt: sixMonthsAgo } },
+        { lastSeen: { $exists: false } },
+        { lastSeen: null }
+      ]
+    });
+    const inactiveYear = await User.countDocuments({ 
+      $or: [
+        { lastSeen: { $lt: oneYearAgo } },
+        { lastSeen: { $exists: false } },
+        { lastSeen: null }
+      ]
+    });
 
     // Match Stats
     const totalMatches = await Relationship.countDocuments({ status: 'matched' });
@@ -88,17 +112,108 @@ const getStats = async (req, res) => {
       { $project: { _id: 0, fname: '$referrerInfo.fname', lname: '$referrerInfo.lname', username: '$referrerInfo.username', totalReferrals: '$totalReferrals' } },
     ]);
 
-    res.json({
-      totalMembers, maleMembers, femaleMembers, premiumMembers, proMembers, hiddenProfiles, recentRegistrations, monthlyRegistrations,
+    // Calculate additional metrics
+    const totalReferrals = await User.countDocuments({ referredBy: { $exists: true } });
+    const activeReferrals = await User.countDocuments({ referredBy: { $exists: true }, status: 'active' });
+    
+    // Age distribution - Simplified approach to avoid type issues
+    let ageDistribution = [];
+    try {
+      ageDistribution = await User.aggregate([
+        { $match: { dob: { $exists: true, $ne: null, $type: 'date' } } },
+        { 
+          $addFields: { 
+            age: { 
+              $floor: { 
+                $divide: [
+                  { $subtract: [new Date(), '$dob'] }, 
+                  31557600000
+                ] 
+              } 
+            } 
+          } 
+        },
+        { $match: { age: { $gte: 18, $lte: 100 } } },
+        { $group: { _id: '$age', count: { $sum: 1 } } },
+        { $sort: { _id: 1 } },
+        { $limit: 20 }
+      ]);
+    } catch (err) {
+      console.error('Age distribution aggregation error:', err);
+      ageDistribution = [];
+    }
+
+    const statsData = {
+      totalMembers, maleMembers, femaleMembers, premiumMembers, proMembers, hiddenProfiles, 
+      recentRegistrations, monthlyRegistrations,
       activeToday, activeThisWeek, activeThisMonth,
       inactiveUsers, inactiveQuarter, inactiveSixMonths, inactiveYear,
-      totalMatches, pendingRequests, rejectedRequests, successRate: successRate.toFixed(2), avgMatchesPerUser: avgMatchesPerUser.toFixed(2),
-      messagesExchanged, messagesThisWeek, messagesThisMonth, matchToChatRate: matchToChatRate.toFixed(2),
-      conversionRate: conversionRate.toFixed(2), freeToProConversions, churnRate: churnRate.toFixed(2), growthRate: growthRate.toFixed(2), engagementRate: engagementRate.toFixed(2),
-      geographicDistribution, topReferrers
+      totalMatches, pendingRequests, rejectedRequests, 
+      successRate: parseFloat(successRate.toFixed(2)), 
+      avgMatchesPerUser: parseFloat(avgMatchesPerUser.toFixed(2)),
+      messagesExchanged, messagesThisWeek, messagesThisMonth, 
+      matchToChatRate: parseFloat(matchToChatRate.toFixed(2)),
+      conversionRate: parseFloat(conversionRate.toFixed(2)), 
+      freeToProConversions, 
+      churnRate: parseFloat(churnRate.toFixed(2)), 
+      growthRate: parseFloat(growthRate.toFixed(2)), 
+      engagementRate: parseFloat(engagementRate.toFixed(2)),
+      totalReferrals, activeReferrals,
+      geographicDistribution, topReferrers, ageDistribution
+    };
+
+    console.log('Admin Stats Generated:', {
+      totalMembers,
+      hiddenProfiles,
+      inactiveUsers,
+      activeToday,
+      activeThisWeek
     });
+
+    res.json(statsData);
   } catch (error) {
     console.error('Error fetching admin stats:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Get user details by ID
+// @route   GET /api/admin/users/:id
+// @access  Private/Admin
+const getUserDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id).select('-password');
+    
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    
+    // Get user's matches from Relationship model
+    const matches = await Relationship.find({
+      $or: [
+        { requester: id, status: 'matched' },
+        { recipient: id, status: 'matched' }
+      ]
+    }).populate('requester', 'fname lname username profilePicture')
+      .populate('recipient', 'fname lname username profilePicture');
+    
+    // Get user's conversations from Chat model
+    const conversations = await Chat.find({
+      $or: [
+        { sender: id },
+        { receiver: id }
+      ]
+    }).distinct('conversationId');
+    
+    const userStats = {
+      totalMatches: matches?.length || 0,
+      totalConversations: conversations?.length || 0,
+      profileViews: user.profileViews || 0,
+      lastActive: user.lastSeen || user.updatedAt
+    };
+    
+    res.json({ ...user.toObject(), stats: userStats });
+  } catch (error) {
+    console.error('Error fetching user details:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -142,8 +257,19 @@ const getAllUsers = async (req, res) => {
       if (!isNaN(days)) {
         const date = new Date();
         date.setDate(date.getDate() - days);
-        query.lastSeen = { $lt: date };
+        query.$or = [
+          { lastSeen: { $lt: date } },
+          { lastSeen: { $exists: false } },
+          { lastSeen: null }
+        ];
       }
+    }
+
+    // Add hidden profile filtering
+    if (req.query.hidden === 'true') {
+      query.hidden = true;
+    } else if (req.query.hidden === 'false') {
+      query.hidden = { $ne: true };
     }
 
     const totalUsers = await User.countDocuments(query);
@@ -153,8 +279,57 @@ const getAllUsers = async (req, res) => {
       .skip((page - 1) * parseInt(limit))
       .sort({ createdAt: -1 });
 
+    console.log(`Fetching ${users.length} users for admin dashboard`);
+    
+    // Calculate lastSeenAgo, matchCount, and messageCount for each user
+    const usersWithStats = await Promise.all(users.map(async (user) => {
+      const userObj = user.toObject();
+      
+      // Calculate lastSeenAgo
+      if (userObj.lastSeen) {
+        const now = new Date();
+        const lastSeenDate = new Date(userObj.lastSeen);
+        const diffTime = Math.abs(now.getTime() - lastSeenDate.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        userObj.lastSeenAgo = diffDays;
+      } else {
+        userObj.lastSeenAgo = null;
+      }
+      
+      try {
+        // Calculate match count from Relationship model
+        const matchCount = await Relationship.countDocuments({
+          $or: [
+            { follower_user_id: user._id.toString(), status: 'matched' },
+            { followed_user_id: user._id.toString(), status: 'matched' }
+          ]
+        });
+        
+        // Calculate message count from Chat model
+        const messageCount = await Chat.countDocuments({
+          $or: [
+            { senderId: user._id },
+            { receiverId: user._id }
+          ]
+        });
+        
+        userObj.matchCount = matchCount;
+        userObj.messageCount = messageCount;
+        
+        if (matchCount > 0 || messageCount > 0) {
+          console.log(`User ${user.fname} ${user.lname}: ${matchCount} matches, ${messageCount} messages`);
+        }
+      } catch (error) {
+        console.error(`Error calculating stats for user ${user._id}:`, error);
+        userObj.matchCount = 0;
+        userObj.messageCount = 0;
+      }
+      
+      return userObj;
+    }));
+
     res.json({
-      users,
+      users: usersWithStats,
       pagination: {
         total: totalUsers,
         currentPage: parseInt(page),
@@ -164,23 +339,7 @@ const getAllUsers = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Error fetching users:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// @desc    Get user details
-// @route   GET /api/admin/users/:id
-// @access  Private/Admin
-const getUserDetails = async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id).select('-password');
-    if (user) {
-      res.json(user);
-    } else {
-      res.status(404).json({ message: 'User not found' });
-    }
-  } catch (error) {
+    console.error('Error fetching all users:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -204,10 +363,17 @@ const updateUser = async (req, res) => {
       if (req.body.plan !== undefined) user.plan = req.body.plan;
       if (req.body.status !== undefined) user.status = req.body.status;
       if (req.body.emailVerified !== undefined) user.emailVerified = req.body.emailVerified;
+      if (req.body.isVerified !== undefined) user.emailVerified = req.body.isVerified;
       if (req.body.city !== undefined) user.city = req.body.city;
       if (req.body.country !== undefined) user.country = req.body.country;
       if (req.body.gender !== undefined) user.gender = req.body.gender;
-      if (req.body.dob !== undefined) user.dob = req.body.dob;
+      if (req.body.dob !== undefined) {
+        // Handle date properly - ensure it's a valid date
+        const dobDate = new Date(req.body.dob);
+        if (!isNaN(dobDate.getTime())) {
+          user.dob = dobDate;
+        }
+      }
       
       console.log('About to save user with updates:', {
         fname: user.fname,
@@ -382,14 +548,71 @@ const sendPasswordResetLink = async (req, res) => {
   }
 };
 
-// @desc    Get all calls
+// @desc    Get all calls for admin dashboard
 // @route   GET /api/admin/calls
 // @access  Private/Admin
 const getAllCalls = async (req, res) => {
   try {
-    const calls = await Call.find({}).populate('caller recipient', 'fname lname');
-    res.json(calls);
+    const {
+      page = 1,
+      limit = 20,
+      status,
+      search,
+      dateFrom,
+      dateTo
+    } = req.query;
+
+    let query = {};
+
+    // Filter by status
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+
+    // Filter by date range
+    if (dateFrom || dateTo) {
+      query.createdAt = {};
+      if (dateFrom) query.createdAt.$gte = new Date(dateFrom);
+      if (dateTo) query.createdAt.$lte = new Date(dateTo);
+    }
+
+    const totalCalls = await Call.countDocuments(query);
+    const calls = await Call.find(query)
+      .populate('caller', 'fname lname username email profilePicture')
+      .populate('recipient', 'fname lname username email profilePicture')
+      .limit(parseInt(limit))
+      .skip((page - 1) * parseInt(limit))
+      .sort({ createdAt: -1 });
+
+    // If search is provided, filter populated results
+    let filteredCalls = calls;
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filteredCalls = calls.filter(call => 
+        call.caller?.fname?.toLowerCase().includes(searchLower) ||
+        call.caller?.lname?.toLowerCase().includes(searchLower) ||
+        call.caller?.username?.toLowerCase().includes(searchLower) ||
+        call.caller?.email?.toLowerCase().includes(searchLower) ||
+        call.recipient?.fname?.toLowerCase().includes(searchLower) ||
+        call.recipient?.lname?.toLowerCase().includes(searchLower) ||
+        call.recipient?.username?.toLowerCase().includes(searchLower) ||
+        call.recipient?.email?.toLowerCase().includes(searchLower) ||
+        call.roomId?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    res.json({
+      calls: filteredCalls,
+      pagination: {
+        total: totalCalls,
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(totalCalls / limit),
+        hasNextPage: parseInt(page) * parseInt(limit) < totalCalls,
+        hasPrevPage: parseInt(page) > 1,
+      },
+    });
   } catch (error) {
+    console.error('Error fetching calls:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -399,24 +622,108 @@ const getAllCalls = async (req, res) => {
 // @access  Private/Admin
 const saveCallRecord = async (req, res) => {
   try {
-    const newCall = new Call(req.body);
-    const savedCall = await newCall.save();
-    res.status(201).json(savedCall);
+    const {
+      caller,
+      recipient,
+      roomId,
+      status,
+      startedAt,
+      endedAt,
+      duration,
+      quality
+    } = req.body;
+
+    const newCall = new Call({
+      caller,
+      recipient,
+      roomId,
+      status,
+      startedAt,
+      endedAt,
+      duration,
+      quality
+    });
+
+    await newCall.save();
+    
+    const savedCall = await Call.findById(newCall._id)
+      .populate('caller', 'fname lname username email')
+      .populate('recipient', 'fname lname username email');
+
+    res.status(201).json({
+      message: 'Call record saved successfully',
+      call: savedCall
+    });
   } catch (error) {
+    console.error('Error saving call record:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
 
-// @desc    Get reported profiles
-// @route   GET /api/admin/reports
+// @desc    Get reported profiles for admin dashboard
+// @route   GET /api/admin/reported-profiles
 // @access  Private/Admin
 const getReportedProfiles = async (req, res) => {
   try {
-    const reports = await Report.find()
-      .populate('reporter', 'fname lname username')
-      .populate('reported', 'fname lname username')
+    const {
+      page = 1,
+      limit = 20,
+      status,
+      search,
+      dateFrom,
+      dateTo
+    } = req.query;
+
+    let query = {};
+
+    // Filter by status
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+
+    // Filter by date range
+    if (dateFrom || dateTo) {
+      query.createdAt = {};
+      if (dateFrom) query.createdAt.$gte = new Date(dateFrom);
+      if (dateTo) query.createdAt.$lte = new Date(dateTo);
+    }
+
+    const totalReports = await Report.countDocuments(query);
+    const reports = await Report.find(query)
+      .populate('reporter', 'fname lname username email profilePicture')
+      .populate('reported', 'fname lname username email profilePicture status')
+      .limit(parseInt(limit))
+      .skip((page - 1) * parseInt(limit))
       .sort({ createdAt: -1 });
-    res.json(reports);
+
+    // If search is provided, filter populated results
+    let filteredReports = reports;
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filteredReports = reports.filter(report => 
+        report.reporter?.fname?.toLowerCase().includes(searchLower) ||
+        report.reporter?.lname?.toLowerCase().includes(searchLower) ||
+        report.reporter?.username?.toLowerCase().includes(searchLower) ||
+        report.reporter?.email?.toLowerCase().includes(searchLower) ||
+        report.reported?.fname?.toLowerCase().includes(searchLower) ||
+        report.reported?.lname?.toLowerCase().includes(searchLower) ||
+        report.reported?.username?.toLowerCase().includes(searchLower) ||
+        report.reported?.email?.toLowerCase().includes(searchLower) ||
+        report.reason?.toLowerCase().includes(searchLower) ||
+        report.description?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    res.json({
+      reports: filteredReports,
+      pagination: {
+        total: totalReports,
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(totalReports / limit),
+        hasNextPage: parseInt(page) * parseInt(limit) < totalReports,
+        hasPrevPage: parseInt(page) > 1,
+      },
+    });
   } catch (error) {
     console.error('Error fetching reported profiles:', error);
     res.status(500).json({ message: 'Server error' });
@@ -531,18 +838,6 @@ const sendPushNotification = async (req, res) => {
   }
 };
 
-const getPremiumUsers = async (req, res) => {
-  try {
-    const premiumUsers = await User.find({ plan: 'premium' })
-      .select('-password')
-      .sort({ createdAt: -1 });
-    res.json(premiumUsers);
-  } catch (error) {
-    console.error('Error fetching premium users:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
 const getEmailConfig = async (req, res) => {
   try {
     const config = await getEmailConfigService();
@@ -552,56 +847,7 @@ const getEmailConfig = async (req, res) => {
   }
 };
 
-// @desc    Get payment history
-// @route   GET /api/admin/payments
-// @access  Private/Admin
-const getPaymentHistory = async (req, res) => {
-  try {
-    const payments = await Payment.find()
-      .populate('user', 'fname lname username email')
-      .sort({ createdAt: -1 });
-    res.json({ payments });
-  } catch (error) {
-    console.error('Error fetching payment history:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// @desc    Process a refund
-// @route   POST /api/admin/payments/:id/refund
-// @access  Private/Admin
-const processRefund = async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const payment = await Payment.findById(id).populate('user');
-
-    if (!payment) {
-      return res.status(404).json({ message: 'Payment not found' });
-    }
-
-    if (payment.status !== 'succeeded') {
-      return res.status(400).json({ message: 'Only successful payments can be refunded.' });
-    }
-
-    // In a real application, you would integrate with your payment gateway (e.g., Stripe)
-    // For now, we'll just update our internal status
-    payment.status = 'refunded';
-    await payment.save();
-
-    const user = await User.findById(payment.user._id);
-    if (user) {
-      user.plan = 'freemium';
-      await user.save();
-    }
-
-    res.json({ message: 'Refund processed successfully', payment });
-
-  } catch (error) {
-    console.error('Error processing refund:', error);
-    res.status(500).json({ message: 'Server error while processing refund.' });
-  }
-};
+// Removed duplicate function declarations - keeping the comprehensive implementations below
 
 // @desc    Send push notification
 // @route   POST /api/admin/push-notifications
@@ -614,34 +860,53 @@ const sendAdminPushNotification = async (req, res) => {
 
     switch (target) {
       case 'all':
-        query = { pushToken: { $exists: true, $ne: null } };
+        query = {};
         break;
       case 'premium':
-        query = { plan: 'premium', pushToken: { $exists: true, $ne: null } };
+        query = { plan: 'premium' };
         break;
       case 'free':
-        query = { plan: 'freemium', pushToken: { $exists: true, $ne: null } };
+        query = { plan: 'freemium' };
         break;
       case 'specific':
         if (!targetUsers || !Array.isArray(targetUsers) || targetUsers.length === 0) {
           return res.status(400).json({ message: 'Please select at least one user.' });
         }
-        query = { _id: { $in: targetUsers }, pushToken: { $exists: true, $ne: null } };
+        query = { _id: { $in: targetUsers } };
         break;
       default:
         return res.status(400).json({ message: 'Invalid target specified.' });
     }
 
-    const usersToNotify = await User.find(query).select('pushToken');
+    const usersToNotify = await User.find(query).select('_id pushToken');
 
     if (usersToNotify.length === 0) {
-      return res.status(404).json({ message: 'No users found with push tokens for the selected target.' });
+      return res.status(404).json({ message: 'No users found for the selected target.' });
     }
 
-    const tokens = usersToNotify.map(user => user.pushToken).filter(Boolean);
+    // Create in-app notifications for all targeted users
+    const inAppNotifications = usersToNotify.map(user => ({
+      user: user._id,
+      type: 'admin_announcement',
+      message: `${title}: ${message}`,
+      relatedId: 'admin',
+      read: false,
+      createdAt: new Date()
+    }));
 
-    console.log(`Simulating sending push notification to ${tokens.length} tokens.`);
+    await Notification.insertMany(inAppNotifications);
 
+    // Send push notifications to users with push tokens
+    const usersWithTokens = usersToNotify.filter(user => user.pushToken);
+    const tokens = usersWithTokens.map(user => user.pushToken);
+
+    if (tokens.length > 0) {
+      console.log(`Simulating sending push notification to ${tokens.length} tokens.`);
+      // Here you would integrate with your push notification service
+      // await sendPushNotificationService(tokens, title, message);
+    }
+
+    // Save push notification record
     const newNotification = new PushNotification({
       title,
       message,
@@ -652,11 +917,18 @@ const sendAdminPushNotification = async (req, res) => {
 
     await newNotification.save();
 
-    res.json({ message: `Push notification successfully sent to ${usersToNotify.length} users.` });
+    res.json({ 
+      message: `Notification sent to ${usersToNotify.length} users (${tokens.length} push notifications, ${inAppNotifications.length} in-app alerts).`,
+      stats: {
+        totalUsers: usersToNotify.length,
+        pushNotifications: tokens.length,
+        inAppNotifications: inAppNotifications.length
+      }
+    });
 
   } catch (error) {
-    console.error('Error sending push notification:', error);
-    res.status(500).json({ message: 'Failed to send push notification.' });
+    console.error('Error sending notification:', error);
+    res.status(500).json({ message: 'Failed to send notification.' });
   }
 };
 
@@ -673,28 +945,354 @@ const getAdminPushNotifications = async (req, res) => {
   }
 };
 
+// @desc    Get premium users for admin dashboard
+// @route   GET /api/admin/premium-users
+// @access  Private/Admin
+const getPremiumUsers = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      search,
+      plan = 'premium'
+    } = req.query;
+
+    let query = {
+      plan: { $in: ['premium', 'pro'] }
+    };
+
+    // If specific plan is requested
+    if (plan && plan !== 'all') {
+      query.plan = plan;
+    }
+
+    // Search functionality
+    if (search) {
+      query.$or = [
+        { fname: { $regex: search, $options: 'i' } },
+        { lname: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { username: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const totalUsers = await User.countDocuments(query);
+    const users = await User.find(query)
+      .select('-password')
+      .limit(parseInt(limit))
+      .skip((page - 1) * parseInt(limit))
+      .sort({ createdAt: -1 });
+
+    // Add additional stats for each premium user
+    const usersWithStats = await Promise.all(users.map(async (user) => {
+      const userObj = user.toObject();
+      
+      try {
+        // Calculate match count
+        const matchCount = await Relationship.countDocuments({
+          $or: [
+            { follower_user_id: user._id.toString(), status: 'matched' },
+            { followed_user_id: user._id.toString(), status: 'matched' }
+          ]
+        });
+        
+        // Calculate message count
+        const messageCount = await Chat.countDocuments({
+          $or: [
+            { senderId: user._id },
+            { receiverId: user._id }
+          ]
+        });
+        
+        userObj.matchCount = matchCount;
+        userObj.messageCount = messageCount;
+        userObj.fullName = `${user.fname} ${user.lname}`;
+        
+        // Calculate days since subscription
+        if (user.createdAt) {
+          const now = new Date();
+          const createdDate = new Date(user.createdAt);
+          const diffTime = Math.abs(now.getTime() - createdDate.getTime());
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          userObj.daysSinceSubscription = diffDays;
+        }
+        
+      } catch (error) {
+        console.error(`Error calculating stats for premium user ${user._id}:`, error);
+        userObj.matchCount = 0;
+        userObj.messageCount = 0;
+        userObj.daysSinceSubscription = 0;
+      }
+      
+      return userObj;
+    }));
+
+    res.json({
+      users: usersWithStats,
+      pagination: {
+        total: totalUsers,
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(totalUsers / limit),
+        hasNextPage: parseInt(page) * parseInt(limit) < totalUsers,
+        hasPrevPage: parseInt(page) > 1,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching premium users:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Get payment history for admin dashboard
+// @route   GET /api/admin/payments
+// @access  Private/Admin
+const getPaymentHistory = async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      status,
+      search,
+      dateFrom,
+      dateTo,
+      plan
+    } = req.query;
+
+    let query = {};
+
+    // Filter by status
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+
+    // Filter by plan
+    if (plan && plan !== 'all') {
+      query.plan = plan;
+    }
+
+    // Filter by date range
+    if (dateFrom || dateTo) {
+      query.createdAt = {};
+      if (dateFrom) query.createdAt.$gte = new Date(dateFrom);
+      if (dateTo) query.createdAt.$lte = new Date(dateTo);
+    }
+
+    const totalPayments = await Payment.countDocuments(query);
+    const payments = await Payment.find(query)
+      .populate('user', 'fname lname username email')
+      .limit(parseInt(limit))
+      .skip((page - 1) * parseInt(limit))
+      .sort({ createdAt: -1 });
+
+    // If search is provided, filter populated results
+    let filteredPayments = payments;
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filteredPayments = payments.filter(payment => 
+        payment.user?.fname?.toLowerCase().includes(searchLower) ||
+        payment.user?.lname?.toLowerCase().includes(searchLower) ||
+        payment.user?.username?.toLowerCase().includes(searchLower) ||
+        payment.user?.email?.toLowerCase().includes(searchLower) ||
+        payment.transactionId?.toLowerCase().includes(searchLower) ||
+        payment.plan?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    res.json({
+      payments: filteredPayments,
+      pagination: {
+        total: totalPayments,
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(totalPayments / limit),
+        hasNextPage: parseInt(page) * parseInt(limit) < totalPayments,
+        hasPrevPage: parseInt(page) > 1,
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching payment history:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Get potential matches for a premium user
+// @route   GET /api/admin/users/:id/potential-matches
+// @access  Private/Admin
+const getPotentialMatches = async (req, res) => {
+  try {
+    const { id: userId } = req.params;
+    const { limit = 20 } = req.query;
+
+    // Get the user to understand their preferences
+    const user = await User.findById(userId).select('gender preferences age country city');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Build match query based on user preferences
+    let matchQuery = {
+      _id: { $ne: userId }, // Exclude the user themselves
+      status: 'active' // Only active users
+    };
+
+    // Gender preference
+    if (user.gender === 'male') {
+      matchQuery.gender = 'female';
+    } else if (user.gender === 'female') {
+      matchQuery.gender = 'male';
+    }
+
+    // Age preference (if user has age)
+    if (user.age) {
+      const ageRange = 5; // 5 years range
+      matchQuery.age = {
+        $gte: Math.max(18, user.age - ageRange),
+        $lte: Math.min(100, user.age + ageRange)
+      };
+    }
+
+    // Location preference (same country preferred)
+    if (user.country) {
+      matchQuery.country = user.country;
+    }
+
+    // Get existing relationships to exclude already connected users
+    const existingRelationships = await Relationship.find({
+      $or: [
+        { follower_user_id: userId },
+        { followed_user_id: userId }
+      ]
+    }).select('follower_user_id followed_user_id');
+
+    const excludeUserIds = existingRelationships.map(rel => 
+      rel.follower_user_id === userId ? rel.followed_user_id : rel.follower_user_id
+    );
+
+    if (excludeUserIds.length > 0) {
+      matchQuery._id = { $nin: [...excludeUserIds, userId] };
+    }
+
+    // Find potential matches
+    const potentialMatches = await User.find(matchQuery)
+      .select('fname lname username gender age country city profilePicture summary plan')
+      .limit(parseInt(limit))
+      .sort({ lastSeen: -1, createdAt: -1 });
+
+    // Add compatibility score and additional info
+    const matchesWithStats = potentialMatches.map(match => {
+      const matchObj = match.toObject();
+      matchObj.fullName = `${match.fname} ${match.lname}`;
+      
+      // Simple compatibility score based on location and age
+      let compatibilityScore = 50; // Base score
+      
+      if (match.country === user.country) compatibilityScore += 20;
+      if (match.city === user.city) compatibilityScore += 10;
+      
+      if (user.age && match.age) {
+        const ageDiff = Math.abs(user.age - match.age);
+        if (ageDiff <= 2) compatibilityScore += 15;
+        else if (ageDiff <= 5) compatibilityScore += 10;
+        else if (ageDiff <= 10) compatibilityScore += 5;
+      }
+      
+      matchObj.compatibilityScore = Math.min(100, compatibilityScore);
+      
+      return matchObj;
+    });
+
+    // Sort by compatibility score
+    matchesWithStats.sort((a, b) => b.compatibilityScore - a.compatibilityScore);
+
+    res.json({
+      matches: matchesWithStats,
+      total: matchesWithStats.length,
+      userId: userId
+    });
+  } catch (error) {
+    console.error('Error fetching potential matches:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// @desc    Process refund for a payment
+// @route   POST /api/admin/payments/:id/refund
+// @access  Private/Admin
+const processRefund = async (req, res) => {
+  try {
+    const { id: paymentId } = req.params;
+    const { reason } = req.body;
+
+    // Find the payment
+    const payment = await Payment.findById(paymentId).populate('user', 'fname lname email');
+    if (!payment) {
+      return res.status(404).json({ message: 'Payment not found' });
+    }
+
+    // Check if payment is already refunded
+    if (payment.status === 'refunded') {
+      return res.status(400).json({ message: 'Payment is already refunded' });
+    }
+
+    // Check if payment is eligible for refund (must be completed)
+    if (payment.status !== 'completed') {
+      return res.status(400).json({ message: 'Only completed payments can be refunded' });
+    }
+
+    // Update payment status to refunded
+    payment.status = 'refunded';
+    payment.refundReason = reason || 'Admin refund';
+    payment.refundedAt = new Date();
+    await payment.save();
+
+    // Update user plan back to freemium if this was a premium payment
+    if (payment.plan === 'premium' && payment.user) {
+      await User.findByIdAndUpdate(payment.user._id, {
+        plan: 'freemium',
+        planExpiresAt: null
+      });
+    }
+
+    // Log the refund action
+    console.log(`Payment ${paymentId} refunded by admin. User: ${payment.user?.email}, Amount: ${payment.amount}, Reason: ${reason}`);
+
+    res.json({
+      message: 'Payment refunded successfully',
+      payment: {
+        id: payment._id,
+        status: payment.status,
+        refundReason: payment.refundReason,
+        refundedAt: payment.refundedAt,
+        user: payment.user
+      }
+    });
+  } catch (error) {
+    console.error('Error processing refund:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
-  getPremiumUsers,
-  sendPushNotification,
   getStats,
   getAllUsers,
   getUserDetails,
-  updateUser,
   updateUserAccountStatus,
   updateUserPlan,
+  updateUser,
   deleteUser,
-  verifyUserEmail,
   sendPasswordResetLink,
+  verifyUserEmail,
   getAllCalls,
   saveCallRecord,
-  getReportedProfiles,
-  dismissReport,
   handleSendBulkEmail,
   sendTestEmail,
   getEmailMetrics,
   saveEmailConfig,
   getEmailConfig,
+  getReportedProfiles,
+  dismissReport,
+  getPremiumUsers,
   getPaymentHistory,
+  getPotentialMatches,
   processRefund,
   sendAdminPushNotification,
   getAdminPushNotifications,
