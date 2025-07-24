@@ -30,6 +30,38 @@ interface Location {
 
 const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProps) => {
   const [currentSection, setCurrentSection] = useState(0);
+  
+  // Task #16: Add swipe functionality state
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  
+  // Task #16: Swipe detection constants
+  const minSwipeDistance = 50;
+  
+  // Task #16: Handle touch events for swiping
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+  
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+  
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+    
+    if (isLeftSwipe && currentSection < sections.length - 1) {
+      setCurrentSection(prev => prev + 1);
+    }
+    if (isRightSwipe && currentSection > 0) {
+      setCurrentSection(prev => prev - 1);
+    }
+  };
 
   const parseEthnicity = () => {
     try {
@@ -200,13 +232,20 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
     ...sportsRelaxationInterests
   ];
 
+  // Task #15: Added "attractive" and other traits from original app with emojis
   const traitOptions = [
-    "Funny", "Cheeky", "Innocent", "Loving", "Crazy", "Suspicious", "Detective", "Angry", "Mischievous",
-    "Gamer", "Loves To Make Dua", "Hafidh", "Strong", "Dentist", "Policeman", "Tired", "Saluting", "Cold",
-    "Cowboy", "Passionate", "Palm Down Hand", "Handshaker", "Selfie Connoisseur", "Intelligent", "Good with Kids",
-    "Beard", "Good Teeth", "Bald", "Deaf", "Astronaut", "Firefighter", "Scientist", "Mechanic", "Judge", "Chef",
-    "Artist", "Pilot", "Farmer", "Graduate", "Teacher", "Programmer", "Businessman", "Nurse", "Weightlifter",
-    "Talkative", "Graceful", "Flamboyant", "Tall", "Dangerous", "Sunny", "Wavy", "Winner", "Good Talker", "Masjid Goer"
+    "😂 Funny", "😏 Cheeky", "😇 Innocent", "🥰 Loving", "🤪 Crazy", "🤨 Suspicious", "🕵️ Detective", "😠 Angry", "😈 Mischievous",
+    "🎮 Gamer", "🤲 Loves To Make Dua", "📖 Hafidh", "💪 Strong", "🦷 Dentist", "👮 Policeman", "😴 Tired", "🫡 Saluting", "🥶 Cold",
+    "🤠 Cowboy", "🔥 Passionate", "🤚 Palm Down Hand", "🤝 Handshaker", "🤳 Selfie Connoisseur", "🧠 Intelligent", "👶 Good with Kids",
+    "🧔 Beard", "😁 Good Teeth", "👨‍🦲 Bald", "🧏 Deaf", "👨‍🚀 Astronaut", "🚒 Firefighter", "👨‍🔬 Scientist", "🔧 Mechanic", "⚖️ Judge", "👨‍🍳 Chef",
+    "🎨 Artist", "✈️ Pilot", "👨‍🌾 Farmer", "🎓 Graduate", "👨‍🏫 Teacher", "👨‍💻 Programmer", "👔 Businessman", "👩‍⚕️ Nurse", "🏋️ Weightlifter",
+    "🗣️ Talkative", "💃 Graceful", "✨ Flamboyant", "📏 Tall", "⚠️ Dangerous", "☀️ Sunny", "🌊 Wavy", "🏆 Winner", "💬 Good Talker", "🕌 Masjid Goer",
+    // Task #15: Additional traits from original app with emojis
+    "😍 Attractive", "🌹 Beautiful", "😎 Handsome", "✨ Charming", "👑 Elegant", "💅 Stylish", "💪 Confident", "🙏 Humble", "⏳ Patient",
+    "❤️ Kind", "🎁 Generous", "💭 Thoughtful", "🤗 Caring", "🤝 Supportive", "🛡️ Loyal", "🤞 Trustworthy", "💯 Honest", "💖 Sincere",
+    "🗺️ Adventurous", "🎨 Creative", "🎯 Ambitious", "🔥 Motivated", "⚡ Hardworking", "🎖️ Dedicated", "✅ Reliable", "📋 Responsible",
+    "📊 Organized", "⏰ Punctual", "🙇 Respectful", "🎩 Polite", "🎭 Well-mannered", "🎓 Educated", "📚 Knowledgeable", "🦉 Wise",
+    "🧘 Mature", "🤝 Understanding", "💝 Empathetic", "🕊️ Compassionate", "🌸 Gentle", "🗣️ Soft-spoken", "👂 Good Listener", "💕 Romantic"
   ];
 
   const handleInputChange = (field: string, value: any) => {
@@ -243,6 +282,22 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
   };
 
   const handleSave = () => {
+    // Task #17: Ensure date of birth is never empty
+    if (!formData.dob) {
+      alert('Date of birth is required and cannot be empty.');
+      return;
+    }
+
+    // Task #18: Ensure country of residence and state are not empty
+    if (!formData.country) {
+      alert('Country of residence is required and cannot be empty.');
+      return;
+    }
+    if (!formData.state) {
+      alert('State/Province of residence is required and cannot be empty.');
+      return;
+    }
+
     const updatedData = {
       ...formData,
       interests: JSON.stringify(selectedInterests),
@@ -599,19 +654,7 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>How Covered Are You?</Label>
-              <Select value={formData.dressingCovering} onValueChange={(value) => handleInputChange("dressingCovering", value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select coverage" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Fully Covered">Fully Covered</SelectItem>
-                  <SelectItem value="Partially Covered">Partially Covered</SelectItem>
-                  <SelectItem value="Not Covered">Not Covered</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Task #14: Removed "How Covered are you" field */}
             <div>
               <Label>Lifestyle and Hobbies</Label>
               <Textarea value={formData.islamicPractice} onChange={(e) => handleInputChange("islamicPractice", e.target.value)} placeholder="Describe your lifestyle and hobbies." />
@@ -624,7 +667,7 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
           <div className="space-y-6">
             <div>
               <Label>Traits</Label>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 mb-4">
                 {traitOptions.map((trait) => (
                   <Badge
                     key={trait}
@@ -635,6 +678,21 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
                     {trait}
                   </Badge>
                 ))}
+              </div>
+              
+              {/* Task #19: Add free text and emoji support for traits */}
+              <div className="space-y-2">
+                <Label htmlFor="customTraits">Custom Traits (with emojis 😊)</Label>
+                <Textarea
+                  id="customTraits"
+                  value={formData.traits}
+                  onChange={(e) => handleInputChange("traits", e.target.value)}
+                  placeholder="Add your own traits with emojis! e.g., 🎨 Creative artist, 🌟 Optimistic, 💪 Fitness enthusiast, 📚 Book lover..."
+                  className="min-h-[80px]"
+                />
+                <p className="text-xs text-muted-foreground">
+                  💡 Tip: Use emojis to make your traits more expressive! You can describe yourself in your own words.
+                </p>
               </div>
             </div>
           </div>
@@ -895,9 +953,21 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
 
         {/* Main Content */}
         <main className="flex-1 p-4 lg:p-6 lg:overflow-y-auto">
-          <Card>
+          {/* Task #16: Add swipe functionality to card */}
+          <Card 
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
+            className="touch-pan-y"
+          >
             <CardHeader>
-              <CardTitle className="text-lg lg:text-xl">{sections[currentSection]}</CardTitle>
+              <CardTitle className="text-lg lg:text-xl flex items-center justify-between">
+                {sections[currentSection]}
+                {/* Task #16: Add swipe indicator */}
+                <span className="text-sm text-muted-foreground lg:hidden">
+                  👈 Swipe to navigate 👉
+                </span>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {renderSection()}

@@ -1,14 +1,24 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAdminData } from '@/hooks/useAdminData';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 
 const VideoCallManagement = () => {
   const { calls, loading } = useAdminData();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   if (loading) return <div>Loading call history...</div>;
+
+  // Calculate pagination
+  const totalCalls = calls?.length || 0;
+  const totalPages = Math.ceil(totalCalls / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedCalls = calls?.slice(startIndex, endIndex) || [];
 
   return (
     <Card>
@@ -29,8 +39,8 @@ const VideoCallManagement = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {calls && calls.length > 0 ? (
-              calls.map((call) => {
+            {paginatedCalls && paginatedCalls.length > 0 ? (
+              paginatedCalls.map((call) => {
                 // Use caller and recipient from backend, not participants array
                 const caller = call.caller || { fname: 'Unknown', lname: 'User', username: 'unknown' };
                 const recipient = call.recipient || { fname: 'Unknown', lname: 'User', username: 'unknown' };
@@ -73,6 +83,36 @@ const VideoCallManagement = () => {
             )}
           </TableBody>
         </Table>
+        
+        {/* Pagination Controls */}
+        {totalCalls > pageSize && (
+          <div className="flex items-center justify-between mt-4">
+            <div className="text-sm text-gray-500">
+              Showing {startIndex + 1} to {Math.min(endIndex, totalCalls)} of {totalCalls} calls
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <span className="text-sm">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

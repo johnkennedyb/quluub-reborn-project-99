@@ -3,11 +3,19 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, Star, UserPlus } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { MessageSquare, Star, UserPlus, Flag } from "lucide-react";
 import { format, differenceInYears } from 'date-fns';
+import { useState, useEffect } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { userService, relationshipService } from '@/lib/api-client';
 
 interface UserProfileViewProps {
   user: User;
+  hasReceivedRequestFrom?: boolean;
+  requestId?: string;
 }
 
 const DetailItem = ({ label, value }: { label: string; value: string | undefined | null }) => {
@@ -20,14 +28,109 @@ const DetailItem = ({ label, value }: { label: string; value: string | undefined
   );
 };
 
-const UserProfileView = ({ user }: UserProfileViewProps) => {
+const UserProfileView = ({ user, hasReceivedRequestFrom = false, requestId }: UserProfileViewProps) => {
+  const [showReportDialog, setShowReportDialog] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [isProcessingRequest, setIsProcessingRequest] = useState(false);
+
+  // Log profile view when component mounts
+  useEffect(() => {
+    const logView = async () => {
+      if (user?._id) {
+        try {
+          await userService.logProfileView(user._id);
+        } catch (error) {
+          console.error('Failed to log profile view:', error);
+          // Don't show error to user as this is background tracking
+        }
+      }
+    };
+
+    logView();
+  }, [user?._id]);
+
   const getInitials = (fname: string, lname: string) => {
     return `${fname.charAt(0)}${lname.charAt(0)}`.toUpperCase();
   };
 
   const calculateAge = (dob: Date | undefined) => {
-    if (!dob) return "N/A";
-    return differenceInYears(new Date(), new Date(dob));
+    // Task #26: Fix age display issue
+    if (!dob) return null;
+    try {
+      const dobDate = typeof dob === 'string' ? new Date(dob) : dob;
+      if (isNaN(dobDate.getTime())) return null;
+      return differenceInYears(new Date(), dobDate);
+    } catch (error) {
+      console.error('Error calculating age:', error);
+      return null;
+    }
+  };
+
+  const getAgeDisplay = (dob: Date | undefined) => {
+    const age = calculateAge(dob);
+    return age ? `${age} years old` : "Age not provided";
+  };
+
+  const handleRequestResponse = async (action: 'accept' | 'reject') => {
+    if (!requestId) return;
+    
+    // Task #28: Check if wali name and email are provided before accept/reject
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const waliDetails = currentUser.waliDetails ? JSON.parse(currentUser.waliDetails) : {};
+    
+    if (!waliDetails.name || !waliDetails.email) {
+      toast.error('Please complete your Wali name and email in your profile settings before accepting or rejecting requests.');
+      return;
+    }
+    
+    setIsProcessingRequest(true);
+    try {
+      await relationshipService.respondToRequest(requestId, action);
+      toast.success(`Request ${action}ed successfully`);
+      // Optionally refresh the page or update the UI
+      window.location.reload();
+    } catch (error: any) {
+      console.error(`Error ${action}ing request:`, error);
+      toast.error(`Failed to ${action} request`);
+    } finally {
+      setIsProcessingRequest(false);
+    }
+  };
+
+  const reportMutation = useMutation({
+    mutationFn: async (reportData: { reportedUserId: string; reason: string; type: string }) => {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/reports`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(reportData)
+      });
+      if (!response.ok) throw new Error('Failed to submit report');
+      return response.json();
+    },
+    onSuccess: () => {
+      toast.success('Report submitted successfully');
+      setShowReportDialog(false);
+      setReportReason('');
+    },
+    onError: (error) => {
+      toast.error('Failed to submit report');
+      console.error('Report error:', error);
+    },
+  });
+
+  const handleReport = () => {
+    if (!reportReason.trim()) {
+      toast.error('Please provide a reason for reporting');
+      return;
+    }
+    reportMutation.mutate({
+      reportedUserId: user._id,
+      reason: reportReason,
+      type: 'profile'
+    });
   };
 
   return (
@@ -43,12 +146,74 @@ const UserProfileView = ({ user }: UserProfileViewProps) => {
               </Avatar>
               <h2 className="text-2xl font-bold">{user.fname} {user.lname}</h2>
               <p className="text-sm text-muted-foreground">@{user.username}</p>
-              <p className="text-sm text-muted-foreground mt-1">{user.city}, {user.country}</p>
+              <p className="text-sm text-muted-foreground mt-1">{user.state || 'Unknown'}, {user.country || 'Unknown'}</p>
               {user.lastSeen && <p className="text-xs text-gray-400 mt-2">Last seen: {format(new Date(user.lastSeen), 'PPp')}</p>}
-              <div className="mt-4 flex gap-2">
-                <Button variant="outline"><UserPlus className="mr-2 h-4 w-4" /> Send Request</Button>
+              <div className="mt-4 flex gap-2 flex-wrap">
+                {/* Task #27: Show accept/reject instead of send request when viewing profile of someone who sent a request */}
+                {hasReceivedRequestFrom ? (
+                  <>
+                    <Button 
+                      onClick={() => handleRequestResponse('accept')}
+                      disabled={isProcessingRequest}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <UserPlus className="mr-2 h-4 w-4" /> Accept
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => handleRequestResponse('reject')}
+                      disabled={isProcessingRequest}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      Reject
+                    </Button>
+                  </>
+                ) : (
+                  <Button variant="outline"><UserPlus className="mr-2 h-4 w-4" /> Send Request</Button>
+                )}
                 <Button variant="outline"><Star className="mr-2 h-4 w-4" /> Favorite</Button>
                 <Button><MessageSquare className="mr-2 h-4 w-4" /> Message</Button>
+                <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                      <Flag className="mr-2 h-4 w-4" /> Report
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Report User</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <p className="text-sm text-gray-600">
+                        Please describe the reason for reporting this user. Your report will be reviewed by our moderation team.
+                      </p>
+                      <Textarea
+                        placeholder="Please describe the reason for reporting this user..."
+                        value={reportReason}
+                        onChange={(e) => setReportReason(e.target.value)}
+                        rows={4}
+                      />
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setShowReportDialog(false);
+                            setReportReason('');
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={handleReport}
+                          disabled={reportMutation.isPending || !reportReason.trim()}
+                          className="bg-red-600 hover:bg-red-700"
+                        >
+                          {reportMutation.isPending ? 'Submitting...' : 'Submit Report'}
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
             </CardContent>
           </Card>
@@ -70,7 +235,7 @@ const UserProfileView = ({ user }: UserProfileViewProps) => {
             </CardHeader>
             <CardContent>
               <dl className="divide-y divide-gray-200">
-                <DetailItem label="Age" value={`${calculateAge(user.dob)} years old`} />
+                <DetailItem label="Age" value={getAgeDisplay(user.dob)} />
                 <DetailItem label="Gender" value={user.gender} />
                 <DetailItem label="Marital Status" value={user.maritalStatus} />
                 <DetailItem label="Children" value={user.noOfChildren} />

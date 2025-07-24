@@ -272,3 +272,39 @@ exports.getPendingRequests = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+// @desc    Get sent connection requests for a user
+// @route   GET /api/relationships/sent
+// @access  Private
+exports.getSentRequests = async (req, res) => {
+  try {
+    const userId = req.user._id.toString();
+    
+    console.log(`Getting sent requests for user: ${userId}`);
+    
+    // Find all relationships where current user is the follower (sender)
+    const sentRequests = await Relationship.find({
+      follower_user_id: userId,
+      status: 'pending'
+    }).populate({
+      path: 'followed_user_id',
+      model: 'User',
+      select: 'fname lname username profilePicture gender dob country region'
+    });
+    
+    console.log(`Found ${sentRequests.length} sent requests`);
+    
+    // Transform the data to match expected format
+    const transformedRequests = sentRequests.map(request => ({
+      id: request.id,
+      status: request.status,
+      createdAt: request.createdAt,
+      user: request.followed_user_id // The user we sent the request to
+    }));
+    
+    res.json({ requests: transformedRequests });
+  } catch (error) {
+    console.error("Get sent requests error:", error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};

@@ -119,6 +119,10 @@ const DashboardInsights = ({ stats }: DashboardInsightsProps) => {
               <Badge variant="destructive">{formatNumber(stats.inactiveQuarter)}</Badge>
             </div>
             <div className="flex justify-between items-center">
+              <span className="text-sm">Inactive (6 months)</span>
+              <Badge variant="destructive">{formatNumber(stats.inactiveSixMonths)}</Badge>
+            </div>
+            <div className="flex justify-between items-center">
               <span className="text-sm">Inactive (1 year)</span>
               <Badge variant="destructive">{formatNumber(stats.inactiveYear)}</Badge>
             </div>

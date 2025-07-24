@@ -195,6 +195,16 @@ export const userService = {
     }
   },
 
+  logProfileView: async (userId: string) => {
+    try {
+      const response = await apiClient.post('/users/log-profile-view', { userId });
+      return response.data;
+    } catch (error) {
+      console.error('Log profile view error:', error);
+      throw error;
+    }
+  },
+
   deleteAccount: async () => {
     const response = await apiClient.delete('/users/account');
     console.log('🗑️ Delete account response:', response);
@@ -556,6 +566,17 @@ export const adminService = {
       throw error;
     }
   }
+};
+
+// Feed service
+export const feedService = {
+  getFeed() {
+    return apiClient.get('/feed');
+  },
+
+  markFeedItemRead(itemId: string) {
+    return apiClient.put(`/feed/${itemId}/read`);
+  },
 };
 
 // Video call service

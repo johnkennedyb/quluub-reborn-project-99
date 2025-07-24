@@ -26,7 +26,7 @@ const Navbar = () => {
 
   return (
     <header className="fixed bottom-0 left-0 w-full bg-white border-t z-50">
-      <div className="container px-0 py-2">
+      <div className="w-full px-0 py-2">
         <nav>
           <ul className="flex items-center justify-around">
             <li>

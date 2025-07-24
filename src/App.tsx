@@ -29,10 +29,13 @@ import Browse from "@/pages/Browse";
 import Messages from "@/pages/Messages";
 import Profile from "@/pages/Profile";
 import Settings from "@/pages/Settings";
-import VideoCall from "@/pages/VideoCall";
+import VideoCallZoom from "@/pages/VideoCallZoom";
 import AdminDashboard from "@/pages/AdminDashboard";
 import Search from "@/pages/Search";
+import Notifications from "@/pages/Notifications";
+import WaliChat from "@/pages/WaliChat";
 import ValidateEmail from "@/pages/ValidateEmail";
+import ResetPassword from "@/pages/ResetPassword";
 import NotFound from "@/pages/NotFound";
 import Alerts from "@/pages/Alerts";
 import UserProfilePage from "@/pages/admin/UserProfilePage";
@@ -180,11 +183,13 @@ function App() {
         <Route path="/auth" element={<Auth />} />
         <Route path="/auth/google/callback" element={<GoogleCallback />} />
         <Route path="/validate-email" element={<ValidateEmail />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/wali-chat/:token" element={<WaliChat />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin/signup" element={<AdminSignup />} />
 
         {/* Private video call routes - authentication required */}
-        <Route path="/video-call" element={<PrivateRoute element={<VideoCall />} />} />
+        <Route path="/video-call" element={<PrivateRoute element={<VideoCallZoom />} />} />
         <Route path="/video-call/:callId" element={<PrivateRoute element={<VideoCallRoom />} />} />
 
         {/* User routes */}
@@ -194,6 +199,7 @@ function App() {
         <Route path="/profile" element={<PrivateRoute element={<Profile />} />} />
         <Route path="/profile/:userId" element={<PrivateRoute element={<Profile />} />} />
         <Route path="/settings" element={<PrivateRoute element={<Settings />} />} />
+        <Route path="/notifications" element={<PrivateRoute element={<Notifications />} />} />
         <Route path="/alerts" element={<PrivateRoute element={<Alerts />} />} />
 
         {/* Admin routes */}

@@ -485,20 +485,57 @@ const getUnreadCount = async (req, res) => {
     // Count unread messages from matched users only
     const unreadChats = await Chat.find({
       receiverId: userId,
-      status: "UNREAD"
-    }).populate('senderId', '_id');
+      status: 'UNREAD'
+    });
     
-    let matchedUnreadCount = 0;
-    for (const chat of unreadChats) {
-      const isMatched = await areUsersMatched(userId.toString(), chat.senderId._id.toString());
-      if (isMatched) {
-        matchedUnreadCount++;
-      }
-    }
-    
-    res.json({ unreadCount: matchedUnreadCount });
+    res.json({ unreadCount });
   } catch (error) {
     console.error(error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// CREATE OR FIND CONVERSATION WITH SPECIFIC USER
+const createOrFindConversation = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { participantId } = req.body;
+    
+    if (!participantId) {
+      return res.status(400).json({ message: 'Participant ID is required' });
+    }
+    
+    // Check if users are matched
+    const isMatched = await areUsersMatched(userId.toString(), participantId);
+    if (!isMatched) {
+      return res.status(403).json({ message: 'You can only chat with matched users' });
+    }
+    
+    // Look for existing conversation between these users
+    const existingChat = await Chat.findOne({
+      $or: [
+        { senderId: userId, receiverId: participantId },
+        { senderId: participantId, receiverId: userId }
+      ]
+    }).sort({ created: -1 });
+    
+    if (existingChat) {
+      // Return existing conversation ID (using participant ID as conversation identifier)
+      return res.json({ 
+        conversationId: participantId,
+        message: 'Existing conversation found'
+      });
+    } else {
+      // No existing conversation, but users are matched so they can start chatting
+      // Return the participant ID as conversation identifier
+      return res.json({ 
+        conversationId: participantId,
+        message: 'Ready to start new conversation'
+      });
+    }
+    
+  } catch (error) {
+    console.error('Error in createOrFindConversation:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -732,6 +769,7 @@ module.exports = {
   updateChat,
   getUnreadCount,
   sendMessage,
+  createOrFindConversation,
   sendVideoCallInvitation,
   contactWali,
   initiateVideoCall

@@ -1,7 +1,9 @@
-
 const User = require('../models/User');
 const UserActivityLog = require('../models/UserActivityLog');
 const bcrypt = require('bcryptjs');
+const path = require('path');
+const mongoose = require('mongoose');
+const LRUCache = require('lru-cache');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
@@ -68,9 +70,19 @@ exports.getUserProfile = async (req, res) => {
       selectFields += ' -email -phoneNumber -parentEmail -waliDetails -favorites -blockedUsers -reportedUsers';
     }
     
-    const user = await User.findById(userId)
-      .select(selectFields)
-      .lean(); // Use lean() for faster queries
+    // Determine if userId is a valid ObjectId or a username
+    let user;
+    if (mongoose.Types.ObjectId.isValid(userId)) {
+      // It's a valid ObjectId, search by _id
+      user = await User.findById(userId)
+        .select(selectFields)
+        .lean();
+    } else {
+      // It's likely a username, search by username
+      user = await User.findOne({ username: userId })
+        .select(selectFields)
+        .lean();
+    }
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -380,6 +392,181 @@ exports.getFavorites = async (req, res) => {
     res.json({ favorites: user.favorites || [] });
   } catch (error) {
     console.error("Get favorites error:", error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Search users with advanced filtering (taofeeq_UI compatible)
+// @route   GET /api/users/search
+// @access  Private
+exports.searchUsers = async (req, res) => {
+  try {
+    const {
+      nationality,
+      country,
+      ageRange,
+      heightRange,
+      weightRange,
+      build,
+      appearance,
+      maritalStatus,
+      patternOfSalaah,
+      genotype,
+      sortBy = 'lastSeen',
+      page = 1,
+      limit = 20
+    } = req.query;
+
+    const currentUser = req.user;
+    const query = {
+      _id: { $ne: currentUser._id },
+      emailVerified: true,
+      hidden: { $ne: true }
+    };
+
+    // Gender filtering - show opposite gender
+    if (currentUser.gender) {
+      query.gender = currentUser.gender === 'male' ? 'female' : 'male';
+    }
+
+    // Apply filters
+    if (nationality && nationality !== '') {
+      query.nationality = new RegExp(nationality, 'i');
+    }
+
+    if (country && country !== '') {
+      query.country = new RegExp(country, 'i');
+    }
+
+    if (build && build !== '') {
+      query.build = new RegExp(build, 'i');
+    }
+
+    if (appearance && appearance !== '') {
+      query.appearance = new RegExp(appearance, 'i');
+    }
+
+    if (maritalStatus && maritalStatus !== '') {
+      query.maritalStatus = new RegExp(maritalStatus, 'i');
+    }
+
+    if (patternOfSalaah && patternOfSalaah !== '') {
+      query.patternOfSalaah = new RegExp(patternOfSalaah, 'i');
+    }
+
+    if (genotype && genotype !== '') {
+      query.genotype = new RegExp(genotype, 'i');
+    }
+
+    // Age range filtering
+    if (ageRange && Array.isArray(ageRange) && ageRange.length === 2) {
+      const [minAge, maxAge] = ageRange.map(Number);
+      const maxDate = new Date();
+      const minDate = new Date();
+      maxDate.setFullYear(maxDate.getFullYear() - minAge);
+      minDate.setFullYear(minDate.getFullYear() - maxAge);
+      
+      query.dob = {
+        $gte: minDate,
+        $lte: maxDate
+      };
+    }
+
+    // Height range filtering (assuming height is stored in inches)
+    if (heightRange && Array.isArray(heightRange) && heightRange.length === 2) {
+      const [minHeight, maxHeight] = heightRange.map(Number);
+      query.height = {
+        $gte: minHeight,
+        $lte: maxHeight
+      };
+    }
+
+    // Weight range filtering
+    if (weightRange && Array.isArray(weightRange) && weightRange.length === 2) {
+      const [minWeight, maxWeight] = weightRange.map(Number);
+      query.weight = {
+        $gte: minWeight,
+        $lte: maxWeight
+      };
+    }
+
+    // Sorting
+    let sortOptions = {};
+    switch (sortBy) {
+      case 'lastSeen':
+        sortOptions = { lastSeen: -1, createdAt: -1 };
+        break;
+      case 'created':
+      case 'newest':
+        sortOptions = { createdAt: -1 };
+        break;
+      default:
+        sortOptions = { lastSeen: -1, createdAt: -1 };
+    }
+
+    // Pagination
+    const pageNum = parseInt(page) || 1;
+    const limitNum = parseInt(limit) || 20;
+    const skip = (pageNum - 1) * limitNum;
+
+    // Execute query
+    const users = await User.find(query)
+      .select('-password -resetPasswordToken -resetPasswordTokenExpiration -validationToken -email -phoneNumber -parentEmail -waliDetails -favorites -blockedUsers -reportedUsers')
+      .sort(sortOptions)
+      .skip(skip)
+      .limit(limitNum)
+      .lean();
+
+    // Get total count for pagination
+    const totalUsers = await User.countDocuments(query);
+    const totalPages = Math.ceil(totalUsers / limitNum);
+
+    // Update last seen for current user
+    await User.findByIdAndUpdate(currentUser._id, { lastSeen: new Date() });
+
+    res.json({
+      returnData: users,
+      currentPage: pageNum,
+      totalPages,
+      totalUsers,
+      hasNextPage: pageNum < totalPages,
+      hasPrevPage: pageNum > 1
+    });
+  } catch (error) {
+    console.error('Search users error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Log profile view
+// @route   POST /api/users/log-profile-view
+// @access  Private
+exports.logProfileView = async (req, res) => {
+  try {
+    const { userId } = req.body;
+    const viewerId = req.user._id.toString();
+    
+    // Don't log if user is viewing their own profile
+    if (userId === viewerId) {
+      return res.status(200).json({ message: 'Own profile view not logged' });
+    }
+    
+    // Check if user exists
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Log the profile view activity
+    await UserActivityLog.create({
+      userId: viewerId,
+      receiverId: userId,
+      action: 'PROFILE_VIEW',
+    });
+    
+    res.status(200).json({ message: 'Profile view logged successfully' });
+  } catch (error) {
+    console.error('Log profile view error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };

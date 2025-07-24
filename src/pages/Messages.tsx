@@ -44,12 +44,19 @@ const Messages = () => {
   const [sending, setSending] = useState(false);
   const [recipientId, setRecipientId] = useState<string | null>(null);
   const [callStatus, setCallStatus] = useState<'idle' | 'calling' | 'answered' | 'declined' | 'missed'>('idle');
+  
+  // Task #29: Message counter state
+  const [messageLimit, setMessageLimit] = useState(10); // Default limit for free users
+  const [messagesUsed, setMessagesUsed] = useState(0);
+  const [wordCount, setWordCount] = useState(0);
+  const maxWordsPerMessage = 100; // Word limit per message
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Get conversation id
+  // Get conversation id or user id for new conversations
   const urlParams = new URLSearchParams(location.search);
   const conversationId = urlParams.get("conversation");
+  const targetUserId = urlParams.get("user");
 
   // Helper function to render message content with clickable links
   const renderMessageContent = (message: string, messageType?: string, videoCallData?: any) => {
@@ -220,15 +227,52 @@ const Messages = () => {
     }
   };
 
-  useEffect(() => {
-    if (!conversationId) {
-      toast({ title: "Error", description: "No conversation ID found", variant: "destructive" });
-      return;
+  // Function to create or find conversation with a specific user
+  const createOrFindConversation = async (userId: string) => {
+    try {
+      setLoading(true);
+      console.log('Creating/finding conversation with user:', userId);
+      
+      // Try to find existing conversation or create a new one
+      const response = await apiClient.post('/conversations/create-or-find', {
+        participantId: userId
+      });
+      
+      if (response.data.conversationId) {
+        // Update URL to use conversation ID instead of user ID
+        const newUrl = `/messages?conversation=${response.data.conversationId}`;
+        window.history.replaceState({}, '', newUrl);
+        
+        // Set the conversation ID and recipient
+        setRecipientId(userId);
+        
+        // Fetch messages for this conversation
+        const data = await chatService.getMessages(response.data.conversationId);
+        setMessages(data);
+        scrollToBottom();
+      }
+    } catch (err) {
+      console.error("Failed to create/find conversation", err);
+      toast({ 
+        title: "Error", 
+        description: "Could not start conversation. You may need to be matched with this user to chat.",
+        variant: "destructive" 
+      });
+    } finally {
+      setLoading(false);
     }
+  };
 
-    fetchMessages();
+  useEffect(() => {
+    if (conversationId) {
+      fetchMessages();
+    } else if (targetUserId) {
+      createOrFindConversation(targetUserId);
+    } else {
+      toast({ title: "Error", description: "No conversation or user ID found", variant: "destructive" });
+    }
     // No polling needed since we have real-time socket updates
-  }, [conversationId]);
+  }, [conversationId, targetUserId]);
 
   // Listen for call status updates
   useEffect(() => {
@@ -336,6 +380,32 @@ const Messages = () => {
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  // Task #29: Update word count when message text changes
+  useEffect(() => {
+    const words = messageText.trim().split(/\s+/).filter(word => word.length > 0);
+    setWordCount(words.length);
+  }, [messageText]);
+
+  // Task #29: Fetch message usage stats
+  useEffect(() => {
+    const fetchMessageStats = async () => {
+      try {
+        // This would be an API call to get user's message usage
+        // For now, we'll use mock data based on user plan
+        const isPremium = isPremiumUser(user);
+        setMessageLimit(isPremium ? 1000 : 10);
+        // In a real implementation, this would come from the backend
+        setMessagesUsed(messages.filter(msg => msg.senderId === user._id).length);
+      } catch (error) {
+        console.error('Error fetching message stats:', error);
+      }
+    };
+
+    if (user) {
+      fetchMessageStats();
+    }
+  }, [user, messages]);
 
   const sendMessage = async () => {
     if (!messageText.trim() || !conversationId || sending) return;
@@ -605,6 +675,21 @@ const Messages = () => {
 
         {/* Message Input */}
         <div className="p-4 border-t bg-white">
+          {/* Task #29: Message counter display */}
+          <div className="flex justify-between items-center mb-2 text-xs text-gray-500">
+            <span>
+              Messages: {messagesUsed}/{messageLimit} 
+              {messageLimit - messagesUsed <= 3 && messageLimit - messagesUsed > 0 && (
+                <span className="text-orange-500 ml-1">({messageLimit - messagesUsed} left)</span>
+              )}
+              {messagesUsed >= messageLimit && (
+                <span className="text-red-500 ml-1">(Limit reached)</span>
+              )}
+            </span>
+            <span className={wordCount > maxWordsPerMessage ? "text-red-500" : "text-gray-500"}>
+              Words: {wordCount}/{maxWordsPerMessage}
+            </span>
+          </div>
           <div className="flex gap-2">
             <Input
               value={messageText}
@@ -612,7 +697,7 @@ const Messages = () => {
               onKeyPress={handleKeyPress}
               placeholder="Type your message..."
               className="flex-1"
-              disabled={sending}
+              disabled={sending || messagesUsed >= messageLimit}
             />
             <Button 
               onClick={sendMessage} 

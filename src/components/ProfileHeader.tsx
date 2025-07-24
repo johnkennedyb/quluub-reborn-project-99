@@ -1,8 +1,8 @@
-
 import { Button } from "@/components/ui/button";
 import { Heart, MessageCircle, Share } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import ProfileImage from "@/components/ProfileImage";
+import logo from "../../taofeeq_UI/public/logo.png";
 
 interface ProfileHeaderProps {
   name: string;
@@ -23,7 +23,9 @@ const ProfileHeader = ({
     <Card className="border-0 shadow-none">
       <CardContent className="p-0">
         <div className="relative">
-          <div className="h-40 md:h-60 w-full bg-gradient-to-b from-primary/20 to-primary/5 rounded-t-xl"></div>
+          <div className="h-40 md:h-60 w-full bg-gradient-to-b from-primary/20 to-primary/5 rounded-t-xl flex justify-center items-center">
+            <img src={logo} alt="Quluub Logo" className="h-10 w-10" />
+          </div>
           <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2">
             <ProfileImage 
               src={photoUrl} 

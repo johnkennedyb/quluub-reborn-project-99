@@ -83,8 +83,8 @@ const UserProfile = ({ userId }: UserProfileProps) => {
         <dl className="divide-y divide-gray-200">
           {renderDetail('Email', user.email)}
           {renderDetail('Gender', user.gender)}
-          {renderDetail('Date of Birth', user.dob ? new Date(user.dob).toLocaleDateString() : 'N/A')}
-          {renderDetail('Country', user.country)}
+          {renderDetail('Date of Birth', user.birthDate ? new Date(user.birthDate).toLocaleDateString() : 'N/A')}
+          {renderDetail('City', user.cityOfResidence || 'N/A')}
           {renderDetail('Region', user.region)}
           {renderDetail('Marital Status', user.maritalStatus)}
           {renderDetail('Practicing Since', user.startedPracticing ? new Date(user.startedPracticing).toLocaleDateString() : 'N/A')}

@@ -1,24 +1,34 @@
 const express = require('express');
 const router = express.Router();
-const { createRoom, getRoom, deleteRoom } = require('../controllers/wherebyController');
+const { createMeeting, getMeeting, deleteMeeting, generateSignature, notifyWali } = require('../controllers/zoomController');
 const { protect } = require('../middlewares/authMiddleware');
 
-// All Whereby routes require authentication
+// All Zoom routes require authentication
 router.use(protect);
 
-// @route   POST /api/whereby/create-room
-// @desc    Create a new Whereby room
+// @route   POST /api/zoom/create-meeting
+// @desc    Create a new Zoom meeting
 // @access  Private (Premium users only)
-router.post('/create-room', createRoom);
+router.post('/create-meeting', createMeeting);
 
-// @route   GET /api/whereby/room/:meetingId
-// @desc    Get room details
+// @route   GET /api/zoom/meeting/:meetingId
+// @desc    Get meeting details
 // @access  Private (Premium users only)
-router.get('/room/:meetingId', getRoom);
+router.get('/meeting/:meetingId', getMeeting);
 
-// @route   DELETE /api/whereby/room/:meetingId
-// @desc    Delete a room
+// @route   DELETE /api/zoom/meeting/:meetingId
+// @desc    Delete a meeting
 // @access  Private (Premium users only)
-router.delete('/room/:meetingId', deleteRoom);
+router.delete('/meeting/:meetingId', deleteMeeting);
+
+// @route   POST /api/zoom/signature
+// @desc    Generate Zoom SDK signature
+// @access  Private (Premium users only)
+router.post('/signature', generateSignature);
+
+// @route   POST /api/zoom/notify-wali
+// @desc    Notify Wali about video call
+// @access  Private (Premium users only)
+router.post('/notify-wali', notifyWali);
 
 module.exports = router;

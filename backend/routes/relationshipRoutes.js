@@ -5,7 +5,8 @@ const {
   respondToRequest, 
   withdrawRequest, 
   getMatches,
-  getPendingRequests
+  getPendingRequests,
+  getSentRequests
 } = require('../controllers/relationshipController');
 const { protect } = require('../middlewares/auth');
 
@@ -16,5 +17,6 @@ router.put('/:id/status', protect, respondToRequest);
 router.delete('/withdraw/:id', protect, withdrawRequest);
 router.get('/matches', protect, getMatches);
 router.get('/pending', protect, getPendingRequests);
+router.get('/sent', protect, getSentRequests);
 
 module.exports = router;

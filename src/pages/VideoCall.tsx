@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Video, MessageCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ArrowLeft, Video, MessageCircle, Crown, Clock, Shield } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import WherebyCallButton from "@/components/VideoCall/WherebyCallButton";
 import WherebyEmbeddedCall from "@/components/VideoCall/WherebyEmbeddedCall";
@@ -18,6 +20,12 @@ const VideoCall = () => {
 
   const [currentMeetingUrl, setCurrentMeetingUrl] = useState<string | null>(meetingUrl);
   const [recipientInfo, setRecipientInfo] = useState<any>(null);
+  const [callDuration, setCallDuration] = useState(0);
+  const [callStartTime, setCallStartTime] = useState<Date | null>(null);
+  const [isCallActive, setIsCallActive] = useState(false);
+  
+  const CALL_TIME_LIMIT = 5 * 60; // 5 minutes in seconds
+  const isPremiumUser = user?.plan === 'premium' || user?.plan === 'gold';
 
   // Redirect to auth if not authenticated
   useEffect(() => {
@@ -45,6 +53,46 @@ const VideoCall = () => {
     }
   }, [recipientId, navigate, toast]);
 
+  // Check premium user access
+  useEffect(() => {
+    if (!isPremiumUser) {
+      toast({
+        title: "Premium Feature",
+        description: "Video calling is available for premium users only",
+        variant: "destructive",
+      });
+      navigate("/dashboard");
+      return;
+    }
+  }, [isPremiumUser, navigate, toast]);
+
+  // Call duration timer
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (isCallActive && callStartTime) {
+      interval = setInterval(() => {
+        const now = new Date();
+        const duration = Math.floor((now.getTime() - callStartTime.getTime()) / 1000);
+        setCallDuration(duration);
+        
+        // End call when time limit is reached
+        if (duration >= CALL_TIME_LIMIT) {
+          toast({
+            title: "Call Time Limit Reached",
+            description: "Maximum call duration of 5 minutes has been reached",
+            variant: "destructive",
+          });
+          handleCallEnd();
+        }
+      }, 1000);
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isCallActive, callStartTime]);
+
   // Fetch recipient info
   useEffect(() => {
     const fetchRecipientInfo = async () => {
@@ -70,10 +118,62 @@ const VideoCall = () => {
 
   const handleCallInitiated = (meetingUrl: string) => {
     setCurrentMeetingUrl(meetingUrl);
+    setCallStartTime(new Date());
+    setIsCallActive(true);
+    setCallDuration(0);
+    
+    // Notify Wali about video call start
+    notifyWaliAboutVideoCall('started');
+    
     toast({
       title: "Call Initiated",
       description: "Professional video call started with Whereby",
     });
+  };
+
+  const handleCallEnd = async () => {
+    setIsCallActive(false);
+    setCurrentMeetingUrl(null);
+    
+    // Notify Wali about video call end
+    await notifyWaliAboutVideoCall('ended');
+    
+    navigate("/dashboard");
+  };
+
+  const notifyWaliAboutVideoCall = async (status: 'started' | 'ended') => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/wali/video-call-notification`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          recipientId,
+          recipientInfo,
+          status,
+          duration: callDuration,
+          timestamp: new Date().toISOString()
+        })
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to notify Wali about video call');
+      }
+    } catch (error) {
+      console.error('Error notifying Wali about video call:', error);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const getRemainingTime = () => {
+    return CALL_TIME_LIMIT - callDuration;
   };
 
   const handleChatRedirect = () => {
@@ -92,10 +192,7 @@ const VideoCall = () => {
           setCurrentMeetingUrl(null);
           navigate("/dashboard");
         }}
-        onCallEnded={() => {
-          setCurrentMeetingUrl(null);
-          navigate("/dashboard");
-        }}
+        onCallEnded={handleCallEnd}
       />
     );
   }
@@ -127,12 +224,48 @@ const VideoCall = () => {
             <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Video className="text-blue-600" size={40} />
             </div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">
-              Start Video Call
-            </h2>
+            <div className="flex items-center justify-center mb-4">
+              <h2 className="text-3xl font-bold text-gray-900 mr-3">
+                Start Video Call
+              </h2>
+              <Badge className="bg-yellow-100 text-yellow-800 flex items-center">
+                <Crown className="h-3 w-3 mr-1" />
+                Premium
+              </Badge>
+            </div>
             <p className="text-gray-600 max-w-md mx-auto">
               Initiate a professional, secure video call with Islamic compliance monitoring
             </p>
+            
+            {/* Call Timer Display */}
+            {isCallActive && (
+              <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-center justify-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <Clock className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm font-medium text-blue-900">
+                      Call Duration: {formatTime(callDuration)}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Shield className="h-4 w-4 text-green-600" />
+                    <span className="text-sm font-medium text-green-900">
+                      Time Remaining: {formatTime(getRemainingTime())}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Warning when less than 1 minute remaining */}
+                {getRemainingTime() <= 60 && getRemainingTime() > 0 && (
+                  <Alert className="mt-3 border-orange-200 bg-orange-50">
+                    <Clock className="h-4 w-4 text-orange-600" />
+                    <AlertDescription className="text-orange-800">
+                      Less than 1 minute remaining in your call
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Recipient Info */}

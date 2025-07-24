@@ -10,7 +10,9 @@ const {
   removeFromFavorites,
   getFavorites,
   getProfileViewsCount,
-  deleteAccount
+  logProfileView,
+  deleteAccount,
+  searchUsers
 } = require('../controllers/userController');
 const { protect } = require('../middlewares/auth');
 
@@ -24,7 +26,9 @@ router.put('/:id', protect, updateUserProfile);
 // Browse routes
 router.get('/users', protect, getAllUsers);
 router.get('/browse', protect, getBrowseUsers);
+router.get('/search', protect, getBrowseUsers); // Add search endpoint for taofeeq_UI compatibility
 router.get('/profile-views-count', protect, getProfileViewsCount);
+router.post('/log-profile-view', protect, logProfileView);
 
 // Payment routes
 router.post('/upgrade-plan', upgradePlan);

@@ -3,10 +3,10 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Search, User, LogOut } from "lucide-react";
+import { Search, User, LogOut, Heart } from "lucide-react";
 
 const TopNavbar = () => {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -21,11 +21,18 @@ const TopNavbar = () => {
 
   return (
     <header className="fixed top-0 left-0 w-full bg-white border-b z-50 shadow-sm">
-      <div className="container px-4 py-3">
+      <div className="w-full px-4 py-3">
         <div className="flex items-center justify-between">
-          {/* Logo */}
-          <Link to="/dashboard" className="text-2xl font-bold text-primary">
+          {/* Logo - Task #13: Added Quluub icon */}
+          <Link to="/dashboard" className="flex items-center gap-2 text-2xl font-bold text-primary">
+            <Heart className="h-6 w-6 fill-current" />
             Quluub
+            {/* Task #21: Show sign in header when account is hidden */}
+            {user?.hidden && (
+              <span className="ml-2 px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">
+                Account Hidden - Sign In to Show
+              </span>
+            )}
           </Link>
           
           {/* Navigation Icons */}

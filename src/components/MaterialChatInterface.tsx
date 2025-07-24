@@ -1,7 +1,8 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { Paper, Box, Stack, Typography } from "@mui/material";
-import { Button, Empty, Space, Input, message } from "antd";
+import { Button, Empty, Space, Input, message, Modal } from "antd";
+import { FlagOutlined } from "@ant-design/icons";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -24,6 +25,8 @@ interface MaterialChatInterfaceProps {
 const MaterialChatInterface: React.FC<MaterialChatInterfaceProps> = ({ setChatCount }) => {
   const [msg, setMsg] = useState("");
   const [chat, setChat] = useState<ChatMessage[]>([]);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState("");
   const endOfDivRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const location = useLocation();
@@ -91,6 +94,30 @@ const MaterialChatInterface: React.FC<MaterialChatInterfaceProps> = ({ setChatCo
     },
   });
 
+  const reportMutation = useMutation({
+    mutationFn: async (reportData: { reportedUserId: string; reason: string; type: string }) => {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/reports`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify(reportData)
+      });
+      if (!response.ok) throw new Error('Failed to submit report');
+      return response.json();
+    },
+    onSuccess: () => {
+      message.success('Report submitted successfully');
+      setShowReportModal(false);
+      setReportReason('');
+    },
+    onError: (error) => {
+      message.error('Failed to submit report');
+      console.error('Report error:', error);
+    },
+  });
+
   const sentMessagesCount = chat.filter((msg) => msg.sender === user?.username).length;
   const hasMetOrExceededPlan = sentMessagesCount >= messageAllowance;
   const hasMetOrExceededWordCountPerMessage = msg.split(" ").length >= wordCountPerMessage;
@@ -117,6 +144,18 @@ const MaterialChatInterface: React.FC<MaterialChatInterfaceProps> = ({ setChatCo
     if (e.key === 'Enter') {
       handleSend();
     }
+  };
+
+  const handleReport = () => {
+    if (!reportReason.trim()) {
+      message.error('Please provide a reason for reporting');
+      return;
+    }
+    reportMutation.mutate({
+      reportedUserId: userId!,
+      reason: reportReason,
+      type: 'chat'
+    });
   };
 
   if (!userId) {
@@ -213,6 +252,35 @@ const MaterialChatInterface: React.FC<MaterialChatInterfaceProps> = ({ setChatCo
           recipientId={userId!}
           recipientName="User"
         />
+        <Button
+          icon={<FlagOutlined />}
+          onClick={() => setShowReportModal(true)}
+          style={{
+            borderRadius: "20px",
+            height: "45px",
+            backgroundColor: "#ff4d4f",
+            borderColor: "#ff4d4f",
+            color: "white"
+          }}
+          title="Report User"
+        />
+        <Modal
+          title="Report User"
+          open={showReportModal}
+          onOk={handleReport}
+          onCancel={() => {
+            setShowReportModal(false);
+            setReportReason('');
+          }}
+          confirmLoading={reportMutation.isPending}
+        >
+          <Input.TextArea
+            placeholder="Please describe the reason for reporting this user..."
+            value={reportReason}
+            onChange={(e) => setReportReason(e.target.value)}
+            rows={4}
+          />
+        </Modal>
         <Space.Compact style={{ width: "100%" }}>
           <Input
             placeholder="Type a message..."

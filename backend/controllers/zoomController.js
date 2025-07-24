@@ -1,5 +1,7 @@
 const axios = require('axios');
+const crypto = require('crypto');
 const User = require('../models/User');
+const nodemailer = require('nodemailer');
 
 // Zoom API configuration (Server-to-Server OAuth)
 const ZOOM_CLIENT_ID = process.env.ZOOM_CLIENT_ID;
@@ -299,6 +301,169 @@ exports.deleteMeeting = async (req, res) => {
     res.status(500).json({ 
       message: 'Failed to delete meeting',
       error: error.response?.data?.message || error.message 
+    });
+  }
+};
+
+// @desc    Generate Zoom SDK signature
+// @route   POST /api/zoom/signature
+// @access  Private (Premium users only)
+exports.generateSignature = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { meetingNumber, role = 0 } = req.body;
+    
+    // Check if user is premium
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    if (user.plan !== 'premium' && user.plan !== 'pro') {
+      return res.status(403).json({ 
+        message: 'Video calls are available for Premium users only.',
+        requiresUpgrade: true 
+      });
+    }
+    
+    if (!ZOOM_CLIENT_ID || !ZOOM_CLIENT_SECRET) {
+      return res.status(500).json({ message: 'Zoom SDK credentials not configured' });
+    }
+    
+    const timestamp = new Date().getTime() - 30000; // 30 seconds ago to account for clock skew
+    const msg = Buffer.from(ZOOM_CLIENT_ID + meetingNumber + timestamp + role, 'utf8');
+    const hash = crypto.createHmac('sha256', ZOOM_CLIENT_SECRET).update(msg).digest('base64');
+    const signature = Buffer.from(`${ZOOM_CLIENT_ID}.${meetingNumber}.${timestamp}.${role}.${hash}`).toString('base64');
+    
+    console.log('✅ Zoom SDK signature generated for meeting:', meetingNumber);
+    
+    res.json({ signature });
+    
+  } catch (error) {
+    console.error('Error generating Zoom signature:', error.message);
+    res.status(500).json({ 
+      message: 'Failed to generate meeting signature',
+      error: error.message 
+    });
+  }
+};
+
+// @desc    Notify Wali about video call
+// @route   POST /api/zoom/notify-wali
+// @access  Private (Premium users only)
+exports.notifyWali = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { recipientId, status, duration = 0, meetingId } = req.body;
+    
+    // Get user and recipient details
+    const user = await User.findById(userId);
+    const recipient = await User.findById(recipientId);
+    
+    if (!user || !recipient) {
+      return res.status(404).json({ message: 'User or recipient not found' });
+    }
+    
+    // Determine which user is female to get Wali email
+    const femaleUser = user.gender === 'female' ? user : recipient;
+    
+    if (!femaleUser.waliDetails) {
+      console.log('No Wali details found for female user');
+      return res.json({ message: 'No Wali details configured' });
+    }
+    
+    let waliEmail;
+    try {
+      const waliDetails = typeof femaleUser.waliDetails === 'string' 
+        ? JSON.parse(femaleUser.waliDetails) 
+        : femaleUser.waliDetails;
+      waliEmail = waliDetails.email;
+    } catch (parseError) {
+      console.error('Error parsing Wali details:', parseError);
+      return res.status(400).json({ message: 'Invalid Wali details format' });
+    }
+    
+    if (!waliEmail) {
+      console.log('No Wali email found in details');
+      return res.json({ message: 'No Wali email configured' });
+    }
+    
+    // Create email transporter
+    const transporter = nodemailer.createTransporter({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    });
+    
+    // Email content based on call status
+    const isCallStart = status === 'started';
+    const subject = `Quluub Video Call ${isCallStart ? 'Started' : 'Ended'} - ${femaleUser.fname}`;
+    
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+        <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #2c5aa0; margin-bottom: 10px;">🎥 Quluub Video Call ${isCallStart ? 'Started' : 'Ended'}</h1>
+            <p style="color: #666; font-size: 16px;">Islamic Marriage Platform - Wali Supervision Notice</p>
+          </div>
+          
+          <div style="background-color: #f8f9ff; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+            <h3 style="color: #2c5aa0; margin-top: 0;">📋 Call Details</h3>
+            <p><strong>👤 Participants:</strong> ${user.fname} ${user.lname} & ${recipient.fname} ${recipient.lname}</p>
+            <p><strong>⏰ ${isCallStart ? 'Started' : 'Ended'} At:</strong> ${new Date().toLocaleString()}</p>
+            <p><strong>🆔 Meeting ID:</strong> ${meetingId || 'N/A'}</p>
+            ${!isCallStart ? `<p><strong>⏱️ Duration:</strong> ${Math.floor(duration / 60)}m ${duration % 60}s</p>` : ''}
+            <p><strong>🏢 Platform:</strong> Zoom Professional</p>
+          </div>
+          
+          <div style="background-color: #fff3cd; padding: 20px; border-radius: 8px; border-left: 4px solid #ffc107; margin-bottom: 25px;">
+            <h3 style="color: #856404; margin-top: 0;">🕌 Islamic Compliance Notice</h3>
+            <p style="color: #856404; margin-bottom: 10px;">This video call is being conducted under Islamic guidelines with proper supervision.</p>
+            <ul style="color: #856404; margin: 10px 0; padding-left: 20px;">
+              <li>Professional Zoom platform ensures secure communication</li>
+              <li>Call details are automatically logged for transparency</li>
+              <li>Duration is limited to maintain appropriate interaction</li>
+              <li>Both parties are aware of Wali oversight</li>
+            </ul>
+          </div>
+          
+          <div style="background-color: #e8f4fd; padding: 20px; border-radius: 8px; margin-bottom: 25px;">
+            <h3 style="color: #0c5460; margin-top: 0;">💬 Continue Supervision</h3>
+            <p style="color: #0c5460;">You can also monitor their chat conversations through your supervision link.</p>
+            <p style="color: #0c5460;"><strong>Chat Supervision:</strong> Available in your Wali dashboard</p>
+          </div>
+          
+          <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+            <p style="color: #666; font-size: 14px; margin-bottom: 10px;">This is an automated notification from Quluub</p>
+            <p style="color: #666; font-size: 14px;">🌙 Connecting Hearts, Honoring Faith 🌙</p>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // Send email to Wali
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: waliEmail,
+      subject: subject,
+      html: htmlContent
+    });
+    
+    console.log(`✅ Wali notification sent for video call ${status}:`, waliEmail);
+    
+    res.json({ 
+      message: 'Wali notification sent successfully',
+      status: status,
+      waliNotified: true
+    });
+    
+  } catch (error) {
+    console.error('Error notifying Wali about video call:', error.message);
+    res.status(500).json({ 
+      message: 'Failed to notify Wali',
+      error: error.message 
     });
   }
 };

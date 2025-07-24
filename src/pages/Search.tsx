@@ -1,4 +1,4 @@
-import { useState , useEffect} from "react";
+import React, { useState, useEffect, Fragment } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -11,92 +11,126 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import TopNavbar from "@/components/TopNavbar";
 import Navbar from "@/components/Navbar";
 import MatchCard from "@/components/MatchCard";
-import { useBrowseUsers } from "@/hooks/useBrowseUsers";
+import Advert from "@/components/Advert";
 import { useAuth } from "@/contexts/AuthContext";
 import { relationshipService } from "@/lib/api-client";
-import { userService } from "@/lib/api-client"; // ensure this is imported
-import AdComponent from '@/components/AdComponent';
+import { userService } from "@/lib/api-client";
 import { isPremiumUser } from "@/utils/premiumUtils";
-
 import { useToast } from "@/components/ui/use-toast";
 import { User } from "@/types/user";
 import { useNavigate } from "react-router-dom";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 const Search = () => {
-  const [ageRange, setAgeRange] = useState([18, 60]);
-  const [heightRange, setHeightRange] = useState([150, 200]);
-  const [weightRange, setWeightRange] = useState([30, 125]);
-  const [location, setLocation] = useState("anywhere");
-  const [nationality, setNationality] = useState("any");
-  const [maritalStatus, setMaritalStatus] = useState("any");
-  const [patternOfSalaah, setPatternOfSalaah] = useState("any");
-  const [sortBy, setSortBy] = useState("newest");
-  const [showHijabOnly, setShowHijabOnly] = useState(false);
-  const [showBeardOnly, setShowBeardOnly] = useState(false);
-  const [build, setBuild] = useState("any");
-  const [facialAppearance, setFacialAppearance] = useState("any");
-  const [genotype, setGenotype] = useState("any");
-  const [currentPage, setCurrentPage] = useState(1);
+  // State matching taofeeq_UI structure
+  const [results, setResults] = useState<User[]>([]);
+  const [expanded, setExpanded] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(10);
+  const [lastRequest, setLastRequest] = useState("");
+
+  const [inputs, setInputs] = useState({
+    nationality: "",
+    country: "",
+    ageRange: [22, 45],
+    heightRange: [52, 80],
+    weightRange: [50, 90],
+    build: "",
+    appearance: "",
+    maritalStatus: "",
+    patternOfSalaah: "",
+    genotype: "",
+    sortBy: "lastSeen",
+  });
+
   const { user: currentUser } = useAuth();
 
 
-  
   const { toast } = useToast();
   const navigate = useNavigate();
-  
-  const [filterParams, setFilterParams] = useState<{
-    country?: string;
-    nationality?: string;
-    gender?: string;
-    hijab?: string;
-    beard?: string;
-    page?: number;
-  }>({});
-  
+
+  const handleChange = (field: string, value: any) => {
+    setInputs(prev => ({ ...prev, [field]: value }));
+  };
+
+  const searchUsers = async () => {
+    setLoading(true);
+    try {
+      const params: any = {
+        page,
+        limit: 20,
+      };
+
+      if (currentUser) {
+        params.gender = currentUser.gender === 'male' ? 'female' : 'male';
+      }
+
+      if (inputs.country) {
+        params.country = inputs.country;
+      }
+
+      if (inputs.nationality) {
+        params.nationality = inputs.nationality;
+      }
+
+      if (inputs.build) {
+        params.build = inputs.build;
+      }
+
+      if (inputs.appearance) {
+        params.appearance = inputs.appearance;
+      }
+
+      if (inputs.maritalStatus) {
+        params.maritalStatus = inputs.maritalStatus;
+      }
+
+      if (inputs.patternOfSalaah) {
+        params.patternOfSalaah = inputs.patternOfSalaah;
+      }
+
+      if (inputs.genotype) {
+        params.genotype = inputs.genotype;
+      }
+
+      console.log('🔍 Search params:', params);
+      const response = await userService.getBrowseUsers(params);
+      console.log('📊 API Response:', response);
+      
+      if (response && response.users) {
+        setResults(response.users);
+        setTotalPages(response.pages || 1);
+      } else if (Array.isArray(response)) {
+        setResults(response);
+        setTotalPages(Math.ceil(response.length / 20));
+      } else {
+        console.warn('⚠️ Unexpected API response format:', response);
+        setResults([]);
+        setTotalPages(1);
+      }
+    } catch (error) {
+      console.error('❌ Search error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to search users. Please try again.",
+        variant: "destructive",
+      });
+      setResults([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const params: any = {};
-
-    if (currentUser) {
-      params.gender = currentUser.gender === 'male' ? 'female' : 'male';
-    }
-
-    if (location !== "anywhere") {
-      params.country = location;
-    }
-
-    if (nationality !== "any") {
-      params.nationality = nationality;
-    }
-
-    if (build !== "any") {
-      params.build = build;
-    }
-
-    if (facialAppearance !== "any") {
-      params.appearance = facialAppearance;
-    }
-
-    if (genotype !== "any") {
-      params.genotype = genotype;
-    }
-
-    if (showHijabOnly) {
-      params.hijab = 'Yes';
-    }
-
-    if (showBeardOnly) {
-      params.beard = 'Yes';
-    }
-
-    params.page = currentPage;
-
-    setFilterParams(params);
-  }, [currentUser, location, nationality, build, facialAppearance, genotype, showHijabOnly, showBeardOnly, currentPage]);
-
-  const { users, page, pages, isLoading, error } = useBrowseUsers(filterParams);
+    searchUsers();
+  }, [page, currentUser]);
   const [pendingConnections, setPendingConnections] = useState<string[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
   
@@ -228,10 +262,10 @@ const Search = () => {
   };
 
   // Sort users based on selection
-  const sortedUsers = users ? [...users].sort((a, b) => {
-    if (sortBy === "newest") {
+  const sortedUsers = results ? [...results].sort((a, b) => {
+    if (inputs.sortBy === "newest") {
       return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-    } else if (sortBy === "lastSeen") {
+    } else if (inputs.sortBy === "lastSeen") {
       return new Date(b.lastSeen || 0).getTime() - new Date(a.lastSeen || 0).getTime();
     }
     return 0;
@@ -247,7 +281,7 @@ const Search = () => {
             <CardContent className="p-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold">Search Filters</h2>
-                <Select value={sortBy} onValueChange={setSortBy}>
+                <Select value={inputs.sortBy} onValueChange={(value) => handleChange('sortBy', value)}>
                   <SelectTrigger className="w-32">
                     <SelectValue placeholder="Sort by" />
                   </SelectTrigger>
@@ -263,16 +297,16 @@ const Search = () => {
                   <label className="text-sm font-medium mb-2 block">Age Range</label>
                   <div className="mb-2">
                     <Slider 
-                      value={ageRange}
+                      value={inputs.ageRange}
                       min={18} 
                       max={60} 
                       step={1}
-                      onValueChange={(value) => setAgeRange(value as number[])}
+                      onValueChange={(value) => handleChange('ageRange', value)}
                     />
                   </div>
                   <div className="flex justify-between text-sm text-muted-foreground">
-                    <span>{ageRange[0]}</span>
-                    <span>{ageRange[1]}</span>
+                    <span>{inputs.ageRange[0]}</span>
+                    <span>{inputs.ageRange[1]}</span>
                   </div>
                 </div>
                 
@@ -280,16 +314,16 @@ const Search = () => {
                   <label className="text-sm font-medium mb-2 block">Height range</label>
                   <div className="mb-2">
                     <Slider 
-                      value={heightRange} 
+                      value={inputs.heightRange} 
                       min={120} 
                       max={215} 
                       step={1}
-                      onValueChange={(value) => setHeightRange(value as number[])}
+                      onValueChange={(value) => handleChange('heightRange', value)}
                     />
                   </div>
                   <div className="flex justify-between text-sm text-muted-foreground">
-                    <span>{Math.floor(heightRange[0]/30.48)}'{Math.round((heightRange[0]/2.54)%12)}"</span>
-                    <span>{Math.floor(heightRange[1]/30.48)}'{Math.round((heightRange[1]/2.54)%12)}"</span>
+                    <span>{Math.floor(inputs.heightRange[0]/30.48)}'{Math.round((inputs.heightRange[0]/2.54)%12)}"</span>
+                    <span>{Math.floor(inputs.heightRange[1]/30.48)}'{Math.round((inputs.heightRange[1]/2.54)%12)}"</span>
                   </div>
                 </div>
                 
@@ -297,22 +331,22 @@ const Search = () => {
                   <label className="text-sm font-medium mb-2 block">Weight range</label>
                   <div className="mb-2">
                     <Slider 
-                      value={weightRange} 
+                      value={inputs.weightRange} 
                       min={30} 
                       max={125} 
                       step={1}
-                      onValueChange={(value) => setWeightRange(value as number[])}
+                      onValueChange={(value) => handleChange('weightRange', value)}
                     />
                   </div>
                   <div className="flex justify-between text-sm text-muted-foreground">
-                    <span>{weightRange[0]}kg</span>
-                    <span>{weightRange[1]}kg</span>
+                    <span>{inputs.weightRange[0]}kg</span>
+                    <span>{inputs.weightRange[1]}kg</span>
                   </div>
                 </div>
                 
                 <div>
                   <label className="text-sm font-medium mb-2 block">Location</label>
-                  <Select value={location} onValueChange={setLocation}>
+                  <Select value={inputs.country} onValueChange={(value) => handleChange('country', value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select location" />
                     </SelectTrigger>
@@ -332,7 +366,7 @@ const Search = () => {
                 
                 <div>
                   <label className="text-sm font-medium mb-2 block">Nationality</label>
-                  <Select value={nationality} onValueChange={setNationality}>
+                  <Select value={inputs.nationality} onValueChange={(value) => handleChange('nationality', value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Any nationality" />
                     </SelectTrigger>
@@ -388,7 +422,7 @@ const Search = () => {
                 
                 <div>
                   <label className="text-sm font-medium mb-2 block">Marital Status</label>
-                  <Select value={maritalStatus} onValueChange={setMaritalStatus}>
+                  <Select value={inputs.maritalStatus} onValueChange={(value) => handleChange('maritalStatus', value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Any status" />
                     </SelectTrigger>
@@ -404,7 +438,7 @@ const Search = () => {
                 
                 <div>
                   <label className="text-sm font-medium mb-2 block">Pattern of Salaah</label>
-                  <Select value={patternOfSalaah} onValueChange={setPatternOfSalaah}>
+                  <Select value={inputs.patternOfSalaah} onValueChange={(value) => handleChange('patternOfSalaah', value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Any practice" />
                     </SelectTrigger>
@@ -421,7 +455,7 @@ const Search = () => {
                 
                 <div>
                   <label className="text-sm font-medium mb-2 block">Build</label>
-                  <Select value={build} onValueChange={setBuild}>
+                  <Select value={inputs.build} onValueChange={(value) => handleChange('build', value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Any build" />
                     </SelectTrigger>
@@ -440,7 +474,7 @@ const Search = () => {
                 
                 <div>
                   <label className="text-sm font-medium mb-2 block">Facial Appearance</label>
-                  <Select value={facialAppearance} onValueChange={setFacialAppearance}>
+                  <Select value={inputs.appearance} onValueChange={(value) => handleChange('appearance', value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Any appearance" />
                     </SelectTrigger>
@@ -457,7 +491,7 @@ const Search = () => {
                 
                 <div>
                   <label className="text-sm font-medium mb-2 block">Genotype</label>
-                  <Select value={genotype} onValueChange={setGenotype}>
+                  <Select value={inputs.genotype} onValueChange={(value) => handleChange('genotype', value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Any genotype" />
                     </SelectTrigger>
@@ -478,7 +512,7 @@ const Search = () => {
                     <Label htmlFor="hijab" className="text-sm font-medium">Hijab</Label>
                     <p className="text-xs text-muted-foreground">Show only sisters who wear hijab</p>
                   </div>
-                  <Switch id="hijab" checked={showHijabOnly} onCheckedChange={setShowHijabOnly} disabled={currentUser?.gender !== 'male'} />
+                  <Switch id="hijab" checked={false} onCheckedChange={() => {}} disabled={currentUser?.gender !== 'male'} />
                 </div>
                 
                 <div className="flex items-center justify-between">
@@ -486,10 +520,16 @@ const Search = () => {
                     <Label htmlFor="beard" className="text-sm font-medium">Beard</Label>
                     <p className="text-xs text-muted-foreground">Show only brothers with beard</p>
                   </div>
-                  <Switch id="beard" checked={showBeardOnly} onCheckedChange={setShowBeardOnly} disabled={currentUser?.gender !== 'female'} />
+                  <Switch id="beard" checked={false} onCheckedChange={() => {}} disabled={currentUser?.gender !== 'female'} />
                 </div>
 
-
+                <Button 
+                  onClick={searchUsers}
+                  className="w-full mt-4"
+                  disabled={loading}
+                >
+                  {loading ? "Searching..." : "Search"}
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -498,11 +538,11 @@ const Search = () => {
           <div className="md:col-span-3">
             <h1 className="text-2xl font-bold mb-6">Potential Spouses</h1>
             
-            {isLoading ? (
+            {loading ? (
               <div className="flex justify-center items-center h-64">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
               </div>
-            ) : error ? (
+            ) : false ? (
               <Card>
                 <CardContent className="p-6">
                   <p className="text-center text-red-500">Error loading users. Please try again.</p>
@@ -517,7 +557,7 @@ const Search = () => {
                   sortedUsers.forEach((user, index) => {
                     const age = calculateAge(user.dob) || 0;
                     
-                    if (age < ageRange[0] || age > ageRange[1]) {
+                    if (age < inputs.ageRange[0] || age > inputs.ageRange[1]) {
                       return;
                     }
                     
@@ -551,7 +591,7 @@ const Search = () => {
                     if (profileCount % 5 === 0 && !isPremiumUser(currentUser)) {
                       items.push(
                         <div key={`ad-${profileCount}`} className="col-span-1">
-                          <AdComponent />
+                          <Advert />
                         </div>
                       );
                     }
@@ -569,21 +609,21 @@ const Search = () => {
             )}
 
             {/* Pagination Controls */}
-            {pages && pages > 1 && (
+            {totalPages && totalPages > 1 && (
               <div className="flex justify-center mt-6 items-center space-x-4">
                 <Button 
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={page <= 1 || isLoading}
+                  onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+                  disabled={page <= 1 || loading}
                   variant="outline"
                 >
                   Previous
                 </Button>
                 <span className="text-sm text-muted-foreground">
-                  Page {page} of {pages}
+                  Page {page} of {totalPages}
                 </span>
                 <Button 
-                  onClick={() => setCurrentPage(prev => prev + 1)}
-                  disabled={page >= pages || isLoading}
+                  onClick={() => setPage(prev => prev + 1)}
+                  disabled={page >= totalPages || loading}
                   variant="outline"
                 >
                   Next
@@ -592,7 +632,7 @@ const Search = () => {
             )}
             {!isPremiumUser(currentUser) && (
               <div className="flex justify-center mt-4">
-                <AdComponent />
+                <Advert />
               </div>
             )}
           </div>

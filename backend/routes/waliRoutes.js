@@ -2,8 +2,15 @@ const express = require('express');
 const Chat = require('../models/Chat');
 const User = require('../models/User');
 const { protect } = require('../middlewares/authMiddleware');
+const { sendVideoCallNotificationToWali, sendMessageToWali } = require('../controllers/waliController');
 
 const router = express.Router();
+
+// Video call notification to Wali
+router.post('/video-call-notification', protect, sendVideoCallNotificationToWali);
+
+// Message notification to Wali
+router.post('/message', protect, sendMessageToWali);
 
 // Wali chat monitoring route
 router.get('/chat-view', async (req, res) => {

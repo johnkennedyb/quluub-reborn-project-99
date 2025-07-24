@@ -23,6 +23,17 @@ import {
 import { format, differenceInYears } from "date-fns";
 import { ChevronLeft, ChevronRight, RefreshCcw, Eye, EyeOff } from "lucide-react";
 
+// Task #2: Major Nigerian cities list
+const majorNigerianCities = [
+  "Lagos", "Abuja", "Kano", "Ibadan", "Port Harcourt", "Benin City",
+  "Kaduna", "Onitsha", "Warri", "Aba", "Jos", "Ilorin", "Enugu",
+  "Abeokuta", "Sokoto", "Maiduguri", "Zaria", "Owerri", "Uyo",
+  "Calabar", "Akure", "Bauchi", "Katsina", "Gombe", "Yola",
+  "Osogbo", "Lokoja", "Lafia", "Makurdi", "Minna", "Asaba",
+  "Awka", "Abakaliki", "Umuahia", "Ado-Ekiti", "Birnin Kebbi",
+  "Dutse", "Jalingo", "Damaturu", "Yenagoa", "Ogun"
+];
+
 interface SignupFormProps {
   onSignup: (data: Omit<RegistrationData, 'username'>) => void;
   onSwitchToLogin: () => void;
@@ -54,6 +65,9 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showVerification, setShowVerification] = useState(false);
   const [verificationCode, setVerificationCode] = useState<string>('');
+  const [verificationSent, setVerificationSent] = useState<boolean>(false);
+  const [resendCooldown, setResendCooldown] = useState<number>(0);
+  const [verificationAttempts, setVerificationAttempts] = useState<number>(0);
   const [isVerified, setIsVerified] = useState(false);
   const [error, setError] = useState<string>('');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -71,7 +85,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
     email: "",
     firstName: "",
     lastName: "",
-    password: "",
+    password: "", 
     dateOfBirth: null,
     ethnicity: [],
     countryOfResidence: "",
@@ -82,15 +96,24 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
     gender: "male",
   });
 
-  useEffect(() => {
-    if (formData.password === "") {
-      const generatedPassword = generatePassword(10);
-      setFormData(prev => ({ ...prev, password: generatedPassword }));
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData(prev => ({
+      ...prev,
+      password: e.target.value
+    }));
+  };
+
+  const handleGeneratePassword = () => {
+    if (formData.password === "") { 
+      setFormData(prev => ({
+        ...prev,
+        password: generatePassword(10)
+      }));
     }
-  }, [formData.password]);
+  };
 
   useEffect(() => {
-    if (formData.firstName && step === 6) { // Changed to step 6
+    if (formData.firstName && step === 6) { 
       const firstPart = formData.firstName.toLowerCase().replace(/\s+/g, '');
       const randomNum = Math.floor(Math.random() * 10000);
 
@@ -144,7 +167,11 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    let processedValue = value;
+    if (name === 'username' || name === 'email') {
+      processedValue = value.toLowerCase().replace(/\s/g, '');
+    }
+    setFormData(prev => ({ ...prev, [name]: processedValue }));
   };
 
   const handleSelectChange = (name: string, value: string | string[]) => {
@@ -170,7 +197,12 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
     setIsLoading(true);
     setError('');
 
-    // Basic validation
+    if (verificationSent && resendCooldown > 0) {
+      setError('Please wait before requesting another verification email');
+      setIsLoading(false);
+      return;
+    }
+
     if (!formData.email || !formData.firstName || !formData.lastName) {
       setError('Please fill in all required fields');
       setIsLoading(false);
@@ -178,7 +210,6 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
     }
 
     try {
-      // Use the API client instead of direct fetch
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/email/send-verification`, {
         method: 'POST',
         headers: {
@@ -198,15 +229,26 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
         throw new Error(data.details || data.message || 'Failed to send verification code. Please try again.');
       }
 
-      // In development, log the verification code to the console
       if (data.code) {
         console.log('Verification code (development only):', data.code);
       }
 
       setShowVerification(true);
+      setVerificationSent(true);
+      setResendCooldown(60); 
+      
+      const timer = setInterval(() => {
+        setResendCooldown(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
     } catch (error: any) {
       console.error('Error sending verification code:', error);
-      // Show error to user (you might want to use a toast notification)
       alert(error.message || 'Failed to send verification code. Please try again.');
     } finally {
       setIsLoading(false);
@@ -219,31 +261,36 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
       return;
     }
 
+    if (verificationAttempts >= 5) {
+      setError('Too many failed attempts. Please request a new verification code.');
+      return;
+    }
+
     setIsLoading(true);
     setError('');
 
     try {
-      // Use the API client instead of direct fetch
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/email/verify-code`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/email/verify-email`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
+          email: formData.email,
           code: verificationCode,
-          email: formData.email 
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to verify code. Please try again.');
+        setVerificationAttempts(prev => prev + 1);
+        throw new Error(data.message || 'Invalid verification code');
       }
 
-      // If verification is successful, proceed to next step
+      setIsVerified(true);
       setShowVerification(false);
-      handleNextStep();
+      setStep(2);
     } catch (error: any) {
       console.error('Error verifying code:', error);
       setError(error.message || 'Invalid verification code. Please try again.');
@@ -256,29 +303,75 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
     setFormData(prev => ({ ...prev, username: suggestedUsername }));
   };
 
+  const handleResendVerification = async () => {
+    if (resendCooldown > 0) {
+      setError(`Please wait ${resendCooldown} seconds before resending`);
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/email/send-verification`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          email: formData.email,
+          firstName: formData.firstName,
+          lastName: formData.lastName 
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.details || data.message || 'Failed to resend verification code');
+      }
+
+      setResendCooldown(60); 
+      
+      const timer = setInterval(() => {
+        setResendCooldown(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      alert('Verification code resent successfully!');
+    } catch (error: any) {
+      setError(error.message || 'Failed to resend verification code');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleFinalSubmit = async () => {
     setIsLoading(true);
 
     try {
-      // Validate all required fields are filled
       if (!formData.username || !formData.dateOfBirth || !formData.countryOfResidence || 
-          !formData.stateOfResidence || !formData.cityOfResidence || !formData.summary) {
+          !formData.cityOfResidence || !formData.summary) {
         alert('Please fill in all required fields');
         return;
       }
 
-      // Prepare the data in the format expected by the backend
       const dataToSubmit = {
         username: formData.username,
         email: formData.email,
         password: formData.password,
-        fname: formData.firstName,
-        lname: formData.lastName,
+        firstName: formData.firstName, 
+        lastName: formData.lastName,   
         gender: formData.gender,
         dateOfBirth: formData.dateOfBirth!,
         ethnicity: formData.ethnicity,
         countryOfResidence: formData.countryOfResidence,
-        stateOfResidence: formData.stateOfResidence,
+        stateOfResidence: formData.countryOfResidence, 
         cityOfResidence: formData.cityOfResidence,
         summary: formData.summary,
       };
@@ -293,112 +386,143 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
     }
   };
 
+  const totalSteps = 7; 
+
   const renderStepContent = () => {
     switch (step) {
       case 1:
         return (
-          <form onSubmit={handleSubmitInitial} className="space-y-4">
-            <div className="space-y-1">
-              <Label htmlFor="email">Email Address</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="your@email.com"
-                value={formData.email}
-                onChange={handleInputChange}
-                required
-                disabled={isLoading}
-                className={errors.email ? 'border-destructive' : ''}
-              />
-              {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="firstName">First Name</Label>
-              <Input
-                id="firstName"
-                name="firstName"
-                placeholder="Your first name"
-                value={formData.firstName}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Last Name</Label>
-              <Input
-                id="lastName"
-                name="lastName"
-                placeholder="Your last name"
-                value={formData.lastName}
-                onChange={handleInputChange}
-                required
-              />
-              <p className="text-xs text-muted-foreground">
-                Your name will not be visible to other users
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+          <div className="space-y-6">
+            <div className="space-y-4">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full flex items-center justify-center gap-2 py-3"
+                onClick={() => {
+                  console.log('Google sign-in clicked');
+                }}
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                Continue with Google
+              </Button>
+              
               <div className="relative">
-                <Input
-                  id="password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  required
-                />
-                <div className="absolute right-0 top-0 flex">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-10 px-3 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-10 px-3"
-                    onClick={() => setFormData(prev => ({
-                      ...prev,
-                      password: generatePassword(10)
-                    }))}
-                  >
-                    <RefreshCcw className="h-4 w-4" />
-                  </Button>
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Or continue with email</span>
                 </div>
               </div>
             </div>
 
-            <div className="space-y-1 text-xs">
-              <p className="text-muted-foreground">By signing up you agree to our:</p>
-              <div className="flex items-center gap-1">
-                <a href="#" className="text-primary hover:underline">Terms of Service</a>
-                <span className="text-muted-foreground">and</span>
-                <a href="#" className="text-primary hover:underline">Privacy Policy</a>
+            <form onSubmit={handleSubmitInitial} className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="your@email.com"
+                  value={formData.email}
+                  onChange={handleInputChange}
+                  required
+                  disabled={isLoading}
+                  className={errors.email ? 'border-destructive' : ''}
+                />
+                {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
               </div>
-            </div>
 
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isLoading}
-            >
-              {isLoading ? "Processing..." : "Submit"}
-            </Button>
-          </form>
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First Name</Label>
+                <Input
+                  id="firstName"
+                  name="firstName"
+                  placeholder="Your first name"
+                  value={formData.firstName}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name</Label>
+                <Input
+                  id="lastName"
+                  name="lastName"
+                  placeholder="Your last name"
+                  value={formData.lastName}
+                  onChange={handleInputChange}
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  Your name will not be visible to other users
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    value={formData.password}
+                    onChange={handlePasswordChange}
+                    required
+                    minLength={6}
+                    placeholder="Enter your password"
+                  />
+                  <div className="absolute right-0 top-0 flex">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-10 px-3 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-10 px-3"
+                      onClick={handleGeneratePassword}
+                    >
+                      <RefreshCcw className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1 text-xs">
+                <p className="text-muted-foreground">By signing up you agree to our:</p>
+                <div className="flex items-center gap-1">
+                  <a href="#" className="text-primary hover:underline">Terms of Service</a>
+                  <span className="text-muted-foreground">and</span>
+                  <a href="#" className="text-primary hover:underline">Privacy Policy</a>
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={isLoading}
+              >
+                {isLoading ? "Processing..." : "Submit"}
+              </Button>
+            </form>
+          </div>
         );
 
       case 2:
@@ -408,13 +532,11 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
               <DatePickerImproved
                 date={formData.dateOfBirth}
                 setDate={(date) => {
-                  // Update form data
                   setFormData(prev => ({
                     ...prev,
                     dateOfBirth: date
                   }));
                   
-                  // Handle validation
                   if (date) {
                     const age = differenceInYears(new Date(), date);
                     if (age < 18) {
@@ -513,6 +635,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
         if (isDataLoading) {
           return <div className="text-center p-8">Loading location data...</div>;
         }
+        
         return (
           <div className="space-y-6">
             <div className="space-y-2">
@@ -539,45 +662,28 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="stateOfResidence">State/Province of Residence</Label>
-              <UiSelect
-                value={formData.stateOfResidence}
-                onValueChange={(value) => {
-                  const state = states.find(s => s.name === value) || null;
-                  setSelectedState(state);
-                  handleSelectChange("stateOfResidence", value);
-                }}
-                disabled={!selectedCountry || states.length === 0}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select your state/province" />
-                </SelectTrigger>
-                <SelectContent>
-                  {states.map((state) => (
-                    <SelectItem key={state.name} value={state.name}>
-                      {state.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </UiSelect>
-            </div>
-
-            <div className="space-y-2">
               <Label htmlFor="cityOfResidence">City of Residence</Label>
               <UiSelect
                 value={formData.cityOfResidence}
                 onValueChange={(value) => handleSelectChange("cityOfResidence", value)}
-                disabled={!selectedState || cities.length === 0}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select your city" />
                 </SelectTrigger>
                 <SelectContent>
-                  {cities.map((city) => (
-                    <SelectItem key={city.name} value={city.name}>
-                      {city.name}
-                    </SelectItem>
-                  ))}
+                  {formData.countryOfResidence === "Nigeria" ? (
+                    majorNigerianCities.map((city) => (
+                      <SelectItem key={city} value={city}>
+                        {city}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    cities.map((city) => (
+                      <SelectItem key={city.name} value={city.name}>
+                        {city.name}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </UiSelect>
             </div>
@@ -592,8 +698,6 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
             </div>
           </div>
         );
-
-
 
       case 5:
         return (
@@ -656,6 +760,9 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                   Suggest
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground">
+                We recommend not using your full name
+              </p>
               {suggestedUsername && !formData.username && (
                 <p className="text-sm text-muted-foreground">
                   Suggestion: {suggestedUsername}
@@ -700,7 +807,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
           </div>
         );
 
-      case 7: // Final step - Registration Summary
+      case 7: 
         return (
           <div className="space-y-6">
             <div className="rounded-lg border p-4 space-y-4">
@@ -772,8 +879,6 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
         return null;
     }
   };
-  
-  const totalSteps = 7; // Total number of steps
 
   return (
     <>
@@ -781,7 +886,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
         <h2 className="text-2xl font-bold">Welcome to Quluub</h2>
         <p className="text-muted-foreground">Your Islamic marriage platform</p>
         <div className="mt-4">
-          Step {currentStep} of {totalSteps}
+          Step {step} of {totalSteps}
         </div>
       </div>
 
@@ -800,7 +905,6 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
         </p>
       )}
 
-      {/* Email verification modal */}
       <Dialog open={showVerification} onOpenChange={setShowVerification}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -841,6 +945,14 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
               disabled={verificationCode.length !== 6 || isLoading}
             >
               {isLoading ? "Verifying..." : "Verify Email"}
+            </Button>
+            <Button
+              onClick={handleResendVerification}
+              variant="outline"
+              className="w-full"
+              disabled={isLoading || resendCooldown > 0}
+            >
+              {isLoading ? "Resending..." : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Verification Code'}
             </Button>
           </div>
         </DialogContent>

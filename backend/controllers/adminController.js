@@ -983,7 +983,7 @@ const getPremiumUsers = async (req, res) => {
       .skip((page - 1) * parseInt(limit))
       .sort({ createdAt: -1 });
 
-    // Add additional stats for each premium user
+    // Add additional stats and payment info for each premium user
     const usersWithStats = await Promise.all(users.map(async (user) => {
       const userObj = user.toObject();
       
@@ -1004,9 +1004,37 @@ const getPremiumUsers = async (req, res) => {
           ]
         });
         
+        // Get payment information
+        const latestPayment = await Payment.findOne({ user: user._id })
+          .sort({ createdAt: -1 })
+          .select('amount currency status transactionId createdAt plan provider');
+        
         userObj.matchCount = matchCount;
         userObj.messageCount = messageCount;
         userObj.fullName = `${user.fname} ${user.lname}`;
+        
+        // Add payment details
+        if (latestPayment) {
+          userObj.paymentInfo = {
+            amount: latestPayment.amount,
+            currency: latestPayment.currency || 'USD',
+            status: latestPayment.status,
+            transactionId: latestPayment.transactionId,
+            paymentDate: latestPayment.createdAt,
+            plan: latestPayment.plan,
+            provider: latestPayment.provider || 'Unknown'
+          };
+        } else {
+          userObj.paymentInfo = {
+            amount: 0,
+            currency: 'USD',
+            status: 'no_payment',
+            transactionId: 'N/A',
+            paymentDate: null,
+            plan: user.plan,
+            provider: 'N/A'
+          };
+        }
         
         // Calculate days since subscription
         if (user.createdAt) {

@@ -11,7 +11,8 @@ const {
   getAllChatReceived,
   contactWali,
   initiateVideoCall,
-  sendVideoCallInvitation
+  sendVideoCallInvitation,
+  createOrFindConversation
 } = require('../controllers/chatController');
 const { protect } = require('../middlewares/auth');
 
@@ -26,6 +27,7 @@ router.get('/unread', protect, getUnreadCount);
 router.post('/contact-wali', protect, contactWali);
 router.post('/video-call', protect, initiateVideoCall);
 router.post('/initiate-video-call', protect, initiateVideoCall);
+router.post('/conversations/create-or-find', protect, createOrFindConversation);
 
 // Legacy routes for compatibility
 router.get('/chat', protect, getChat);

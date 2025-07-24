@@ -1,4 +1,3 @@
-
 import { 
   Heart, 
   Lock, 
@@ -8,7 +7,9 @@ import {
   LayoutDashboard, 
   User, 
   Bell, 
-  Settings 
+  Settings, 
+  Send, 
+  UserPlus 
 } from "lucide-react";
 
 export { 
@@ -20,5 +21,7 @@ export {
   LayoutDashboard, 
   User, 
   Bell, 
-  Settings 
+  Settings, 
+  Send as RequestIcon, 
+  UserPlus as MatchIcon 
 };
