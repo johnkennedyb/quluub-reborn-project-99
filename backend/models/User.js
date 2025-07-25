@@ -112,24 +112,57 @@ const userSchema = new mongoose.Schema(
       type: String, // JSON string e.g. '{"email":"wali@example.com"}'
       default: ""
     },
+    // Basic Profile Info
     kunya: { type: String },
+    
+    // Location and Demographics
     nationality: { type: String },
     country: { type: String },
+    state: { type: String },
+    city: { type: String },
     region: { type: String },
+    
+    // Physical Appearance
+    height: { type: String },
+    weight: { type: String },
     build: { type: String },
     appearance: { type: String },
     hijab: { type: String, enum: ['Yes', 'No'], default: 'No' },
     beard: { type: String, enum: ['Yes', 'No'], default: 'No' },
+    
+    // Family and Marital
     maritalStatus: { type: String },
     noOfChildren: { type: String },
+    
+    // Ethnicity (array field)
     ethnicity: {
       type: [String],
       validate: [val => val.length <= 2, 'Ethnicity cannot have more than 2 entries.']
     },
+    
+    // Islamic Practice and Deen
     patternOfSalaah: { type: String },
+    revert: { type: String },
+    sect: { type: String },
+    scholarsSpeakers: { type: String },
+    dressingCovering: { type: String },
+    islamicPractice: { type: String },
+    
+    // Medical and Health
     genotype: { type: String },
+    
+    // Profile Content
     summary: { type: String },
     workEducation: { type: String },
+    
+    // Lifestyle and Personality (JSON strings for arrays)
+    traits: { type: String }, // JSON string e.g. '["kind", "patient"]'
+    interests: { type: String }, // JSON string e.g. '["reading", "travel"]'
+    
+    // Matching Preferences
+    openToMatches: { type: String },
+    dealbreakers: { type: String },
+    icebreakers: { type: String },
     lastSeen: { type: Date },
     favorites: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     deviceTokens: [{ type: String }],

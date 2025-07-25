@@ -3,15 +3,13 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { chatService } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { ArrowLeft, Video, Send, ExternalLink, Crown } from "lucide-react";
+import { ArrowLeft, Video, Send, ExternalLink, Crown, Flag, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import apiClient from "@/lib/api-client";
 import socket from "@/lib/socket";
-import { wherebyService } from "@/lib/whereby-service";
 import { isPremiumUser, hasFeatureAccess, getUpgradeMessage, PREMIUM_FEATURES } from "@/utils/premiumUtils";
-import VideoCallButton from "@/components/VideoCall/VideoCallButton";
-import { useVideoCall } from "@/contexts/VideoCallContext";
+import ZoomVideoCall from "@/components/ZoomVideoCall";
 
 interface Message {
   _id: string;
@@ -36,14 +34,14 @@ const Messages = () => {
   const { toast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
-  const { initiateCall } = useVideoCall();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageText, setMessageText] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [recipientId, setRecipientId] = useState<string | null>(null);
-  const [callStatus, setCallStatus] = useState<'idle' | 'calling' | 'answered' | 'declined' | 'missed'>('idle');
+  const [showZoomCall, setShowZoomCall] = useState(false);
+  const [recipientName, setRecipientName] = useState<string>("");
   
   // Task #29: Message counter state
   const [messageLimit, setMessageLimit] = useState(10); // Default limit for free users
@@ -234,7 +232,7 @@ const Messages = () => {
       console.log('Creating/finding conversation with user:', userId);
       
       // Try to find existing conversation or create a new one
-      const response = await apiClient.post('/conversations/create-or-find', {
+      const response = await apiClient.post('/chats/conversations/create-or-find', {
         participantId: userId
       });
       
@@ -274,47 +272,17 @@ const Messages = () => {
     // No polling needed since we have real-time socket updates
   }, [conversationId, targetUserId]);
 
-  // Listen for call status updates
+  // Socket listeners for messages only (video call functionality removed)
   useEffect(() => {
     if (!user) return;
 
-    socket.on('call-accepted', ({ roomId }) => {
-      console.log('Call accepted for room:', roomId);
-      setCallStatus('answered');
-      toast({
-        title: "Call Accepted",
-        description: "The other user accepted your call",
-      });
-    });
-
-    socket.on('call-declined', ({ roomId }) => {
-      console.log('Call declined for room:', roomId);
-      setCallStatus('declined');
-      toast({
-        title: "Call Declined",
-        description: "The other user declined your call",
-        variant: "destructive",
-      });
-    });
-
-    socket.on('callStatusUpdate', ({ status }) => {
-      console.log('Call status update:', status);
-      if (status === 'missed') {
-        setCallStatus('missed');
-        toast({
-          title: "Call Missed",
-          description: "The other user didn't answer",
-          variant: "destructive",
-        });
-      }
-    });
+    // Only message-related socket listeners remain
+    // Video call socket listeners have been removed
 
     return () => {
-      socket.off('call-accepted');
-      socket.off('call-declined');
-      socket.off('callStatusUpdate');
+      // Cleanup any remaining socket listeners if needed
     };
-  }, [user, toast]);
+  }, [user]);
 
   // fetchMessages is already called in the main useEffect above
 
@@ -481,70 +449,30 @@ const Messages = () => {
       return;
     }
     
-    try {
-      setCallStatus('calling');
-      console.log('Initiating Whereby video call with recipient:', recipientId);
-      
-      // Create Whereby room
-      const meetingData = await wherebyService.createRoom({
-        roomName: `Quluub Video Call - ${new Date().toLocaleDateString()}`,
-        isLocked: false,
-        roomMode: 'normal',
-        partnerId: recipientId
-      });
-      
-      console.log('Whereby room created:', meetingData);
-      
-      // Send video call invitation via chat
-      await wherebyService.sendVideoCallInvitation(conversationId!, meetingData);
-      
-      toast({
-        title: "Video Call Initiated",
-        description: "Whereby room created and invitation sent in chat. You can join directly or wait for the other person.",
-      });
-      
-      // Open Whereby room directly for the host
-      window.open(meetingData.hostRoomUrl || meetingData.roomUrl, '_blank');
-      
-      setCallStatus('idle');
-      
-    } catch (error: any) {
-      console.error('Error initiating Whereby video call:', error);
-      setCallStatus('idle');
-      
-      if (error.response?.data?.requiresUpgrade) {
-        toast({
-          title: "Premium Required",
-          description: error.response.data.message,
-          variant: "destructive",
-        });
-        navigate('/upgrade');
-      } else {
-        toast({
-          title: "Call Failed",
-          description: error.response?.data?.message || "Failed to initiate video call",
-          variant: "destructive",
-        });
-      }
-    }
+    // Removed old video call functionality
+    // Now using Zoom only
   };
 
-  const getCallButtonText = () => {
-    switch (callStatus) {
-      case 'calling': return 'Calling...';
-      case 'answered': return 'Call Answered';
-      case 'declined': return 'Call Declined';
-      case 'missed': return 'Call Missed';
-      default: return 'Video Call';
-    }
-  };
+  // ... (rest of the code remains the same)
 
-  if (!conversationId) {
+  if (!conversationId && !targetUserId) {
     return (
       <div className="flex h-screen bg-gray-100 items-center justify-center">
         <div className="text-center">
           <h2 className="text-xl font-medium text-gray-800 mb-4">No Conversation Selected</h2>
           <Button onClick={() => navigate(-1)}>Go Back</Button>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading state while creating/finding conversation
+  if (!conversationId && targetUserId && loading) {
+    return (
+      <div className="flex h-screen bg-gray-100 items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-xl font-medium text-gray-800 mb-4">Starting Conversation...</h2>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
         </div>
       </div>
     );
@@ -562,30 +490,76 @@ const Messages = () => {
             <h2 className="ml-4 text-lg font-medium text-gray-800">Chat</h2>
           </div>
           <div className="flex items-center gap-2">
-            {callStatus !== 'idle' && (
-              <span className={`text-sm px-2 py-1 rounded ${
-                callStatus === 'calling' ? 'bg-yellow-100 text-yellow-800' :
-                callStatus === 'answered' ? 'bg-green-100 text-green-800' :
-                'bg-red-100 text-red-800'
-              }`}>
-                {callStatus === 'calling' ? 'Calling...' :
-                 callStatus === 'answered' ? 'Answered' :
-                 callStatus === 'declined' ? 'Declined' : 'Missed'}
-              </span>
-            )}
+            {/* View Profile Button */}
             {recipientId && (
-              <VideoCallButton
-                recipientId={recipientId}
-                recipientName="Chat Partner"
-                onCallInitiated={(meetingUrl) => {
+              <Button
+                onClick={() => navigate(`/profile/${recipientId}`)}
+                variant="outline"
+                size="sm"
+                className="border-gray-300 hover:bg-gray-50"
+              >
+                <User className="w-4 h-4 mr-2" />
+                View Profile
+              </Button>
+            )}
+            
+            {/* Video Call Button */}
+            {recipientId && isPremiumUser(user) && (
+              <Button
+                onClick={async () => {
+                  try {
+                    // Send chat notification to match about video call invitation
+                    await chatService.sendMessage({
+                      conversationId: conversationId!,
+                      message: `🎥 ${user?.firstName || 'Someone'} is inviting you to a video call. Click the video call button to join!`,
+                      messageType: 'video_call_invitation'
+                    });
+                    
+                    toast({
+                      title: "Video Call Invitation Sent",
+                      description: `${recipientName} has been notified about the video call invitation.`,
+                      variant: "default"
+                    });
+                    
+                    // Start the video call
+                    setShowZoomCall(true);
+                  } catch (error) {
+                    console.error('Error sending video call invitation:', error);
+                    toast({
+                      title: "Invitation Failed",
+                      description: "Failed to send video call invitation. Starting call anyway...",
+                      variant: "destructive"
+                    });
+                    setShowZoomCall(true);
+                  }
+                }}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                size="sm"
+              >
+                <Video className="w-4 h-4 mr-2" />
+                Video Call
+                <Crown className="w-3 h-3 ml-1 text-yellow-400" />
+              </Button>
+            )}
+            {recipientId && !isPremiumUser(user) && (
+              <Button
+                onClick={() => {
                   toast({
-                    title: "Video Call Initiated",
-                    description: "Call invitation sent successfully",
+                    title: "Premium Feature",
+                    description: "Video calling is available for Premium users only. Upgrade to access this feature.",
+                    variant: "destructive"
                   });
                 }}
-                variant="compact"
-              />
+                variant="outline"
+                size="sm"
+              >
+                <Video className="w-4 h-4 mr-2" />
+                Video Call
+                <Crown className="w-3 h-3 ml-1 text-yellow-400" />
+              </Button>
             )}
+            
+
           </div>
         </div>
 
@@ -713,6 +687,21 @@ const Messages = () => {
           </div>
         </div>
       </div>
+      
+      {/* Zoom Video Call Component */}
+      {showZoomCall && recipientId && (
+        <ZoomVideoCall
+          participantId={recipientId}
+          participantName={recipientName || "Chat Partner"}
+          onCallEnd={() => {
+            setShowZoomCall(false);
+            toast({
+              title: "📞 Call Ended",
+              description: "Video call has ended. Recording sent to Wali for review."
+            });
+          }}
+        />
+      )}
     </div>
   );
 };

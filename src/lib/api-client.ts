@@ -205,6 +205,17 @@ export const userService = {
     }
   },
 
+  // Optimized profile endpoint that combines profile and relationship data
+  getProfileOptimized: async (userId: string) => {
+    try {
+      const response = await apiClient.get(`/users/profile-optimized/${userId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Get optimized profile error:', error);
+      throw error;
+    }
+  },
+
   deleteAccount: async () => {
     const response = await apiClient.delete('/users/account');
     console.log('🗑️ Delete account response:', response);
@@ -214,10 +225,6 @@ export const userService = {
 
 // Relationship service
 export const relationshipService = {
-  sendRequest: async (followedUserId: string) => {
-    const response = await apiClient.post('/relationships/request', { followedUserId });
-    return response.data;
-  },
   
   respondToRequest: async (requestId: string, action: 'accept' | 'reject') => {
     // Map frontend actions to backend status values
@@ -243,6 +250,16 @@ export const relationshipService = {
   
   getMatches: async () => {
     const response = await apiClient.get('/relationships/matches');
+    return response.data;
+  },
+  
+  withdrawRequest: async (relationshipId: string) => {
+    const response = await apiClient.delete(`/relationships/withdraw/${relationshipId}`);
+    return response.data;
+  },
+  
+  sendRequest: async (userId: string) => {
+    const response = await apiClient.post('/relationships/request', { followedUserId: userId });
     return response.data;
   }
 };

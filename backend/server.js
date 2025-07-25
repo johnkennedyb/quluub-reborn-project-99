@@ -18,6 +18,8 @@ const userRoutes = require('./routes/userRoutes');
 const wherebyRoutes = require('./routes/wherebyRoutes');
 const waliRoutes = require('./routes/waliRoutes');
 const feedRoutes = require('./routes/feedRoutes');
+const profileTestRoutes = require('./routes/profileTestRoutes');
+const videoCallTestRoutes = require('./routes/videoCallTestRoutes');
 const cors = require('cors');
 const User = require('./models/User');
 
@@ -215,8 +217,12 @@ app.use('/api/relationships', relationshipRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/whereby', wherebyRoutes);
+app.use('/api/zoom', require('./routes/zoomRoutes'));
+app.use('/api/zoom', videoCallTestRoutes);
+app.use('/api/video-calls', require('./routes/videoRecordingRoutes'));
 app.use('/wali', waliRoutes);
 app.use('/api/feed', feedRoutes);
+app.use('/api/test', profileTestRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

@@ -139,12 +139,27 @@ exports.updateUserProfile = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     
-    // Update fields
+    // Update fields - COMPREHENSIVE LIST including all ProfileEditSections fields
     const updatableFields = [
-      'fname', 'lname', 'parentEmail', 'nationality', 'country', 'state', 'city', 'build', 
-      'appearance', 'maritalStatus', 'patternOfSalaah', 
-      'genotype', 'summary', 'workEducation', 'hidden',
-      'profile_pic', 'kunya', 'dob', 'ethnicity', 'waliDetails', 'hijab', 'beard'
+      // Basic Info
+      'fname', 'lname', 'kunya', 'dob', 'maritalStatus', 'noOfChildren', 
+      'summary', 'workEducation', 'parentEmail', 'profile_pic', 'hidden',
+      
+      // Location and Ethnicity
+      'nationality', 'country', 'state', 'city', 'region', 'ethnicity',
+      
+      // Appearance and Physical
+      'height', 'weight', 'build', 'appearance', 'hijab', 'beard', 'genotype',
+      
+      // Islamic Practice and Deen
+      'patternOfSalaah', 'revert', 'startedPracticing', 'sect', 
+      'scholarsSpeakers', 'dressingCovering', 'islamicPractice',
+      
+      // Lifestyle and Matching
+      'traits', 'interests', 'openToMatches', 'dealbreakers', 'icebreakers',
+      
+      // Wali Details (for female users)
+      'waliDetails'
     ];
     
     updatableFields.forEach(field => {
@@ -159,33 +174,69 @@ exports.updateUserProfile = async (req, res) => {
     // Clear profile cache for this user to ensure fresh data
     clearProfileCache(req.params.id);
     
+    // Return comprehensive user data including all updated fields
     res.json({
       _id: updatedUser._id,
       id: updatedUser._id,
       username: updatedUser.username,
       email: updatedUser.email,
+      
+      // Basic Info
       fname: updatedUser.fname,
       lname: updatedUser.lname,
-      parentEmail: updatedUser.parentEmail,
-      plan: updatedUser.plan,
-      gender: updatedUser.gender,
-      nationality: updatedUser.nationality,
-      country: updatedUser.country,
-      build: updatedUser.build,
-      appearance: updatedUser.appearance,
-      maritalStatus: updatedUser.maritalStatus,
-      patternOfSalaah: updatedUser.patternOfSalaah,
-      genotype: updatedUser.genotype,
-      summary: updatedUser.summary,
-      workEducation: updatedUser.workEducation,
-      hidden: updatedUser.hidden,
       kunya: updatedUser.kunya,
       dob: updatedUser.dob,
-      ethnicity: updatedUser.ethnicity,  
+      maritalStatus: updatedUser.maritalStatus,
+      noOfChildren: updatedUser.noOfChildren,
+      summary: updatedUser.summary,
+      workEducation: updatedUser.workEducation,
+      parentEmail: updatedUser.parentEmail,
       profile_pic: updatedUser.profile_pic,
-      waliDetails: updatedUser.waliDetails,
+      hidden: updatedUser.hidden,
+      
+      // System fields
+      plan: updatedUser.plan,
+      gender: updatedUser.gender,
+      
+      // Location and Ethnicity
+      nationality: updatedUser.nationality,
+      country: updatedUser.country,
+      state: updatedUser.state,
+      city: updatedUser.city,
+      region: updatedUser.region,
+      ethnicity: updatedUser.ethnicity,
+      
+      // Appearance and Physical
+      height: updatedUser.height,
+      weight: updatedUser.weight,
+      build: updatedUser.build,
+      appearance: updatedUser.appearance,
       hijab: updatedUser.hijab,
-      beard: updatedUser.beard
+      beard: updatedUser.beard,
+      genotype: updatedUser.genotype,
+      
+      // Islamic Practice and Deen
+      patternOfSalaah: updatedUser.patternOfSalaah,
+      revert: updatedUser.revert,
+      startedPracticing: updatedUser.startedPracticing,
+      sect: updatedUser.sect,
+      scholarsSpeakers: updatedUser.scholarsSpeakers,
+      dressingCovering: updatedUser.dressingCovering,
+      islamicPractice: updatedUser.islamicPractice,
+      
+      // Lifestyle and Matching
+      traits: updatedUser.traits,
+      interests: updatedUser.interests,
+      openToMatches: updatedUser.openToMatches,
+      dealbreakers: updatedUser.dealbreakers,
+      icebreakers: updatedUser.icebreakers,
+      
+      // Wali Details (for female users)
+      waliDetails: updatedUser.waliDetails,
+      
+      // Timestamps
+      createdAt: updatedUser.createdAt,
+      updatedAt: updatedUser.updatedAt
     });
   } catch (error) {
     console.error(error);
@@ -418,8 +469,29 @@ exports.searchUsers = async (req, res) => {
     } = req.query;
 
     const currentUser = req.user;
+    
+    // Get existing relationships to exclude from search
+    const Relationship = require('../models/Relationship');
+    const existingRelationships = await Relationship.find({
+      $or: [
+        { requester: currentUser._id },
+        { recipient: currentUser._id }
+      ],
+      status: { $in: ['pending', 'accepted'] }
+    }).select('requester recipient');
+    
+    // Extract user IDs to exclude (existing matches/pending requests)
+    const excludeUserIds = existingRelationships.map(rel => 
+      rel.requester.toString() === currentUser._id.toString() 
+        ? rel.recipient 
+        : rel.requester
+    );
+    
     const query = {
-      _id: { $ne: currentUser._id },
+      _id: { 
+        $ne: currentUser._id,
+        $nin: excludeUserIds // Exclude existing matches and pending requests
+      },
       emailVerified: true,
       hidden: { $ne: true }
     };

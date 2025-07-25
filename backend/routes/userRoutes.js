@@ -14,6 +14,7 @@ const {
   deleteAccount,
   searchUsers
 } = require('../controllers/userController');
+const { getProfileWithRelationships } = require('../controllers/optimizedUserController');
 const { protect } = require('../middlewares/auth');
 
 const router = express.Router();
@@ -21,6 +22,7 @@ const router = express.Router();
 // Profile routes
 router.get('/profile', protect, getUserProfile);
 router.get('/profile/:userId', protect, getUserProfile);
+router.get('/profile-optimized/:userId', protect, getProfileWithRelationships);
 router.put('/:id', protect, updateUserProfile);
 
 // Browse routes

@@ -5,7 +5,7 @@ import TopNavbar from "@/components/TopNavbar";
 import Navbar from "@/components/Navbar";
 import ProfileEditSections from "@/components/ProfileEditSections";
 import UserProfileView from "@/components/UserProfileView";
-import { userService } from "@/lib/api-client";
+import { userService, relationshipService } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/use-toast";
 import { User } from "@/types/user";
@@ -16,12 +16,83 @@ const Profile = () => {
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [relationshipStatus, setRelationshipStatus] = useState<{
+    isMatched: boolean;
+    hasReceivedRequestFrom: boolean;
+    relationshipId?: string;
+    requestId?: string;
+  }>({ isMatched: false, hasReceivedRequestFrom: false });
   const { toast } = useToast();
   
   // Memoize computed values to prevent unnecessary re-renders
   const isOwnProfile = useMemo(() => !userId || (currentUser?._id === userId), [userId, currentUser?._id]);
   const displayUserId = useMemo(() => userId || currentUser?._id, [userId, currentUser?._id]);
   
+  // Fetch relationship status for other users' profiles
+  const fetchRelationshipStatus = useCallback(async (targetUserId: string) => {
+    if (!currentUser?._id || isOwnProfile) return;
+    
+    try {
+      // Check if user is in matches (accepted relationships)
+      const matchesResponse = await relationshipService.getMatches();
+      console.log('Matches response:', matchesResponse);
+      
+      // Handle different response structures
+      const matchesArray = Array.isArray(matchesResponse) ? matchesResponse : 
+                          matchesResponse?.matches ? matchesResponse.matches : 
+                          matchesResponse?.data ? matchesResponse.data : [];
+      
+      if (!Array.isArray(matchesArray)) {
+        console.warn('Matches data is not an array:', matchesArray);
+        return;
+      }
+      
+      const match = matchesArray.find((match: any) => match._id === targetUserId);
+      
+      if (match) {
+        setRelationshipStatus({
+          isMatched: true,
+          hasReceivedRequestFrom: false,
+          relationshipId: match.relationshipId || match._id
+        });
+        return;
+      }
+      
+      // Check if user has sent a request to current user (received requests)
+      const receivedRequests = await relationshipService.getReceivedRequests();
+      const receivedRequest = receivedRequests.find((req: any) => req.requester._id === targetUserId);
+      
+      if (receivedRequest) {
+        setRelationshipStatus({
+          isMatched: false,
+          hasReceivedRequestFrom: true,
+          requestId: receivedRequest._id
+        });
+        return;
+      }
+      
+      // Check if current user has sent a request to target user (sent requests)
+      const sentRequests = await relationshipService.getSentRequests();
+      const sentRequest = sentRequests.find((req: any) => req.recipient._id === targetUserId);
+      
+      if (sentRequest) {
+        setRelationshipStatus({
+          isMatched: false,
+          hasReceivedRequestFrom: false,
+          relationshipId: sentRequest._id
+        });
+        return;
+      }
+      
+      // No relationship found
+      setRelationshipStatus({ isMatched: false, hasReceivedRequestFrom: false });
+      
+    } catch (error) {
+      console.error("Failed to fetch relationship status:", error);
+      setRelationshipStatus({ isMatched: false, hasReceivedRequestFrom: false });
+    }
+  }, [currentUser?._id, isOwnProfile]);
+
   // Memoize the fetch function to prevent recreation on every render
   const fetchUserProfile = useCallback(async () => {
     if (!displayUserId) return;
@@ -40,6 +111,11 @@ const Profile = () => {
       const userData = await userService.getProfile(displayUserId);
       setProfileUser(userData || null);
       
+      // Fetch relationship status for other users' profiles
+      if (!isOwnProfile && userData) {
+        await fetchRelationshipStatus(userData._id);
+      }
+      
     } catch (error) {
       console.error("Failed to fetch profile:", error);
       toast({
@@ -50,7 +126,7 @@ const Profile = () => {
     } finally {
       setLoading(false);
     }
-  }, [displayUserId, isOwnProfile, currentUser, toast]);
+  }, [displayUserId, isOwnProfile, currentUser, toast, fetchRelationshipStatus]);
   
   useEffect(() => {
     fetchUserProfile();
@@ -129,7 +205,13 @@ const Profile = () => {
   return (
     <div className="min-h-screen bg-gray-50 pt-16">
       <TopNavbar />
-      <UserProfileView user={profileUser} />
+      <UserProfileView 
+        user={profileUser} 
+        hasReceivedRequestFrom={relationshipStatus.hasReceivedRequestFrom}
+        requestId={relationshipStatus.requestId}
+        isMatched={relationshipStatus.isMatched}
+        relationshipId={relationshipStatus.relationshipId}
+      />
       <Navbar />
     </div>
   );

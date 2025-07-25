@@ -11,11 +11,14 @@ import { useState, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { userService, relationshipService } from '@/lib/api-client';
+import apiClient from '@/lib/api-client';
 
 interface UserProfileViewProps {
   user: User;
   hasReceivedRequestFrom?: boolean;
   requestId?: string;
+  isMatched?: boolean;
+  relationshipId?: string;
 }
 
 const DetailItem = ({ label, value }: { label: string; value: string | undefined | null }) => {
@@ -28,10 +31,46 @@ const DetailItem = ({ label, value }: { label: string; value: string | undefined
   );
 };
 
-const UserProfileView = ({ user, hasReceivedRequestFrom = false, requestId }: UserProfileViewProps) => {
+const UserProfileView = ({ user, hasReceivedRequestFrom = false, requestId, isMatched = false, relationshipId }: UserProfileViewProps) => {
   const [showReportDialog, setShowReportDialog] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [isProcessingRequest, setIsProcessingRequest] = useState(false);
+  const [isFavorited, setIsFavorited] = useState(false);
+  const [hasSentRequest, setHasSentRequest] = useState(false);
+
+  // Report mutation
+  const reportMutation = useMutation({
+    mutationFn: async (reportData: { reportedUserId: string; reason: string; type: string }) => {
+      console.log('Sending report data:', reportData);
+      return await apiClient.post('/reports', reportData);
+    },
+    onSuccess: () => {
+      toast.success('Report submitted successfully. Our team will review it.');
+      setShowReportDialog(false);
+      setReportReason('');
+    },
+    onError: (error: any) => {
+      console.error('Error submitting report:', error);
+      toast.error('Failed to submit report. Please try again.');
+    }
+  });
+
+  // Handle report submission
+  const handleReport = () => {
+    if (!reportReason.trim()) {
+      toast.error('Please provide a reason for reporting this user.');
+      return;
+    }
+    
+    const reportData = {
+      reportedUserId: user._id,
+      reason: reportReason.trim(),
+      type: 'user_behavior'
+    };
+    
+    console.log('Submitting report with data:', reportData);
+    reportMutation.mutate(reportData);
+  };
 
   // Log profile view when component mounts
   useEffect(() => {
@@ -47,6 +86,42 @@ const UserProfileView = ({ user, hasReceivedRequestFrom = false, requestId }: Us
     };
 
     logView();
+  }, [user?._id]);
+
+  // Check favorite status and sent request status
+  useEffect(() => {
+    const checkUserStatus = async () => {
+      if (user?._id) {
+        try {
+          // Check if user is in favorites
+          const favorites = await userService.getFavorites();
+          const isInFavorites = favorites.favorites?.some((fav: any) => fav._id === user._id);
+          setIsFavorited(isInFavorites);
+
+          // Check if request already sent
+          const sentRequestsResponse = await relationshipService.getSentRequests();
+          console.log('Sent requests response:', sentRequestsResponse);
+          
+          // Handle different response structures
+          const sentRequestsArray = Array.isArray(sentRequestsResponse) ? sentRequestsResponse : 
+                                   sentRequestsResponse?.requests ? sentRequestsResponse.requests : 
+                                   sentRequestsResponse?.data ? sentRequestsResponse.data : [];
+          
+          if (!Array.isArray(sentRequestsArray)) {
+            console.warn('Sent requests data is not an array:', sentRequestsArray);
+            setHasSentRequest(false);
+            return;
+          }
+          
+          const hasRequestSent = sentRequestsArray.some((req: any) => req.followed_user_id === user._id && req.status === 'pending');
+          setHasSentRequest(hasRequestSent);
+        } catch (error) {
+          console.error('Failed to check user status:', error);
+        }
+      }
+    };
+
+    checkUserStatus();
   }, [user?._id]);
 
   const getInitials = (fname: string, lname: string) => {
@@ -97,41 +172,7 @@ const UserProfileView = ({ user, hasReceivedRequestFrom = false, requestId }: Us
     }
   };
 
-  const reportMutation = useMutation({
-    mutationFn: async (reportData: { reportedUserId: string; reason: string; type: string }) => {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/reports`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(reportData)
-      });
-      if (!response.ok) throw new Error('Failed to submit report');
-      return response.json();
-    },
-    onSuccess: () => {
-      toast.success('Report submitted successfully');
-      setShowReportDialog(false);
-      setReportReason('');
-    },
-    onError: (error) => {
-      toast.error('Failed to submit report');
-      console.error('Report error:', error);
-    },
-  });
 
-  const handleReport = () => {
-    if (!reportReason.trim()) {
-      toast.error('Please provide a reason for reporting');
-      return;
-    }
-    reportMutation.mutate({
-      reportedUserId: user._id,
-      reason: reportReason,
-      type: 'profile'
-    });
-  };
 
   return (
     <div className="container mx-auto py-6 px-4 sm:px-6 lg:px-8">
@@ -149,8 +190,9 @@ const UserProfileView = ({ user, hasReceivedRequestFrom = false, requestId }: Us
               <p className="text-sm text-muted-foreground mt-1">{user.state || 'Unknown'}, {user.country || 'Unknown'}</p>
               {user.lastSeen && <p className="text-xs text-gray-400 mt-2">Last seen: {format(new Date(user.lastSeen), 'PPp')}</p>}
               <div className="mt-4 flex gap-2 flex-wrap">
-                {/* Task #27: Show accept/reject instead of send request when viewing profile of someone who sent a request */}
+                {/* Show different buttons based on relationship status */}
                 {hasReceivedRequestFrom ? (
+                  // User has received a request from this person - show accept/reject
                   <>
                     <Button 
                       onClick={() => handleRequestResponse('accept')}
@@ -168,11 +210,85 @@ const UserProfileView = ({ user, hasReceivedRequestFrom = false, requestId }: Us
                       Reject
                     </Button>
                   </>
+                ) : isMatched ? (
+                  // Users are matched - show chat and withdraw connection
+                  <>
+                    <Button 
+                      onClick={() => {
+                        // Navigate to chat with this user
+                        window.location.href = `/messages?user=${user._id}`;
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      <MessageSquare className="mr-2 h-4 w-4" /> Chat
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={async () => {
+                        if (relationshipId) {
+                          try {
+                            await relationshipService.withdrawRequest(relationshipId);
+                            toast.success('Connection withdrawn successfully');
+                            window.location.reload();
+                          } catch (error) {
+                            console.error('Error withdrawing connection:', error);
+                            toast.error('Failed to withdraw connection');
+                          }
+                        }
+                      }}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      Withdraw Connection
+                    </Button>
+                  </>
                 ) : (
-                  <Button variant="outline"><UserPlus className="mr-2 h-4 w-4" /> Send Request</Button>
+                  // No relationship - show send request and favorite
+                  <>
+                    <Button 
+                      variant={hasSentRequest ? "default" : "outline"}
+                      onClick={async () => {
+                        if (hasSentRequest) {
+                          toast.info('You have already sent a connection request to this user');
+                          return;
+                        }
+                        try {
+                          await relationshipService.sendRequest(user._id);
+                          setHasSentRequest(true);
+                          toast.success('Request sent successfully');
+                        } catch (error) {
+                          console.error('Error sending request:', error);
+                          toast.error('Failed to send request');
+                        }
+                      }}
+                      className={hasSentRequest ? "bg-blue-600 hover:bg-blue-700 text-white" : ""}
+                    >
+                      <UserPlus className="mr-2 h-4 w-4" /> {hasSentRequest ? 'Request Sent' : 'Send Request'}
+                    </Button>
+                    <Button 
+                      variant={isFavorited ? "default" : "outline"}
+                      onClick={async () => {
+                        try {
+                          if (isFavorited) {
+                            await userService.removeFromFavorites(user._id);
+                            setIsFavorited(false);
+                            toast.success('Removed from favorites');
+                          } else {
+                            await userService.addToFavorites(user._id);
+                            setIsFavorited(true);
+                            toast.success('Added to favorites');
+                          }
+                        } catch (error) {
+                          console.error('Error updating favorites:', error);
+                          toast.error('Failed to update favorites');
+                        }
+                      }}
+                      className={isFavorited ? "bg-yellow-500 hover:bg-yellow-600 text-white" : ""}
+                    >
+                      <Star className={`mr-2 h-4 w-4 ${isFavorited ? 'fill-current' : ''}`} /> 
+                      {isFavorited ? 'Favorited' : 'Favorite'}
+                    </Button>
+                  </>
                 )}
-                <Button variant="outline"><Star className="mr-2 h-4 w-4" /> Favorite</Button>
-                <Button><MessageSquare className="mr-2 h-4 w-4" /> Message</Button>
                 <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
                   <DialogTrigger asChild>
                     <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">

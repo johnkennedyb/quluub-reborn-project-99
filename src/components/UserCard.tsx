@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import moment from 'moment';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, User as UserIcon } from 'lucide-react';
 
 import { User } from '@/types/user';
 
@@ -19,9 +19,10 @@ interface UserCardProps {
   isSearch?: boolean;
   showChatButton?: boolean;
   conversationId?: string;
+  showViewProfileButton?: boolean;
 }
 
-const UserCard: React.FC<UserCardProps> = ({ user, isSearch = false, showChatButton = false, conversationId }) => {
+const UserCard: React.FC<UserCardProps> = ({ user, isSearch = false, showChatButton = false, conversationId, showViewProfileButton = false }) => {
   const navigate = useNavigate();
 
   const handleChatClick = (e: React.MouseEvent) => {
@@ -32,6 +33,11 @@ const UserCard: React.FC<UserCardProps> = ({ user, isSearch = false, showChatBut
       // If no conversationId, try to navigate with user ID
       navigate(`/messages?user=${user._id || user.username}`);
     }
+  };
+
+  const handleViewProfileClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate(`/profile/${user._id || user.username}`);
   };
 
   const summary = user.summary || '';
@@ -107,16 +113,31 @@ const UserCard: React.FC<UserCardProps> = ({ user, isSearch = false, showChatBut
             Last seen: {daysAgo(user.lastSeen || user.createdAt)}
         </div>
         
-        {showChatButton && (
+        {(showChatButton || showViewProfileButton) && (
           <div className="mt-4 pt-3 border-t">
-            <Button 
-              onClick={handleChatClick}
-              className="w-full flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
-              size="sm"
-            >
-              <MessageCircle className="w-4 h-4" />
-              Start Chat
-            </Button>
+            <div className={`flex gap-2 ${showChatButton && showViewProfileButton ? 'flex-row' : 'flex-col'}`}>
+              {showChatButton && (
+                <Button 
+                  onClick={handleChatClick}
+                  className={`flex items-center gap-2 bg-blue-600 hover:bg-blue-700 ${showViewProfileButton ? 'flex-1' : 'w-full'}`}
+                  size="sm"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  Chat
+                </Button>
+              )}
+              {showViewProfileButton && (
+                <Button 
+                  onClick={handleViewProfileClick}
+                  variant="outline"
+                  className={`flex items-center gap-2 ${showChatButton ? 'flex-1' : 'w-full'}`}
+                  size="sm"
+                >
+                  <UserIcon className="w-4 h-4" />
+                  View Profile
+                </Button>
+              )}
+            </div>
           </div>
         )}
       </CardContent>

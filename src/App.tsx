@@ -30,6 +30,7 @@ import Messages from "@/pages/Messages";
 import Profile from "@/pages/Profile";
 import Settings from "@/pages/Settings";
 import VideoCallZoom from "@/pages/VideoCallZoom";
+import VideoCallTest from "@/pages/VideoCallTest";
 import AdminDashboard from "@/pages/AdminDashboard";
 import Search from "@/pages/Search";
 import Notifications from "@/pages/Notifications";
@@ -191,6 +192,7 @@ function App() {
         {/* Private video call routes - authentication required */}
         <Route path="/video-call" element={<PrivateRoute element={<VideoCallZoom />} />} />
         <Route path="/video-call/:callId" element={<PrivateRoute element={<VideoCallRoom />} />} />
+        <Route path="/video-call-test" element={<PrivateRoute element={<VideoCallTest />} />} />
 
         {/* User routes */}
         <Route path="/dashboard" element={<PrivateRoute element={<Dashboard />} />} />

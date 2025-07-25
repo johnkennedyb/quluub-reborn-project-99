@@ -151,7 +151,7 @@ const DashboardTabs = ({
                 {currentTab.title === "Matches" && (
                   <Button
                     size="sm"
-                    onClick={() => navigate(`/chat/${item._id}`)}
+                    onClick={() => navigate(`/messages?user=${item._id}`)}
                     className="ml-2"
                   >
                     <MessageCircle className="w-4 h-4 mr-1" />

@@ -217,15 +217,20 @@ exports.getMatches = async (req, res) => {
 
     res.json({
       count: matches.length,
-      matches: matches.map((match) => ({
-        ...match._doc,
-        relationship: relationships.find(
+      matches: matches.map((match) => {
+        const relationship = relationships.find(
           (rel) =>
             (rel.follower_user_id === match._id.toString() ||
               rel.followed_user_id === match._id.toString()) &&
             (rel.follower_user_id === userId || rel.followed_user_id === userId)
-        ),
-      })),
+        );
+        
+        return {
+          ...match._doc,
+          relationship: relationship,
+          relationshipId: relationship ? relationship.id : null // Use custom id for frontend
+        };
+      }),
     });
   } catch (error) {
     console.error('Get matches error:', error);
@@ -296,15 +301,94 @@ exports.getSentRequests = async (req, res) => {
     
     // Transform the data to match expected format
     const transformedRequests = sentRequests.map(request => ({
-      id: request.id,
+      id: request.id, // Custom relationship ID
+      _id: request._id, // MongoDB ID
       status: request.status,
       createdAt: request.createdAt,
-      user: request.followed_user_id // The user we sent the request to
+      user: request.followed_user_id, // The user we sent the request to
+      recipient: request.followed_user_id, // For compatibility
+      relationshipId: request.id // Use custom id for frontend
     }));
     
     res.json({ requests: transformedRequests });
   } catch (error) {
     console.error("Get sent requests error:", error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Withdraw a connection request or relationship
+// @route   DELETE /api/relationships/withdraw/:id
+// @access  Private
+exports.withdrawRequest = async (req, res) => {
+  try {
+    const relationshipId = req.params.id;
+    const userId = req.user._id.toString();
+    
+    console.log(`Withdrawing relationship: ${relationshipId} by user: ${userId}`);
+    
+    // Find the relationship by MongoDB _id or custom id field
+    let relationship = await Relationship.findById(relationshipId);
+    
+    if (!relationship) {
+      // Try finding by custom id field if _id doesn't work
+      relationship = await Relationship.findOne({ id: relationshipId });
+    }
+    
+    if (!relationship) {
+      console.log(`Relationship not found with id: ${relationshipId}`);
+      return res.status(404).json({ message: 'Relationship not found' });
+    }
+    
+    // Check if user is part of this relationship
+    if (relationship.follower_user_id !== userId && relationship.followed_user_id !== userId) {
+      return res.status(403).json({ message: 'Not authorized to withdraw this relationship' });
+    }
+    
+    // Get the other user for notification
+    const otherUserId = relationship.follower_user_id === userId 
+      ? relationship.followed_user_id 
+      : relationship.follower_user_id;
+    
+    const otherUser = await User.findById(otherUserId);
+    const currentUser = await User.findById(userId);
+    
+    // Delete the relationship using its MongoDB _id
+    await Relationship.findByIdAndDelete(relationship._id);
+    
+    // Log the activity
+    try {
+      await UserActivityLog.create({
+        userId: userId,
+        action: 'CONNECTION_WITHDRAWN',
+        receiverId: otherUserId,
+        metadata: {
+          relationshipId: relationship._id,
+          previousStatus: relationship.status
+        }
+      });
+    } catch (logError) {
+      console.error('Failed to log withdraw activity:', logError);
+    }
+    
+    // Send email notification if other user exists
+    if (otherUser && currentUser) {
+      try {
+        await sendRequestWithdrawnEmail(otherUser, currentUser);
+      } catch (emailError) {
+        console.error('Failed to send withdrawal email:', emailError);
+      }
+    }
+    
+    console.log(`Relationship withdrawn successfully: ${relationshipId}`);
+    
+    res.json({ 
+      message: 'Connection withdrawn successfully',
+      relationshipId: relationship._id
+    });
+    
+  } catch (error) {
+    console.error('Withdraw request error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };

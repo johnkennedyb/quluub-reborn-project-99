@@ -6,12 +6,35 @@ const User = require('../models/User');
 // @access  Private
 const createReport = async (req, res) => {
   try {
-    const { reportedUserId, reason, type } = req.body;
-    const reporterId = req.user.id;
+    console.log('📝 Report creation request received:');
+    console.log('Request body:', req.body);
+    console.log('User ID from token:', req.user?._id || req.user?.id);
+    console.log('Full user object:', req.user);
+    
+    const { reportedUserId, reason, type, reportType, description } = req.body;
+    const reporterId = req.user._id || req.user.id;
+    
+    // Accept both 'type' and 'reportType' from frontend
+    const reportTypeValue = type || reportType || 'user_behavior';
+    
+    console.log('Extracted values:', {
+      reportedUserId,
+      reason,
+      type,
+      reportType,
+      reportTypeValue,
+      reporterId
+    });
 
     // Validate required fields
-    if (!reportedUserId || !reason || !type) {
-      return res.status(400).json({ message: 'All fields are required' });
+    if (!reportedUserId || !reason) {
+      console.log('❌ Validation failed - missing required fields');
+      return res.status(400).json({ message: 'Reported user ID and reason are required' });
+    }
+    
+    if (!reporterId) {
+      console.log('❌ Validation failed - no reporter ID from token');
+      return res.status(400).json({ message: 'Authentication required' });
     }
 
     // Check if reported user exists
@@ -28,20 +51,25 @@ const createReport = async (req, res) => {
     // Create the report
     const report = new Report({
       reporter: reporterId,
-      reportedUser: reportedUserId,
+      reported: reportedUserId,  // Match the model field name
       reason,
-      type,
+      description: description || reason,
       status: 'pending'
     });
+    
+    console.log('✅ Report object created:', report);
 
     await report.save();
 
     // Populate the report with user details
     await report.populate([
       { path: 'reporter', select: 'fname lname username email' },
-      { path: 'reportedUser', select: 'fname lname username email' }
+      { path: 'reported', select: 'fname lname username email' }  // Match the model field name
     ]);
+    
+    console.log('✅ Report saved and populated successfully');
 
+    console.log('✅ Sending success response');
     res.status(201).json({
       message: 'Report submitted successfully',
       report

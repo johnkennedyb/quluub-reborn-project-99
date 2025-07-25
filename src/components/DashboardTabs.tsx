@@ -65,7 +65,12 @@ const DashboardTabs: React.FC<DashboardTabsProps> = ({
               <div className="max-h-[63.25vh] overflow-y-auto p-4 space-y-4">
                 {matchesArray?.length > 0 ? (
                   matchesArray.map((user) => (
-                    <UserCard key={user._id || user.username} user={user} />
+                    <UserCard 
+                      key={user._id || user.username} 
+                      user={user} 
+                      showChatButton={true}
+                      showViewProfileButton={true}
+                    />
                   ))
                 ) : (
                   <EmptyState message="No matches yet" />

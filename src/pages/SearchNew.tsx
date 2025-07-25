@@ -343,15 +343,20 @@ const Search = () => {
         {loading ? (
           <Skeleton className="h-96 w-full" />
         ) : (
-          <>
-            {results && results.length > 0 ? (
-              <div className="space-y-4 pb-16">
-                {results.map((user, index) => (
-                  <Fragment key={user._id || user.username}>
-                    <UserCard user={user} isSearch={true} />
-                    {(index + 1) % 5 === 0 && <Advert />}
-                  </Fragment>
-                ))}
+          (() => {
+            const matchedUserIds = new Set(currentUser?.matches?.map(match => match._id) || []);
+            const displayedUsers = results.filter(user => !matchedUserIds.has(user._id));
+
+            return (
+              <>
+                {displayedUsers.length > 0 ? (
+                  <div className="space-y-4 pb-16">
+                    {displayedUsers.map((user, index) => (
+                      <Fragment key={user._id || user.username}>
+                        <UserCard user={user} isSearch={true} />
+                        {(index + 1) % 5 === 0 && <Advert />}
+                      </Fragment>
+                    ))}
                 
                 {/* Pagination */}
                 <div className="flex justify-center items-center space-x-4 mt-8">
@@ -373,15 +378,17 @@ const Search = () => {
                     Next
                   </Button>
                 </div>
-              </div>
-            ) : (
-              <Card>
-                <CardContent className="p-8 text-center">
-                  <p className="text-muted-foreground">Your search did not return any results, try again</p>
-                </CardContent>
-              </Card>
-            )}
-          </>
+                  </div>
+                ) : (
+                  <Card>
+                    <CardContent className="p-8 text-center">
+                      <p className="text-muted-foreground">Your search did not return any new results. Try adjusting your filters.</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
+            );
+          })()
         )}
       </div>
       <Navbar />

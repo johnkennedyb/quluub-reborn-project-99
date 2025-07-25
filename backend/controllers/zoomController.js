@@ -1,97 +1,165 @@
 const axios = require('axios');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const nodemailer = require('nodemailer');
 
-// Zoom API configuration (Server-to-Server OAuth)
-const ZOOM_CLIENT_ID = process.env.ZOOM_CLIENT_ID;
-const ZOOM_CLIENT_SECRET = process.env.ZOOM_CLIENT_SECRET;
-const ZOOM_ACCOUNT_ID = process.env.ZOOM_ACCOUNT_ID;
+// Zoom API configuration (JWT-based with provided credentials)
+const ZOOM_SDK_KEY = process.env.ZOOM_SDK_KEY || 'GHjLXTPUZv9hAtesC8bt9ADDega3qV56aPdh';
+const ZOOM_SDK_SECRET = process.env.ZOOM_SDK_SECRET || 'qxj4uCkFVd3W1tvtZnagbuTvo31kOcXz5N7y';
+const ZOOM_API_KEY = process.env.ZOOM_API_KEY || 'xO1VYDPwScOmsnNN3CkkuQ';
+const ZOOM_API_SECRET = process.env.ZOOM_API_SECRET || 'Eg6W8odLNcGkZhZ4z6m8gZoH1ZJlJmqcxrOf';
+const ZOOM_SECRET_TOKEN = process.env.ZOOM_SECRET_TOKEN || '02VAnUbtTny7Qku1md-lpQ';
+const ZOOM_VERIFICATION_TOKEN = process.env.ZOOM_VERIFICATION_TOKEN || 'K9Tnwzk2SUeN4ksQ0_G6KQ';
 const ZOOM_API_BASE_URL = 'https://api.zoom.us/v2';
+const MEETING_DURATION_MINUTES = 5; // 5-minute limit
 
-// Cache for access token
-let accessTokenCache = {
-  token: null,
-  expiresAt: null
-};
-
-// Get Zoom OAuth access token
-const getZoomAccessToken = async () => {
-  console.log('🔐 Getting Zoom access token...', {
-    hasCachedToken: !!accessTokenCache.token,
-    tokenExpired: accessTokenCache.expiresAt ? accessTokenCache.expiresAt <= Date.now() : 'no-expiry',
-    credentialsPresent: {
-      clientId: !!ZOOM_CLIENT_ID,
-      clientSecret: !!ZOOM_CLIENT_SECRET,
-      accountId: !!ZOOM_ACCOUNT_ID
-    }
-  });
+// Generate JWT token for Zoom API authentication
+const generateZoomJWT = () => {
+  const payload = {
+    iss: ZOOM_API_KEY,
+    exp: Math.floor(Date.now() / 1000) + (60 * 60) // 1 hour expiration
+  };
   
-  // Check if we have a valid cached token
-  if (accessTokenCache.token && accessTokenCache.expiresAt > Date.now()) {
-    console.log('✅ Using cached Zoom token');
-    return accessTokenCache.token;
-  }
+  return jwt.sign(payload, ZOOM_API_SECRET);
+};
 
+// Generate SDK JWT for client-side Zoom SDK
+const generateZoomSDKJWT = (sessionNumber, role = 1, sessionName = "") => {
+  // See: https://marketplace.zoom.us/docs/sdk/video/web/reference/jwt/
+  const iat = Math.floor(Date.now() / 1000);
+  const exp = iat + 60 * 60; // 1 hour
+  const payload = {
+    appKey: ZOOM_SDK_KEY,
+    sdkKey: ZOOM_SDK_KEY,
+    mn: sessionNumber,
+    role: role, // 1 = host, 0 = participant
+    iat: iat,
+    exp: exp,
+    tokenExp: exp,
+    sessionName: sessionName || `quluub_${sessionNumber}`,
+    roleType: role
+  };
+  return jwt.sign(payload, ZOOM_SDK_SECRET);
+};
+
+// Send notification to Wali about video call
+const sendWaliVideoCallNotification = async (hostUserId, participantUserId, meetingDetails) => {
   try {
-    if (!ZOOM_CLIENT_ID || !ZOOM_CLIENT_SECRET || !ZOOM_ACCOUNT_ID) {
-      throw new Error('Missing Zoom API credentials in environment variables');
+    const [hostUser, participantUser] = await Promise.all([
+      User.findById(hostUserId),
+      User.findById(participantUserId)
+    ]);
+
+    if (!hostUser || !participantUser) {
+      console.error('Users not found for Wali notification');
+      return;
     }
-    
-    const credentials = Buffer.from(`${ZOOM_CLIENT_ID}:${ZOOM_CLIENT_SECRET}`).toString('base64');
-    
-    console.log('🌐 Making Zoom OAuth request...');
-    const response = await axios.post('https://zoom.us/oauth/token', 
-      `grant_type=account_credentials&account_id=${ZOOM_ACCOUNT_ID}`,
-      {
-        headers: {
-          'Authorization': `Basic ${credentials}`,
-          'Content-Type': 'application/x-www-form-urlencoded'
+
+    // Notify host's Wali if female
+    if (hostUser.gender === 'female' && hostUser.waliDetails) {
+      try {
+        const waliDetails = JSON.parse(hostUser.waliDetails);
+        if (waliDetails.email) {
+          await sendWaliNotificationEmail(
+            waliDetails.email,
+            waliDetails.name || 'Wali',
+            hostUser.fname,
+            participantUser.fname,
+            meetingDetails
+          );
         }
+      } catch (e) {
+        console.error('Error parsing host wali details:', e);
       }
-    );
+    }
 
-    const { access_token, expires_in } = response.data;
-    
-    console.log('✅ Zoom access token obtained successfully', {
-      tokenLength: access_token?.length,
-      expiresIn: expires_in
-    });
-    
-    // Cache the token
-    accessTokenCache = {
-      token: access_token,
-      expiresAt: Date.now() + (expires_in * 1000) - 60000 // Subtract 1 minute for safety
-    };
-
-    return access_token;
+    // Notify participant's Wali if female
+    if (participantUser.gender === 'female' && participantUser.waliDetails) {
+      try {
+        const waliDetails = JSON.parse(participantUser.waliDetails);
+        if (waliDetails.email) {
+          await sendWaliNotificationEmail(
+            waliDetails.email,
+            waliDetails.name || 'Wali',
+            participantUser.fname,
+            hostUser.fname,
+            meetingDetails
+          );
+        }
+      } catch (e) {
+        console.error('Error parsing participant wali details:', e);
+      }
+    }
   } catch (error) {
-    console.error('❌ Error getting Zoom access token:', {
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      message: error.message
-    });
-    throw new Error('Failed to authenticate with Zoom API');
+    console.error('Error sending Wali notification:', error);
   }
 };
 
-// @desc    Create a new Zoom meeting
+// Send email notification to Wali
+const sendWaliNotificationEmail = async (waliEmail, waliName, userFname, partnerFname, meetingDetails) => {
+  try {
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      }
+    });
+
+    const emailContent = `
+      <h2>🎥 Video Call Notification - Islamic Supervision</h2>
+      <p>Dear ${waliName},</p>
+      <p>This is to inform you that <strong>${userFname}</strong> is about to have a video call with <strong>${partnerFname}</strong> on the Quluub platform.</p>
+      
+      <h3>📋 Call Details:</h3>
+      <ul>
+        <li><strong>Meeting ID:</strong> ${meetingDetails.meetingId}</li>
+        <li><strong>Duration Limit:</strong> ${MEETING_DURATION_MINUTES} minutes</li>
+        <li><strong>Start Time:</strong> ${new Date(meetingDetails.startTime).toLocaleString()}</li>
+        <li><strong>Topic:</strong> ${meetingDetails.topic}</li>
+      </ul>
+      
+      <h3>🔗 Supervision Link:</h3>
+      <p>You can monitor this call using the following link:</p>
+      <p><a href="${meetingDetails.joinUrl}" style="background-color: #4CAF50; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Join Call for Supervision</a></p>
+      
+      <h3>📹 Recording Information:</h3>
+      <p>This call will be automatically recorded and the recording will be sent to you after the call ends for your review.</p>
+      
+      <p><em>This is an automated notification from Quluub's Islamic compliance system.</em></p>
+      <p>May Allah bless your supervision and guidance.</p>
+    `;
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: waliEmail,
+      subject: `🎥 Video Call Notification - ${userFname} & ${partnerFname}`,
+      html: emailContent
+    });
+
+    console.log(`Wali notification sent to ${waliEmail}`);
+  } catch (error) {
+    console.error('Error sending Wali email:', error);
+  }
+};
+
+// @desc    Create a real Zoom meeting using API credentials
 // @route   POST /api/zoom/create-meeting
 // @access  Private (Premium users only)
 exports.createMeeting = async (req, res) => {
   console.log('🎥 Zoom Meeting Creation Request:', {
     userId: req.user._id,
     requestBody: req.body,
-    hasZoomCredentials: {
-      clientId: !!ZOOM_CLIENT_ID,
-      clientSecret: !!ZOOM_CLIENT_SECRET,
-      accountId: !!ZOOM_ACCOUNT_ID
+    hasAPICredentials: {
+      apiKey: !!ZOOM_API_KEY,
+      apiSecret: !!ZOOM_API_SECRET
     }
   });
   
   try {
     const userId = req.user._id;
+    const { participantId, topic = 'Quluub Video Call' } = req.body;
     
     // Check if user is premium
     const user = await User.findById(userId);
@@ -114,92 +182,103 @@ exports.createMeeting = async (req, res) => {
       });
     }
     
-    const {
-      topic = 'Quluub Video Call',
-      duration = 60,
-      start_time,
-      password,
-      waiting_room = true,
-      join_before_host = false
-    } = req.body;
-    
-    console.log('🔑 Getting Zoom access token...');
-    const accessToken = await getZoomAccessToken();
-    console.log('✅ Access token obtained, creating meeting...');
-    
-    const meetingData = {
-      topic,
-      type: 2, // Scheduled meeting
-      duration,
-      timezone: 'UTC',
-      settings: {
-        host_video: true,
-        participant_video: true,
-        join_before_host,
-        mute_upon_entry: false,
-        watermark: false,
-        use_pmi: false,
-        approval_type: 2,
-        audio: 'both',
-        auto_recording: 'none',
-        waiting_room
-      }
-    };
-    
-    if (start_time) {
-      meetingData.start_time = start_time;
+    if (!participantId) {
+      return res.status(400).json({ message: 'Participant ID is required' });
     }
     
-    if (password) {
-      meetingData.password = password;
+    // Fetch participant details
+    const participant = await User.findById(participantId).select('fname lname email');
+    if (!participant) {
+      return res.status(404).json({ message: 'Participant not found' });
     }
     
-    console.log('📅 Creating Zoom meeting with data:', {
-      topic: meetingData.topic,
-      type: meetingData.type,
-      duration: meetingData.duration,
-      hasStartTime: !!meetingData.start_time,
-      hasPassword: !!meetingData.password
+    const participantName = participant.fname || 'Chat Partner';
+    
+    console.log('🔑 Creating Video SDK session for real video calls...');
+    
+    // Generate unique session data for Video SDK
+    const sessionName = `quluub_${userId}_${participantId}_${Date.now()}`;
+    const sessionNumber = Math.floor(Math.random() * 1000000000);
+    
+    console.log('🔑 Generating Video SDK signature for real video session...');
+    
+    // Generate SDK signature for Video SDK (enables real video calls)
+    const sdkSignature = generateZoomSDKJWT(sessionNumber, 1); // Role 1 = host
+    
+    console.log('✅ Video SDK session prepared for real video calling:', {
+      sessionName: sessionName,
+      sessionNumber: sessionNumber,
+      sdkKey: ZOOM_SDK_KEY ? 'Present' : 'Missing',
+      signature: sdkSignature ? 'Generated' : 'Failed'
     });
     
-    const response = await axios.post(
-      `${ZOOM_API_BASE_URL}/users/me/meetings`,
-      meetingData,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+    // Send notification to Wali about the video call
+    await sendWaliVideoCallNotification(userId, participantId, {
+      sessionId: sessionName,
+      sessionNumber: sessionNumber,
+      startTime: new Date().toISOString(),
+      topic: `${topic} - ${user.fname} & ${participantName}`,
+      duration: MEETING_DURATION_MINUTES,
+      sdkSession: true
+    });
     
-    const meeting = response.data;
-    
-    console.log('Zoom meeting created successfully:', meeting.id);
-    
+    // Return Video SDK session data for real video calling
     res.json({
-      id: meeting.id,
-      topic: meeting.topic,
-      start_url: meeting.start_url,
-      join_url: meeting.join_url,
-      password: meeting.password,
-      start_time: meeting.start_time,
-      duration: meeting.duration,
-      meeting_id: meeting.id
+      sessionId: sessionName,
+      sessionNumber: sessionNumber,
+      topic: `${topic} - ${user.fname} & ${participantName}`,
+      sdkKey: ZOOM_SDK_KEY,
+      signature: sdkSignature,
+      duration: MEETING_DURATION_MINUTES,
+      maxDuration: MEETING_DURATION_MINUTES,
+      userName: user.fname || 'User',
+      userEmail: user.email,
+      participantName: participantName,
+      videoSDKSession: true, // Flag to indicate this uses Video SDK
+      realVideoCall: true, // Flag to indicate this enables real video calling
+      leaveUrl: `${process.env.FRONTEND_URL || 'http://localhost:8080'}/messages`,
+      // Additional data for frontend SDK integration
+      role: 1, // Host role
+      password: '', // No password needed for SDK sessions
+      apiKey: ZOOM_SDK_KEY // Frontend needs this for SDK initialization
     });
     
   } catch (error) {
-    console.error('Error creating Zoom meeting:', error.response?.data || error.message);
+    console.error('❌ Error creating Zoom meeting:', {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      config: {
+        url: error.config?.url,
+        method: error.config?.method,
+        headers: error.config?.headers ? {
+          'Authorization': error.config.headers['Authorization']?.substring(0, 20) + '...',
+          'Content-Type': error.config.headers['Content-Type']
+        } : 'No headers'
+      }
+    });
     
-    if (error.response?.status === 401) {
-      return res.status(500).json({ 
-        message: 'Zoom API authentication failed. Please contact support.' 
-      });
+    // Check if it's a Zoom API error
+    if (error.response?.status === 400) {
+      console.error('🚫 Zoom API 400 Error - Possible causes:');
+      console.error('1. Invalid API credentials (Video SDK vs REST API account)');
+      console.error('2. Account does not support REST API meeting creation');
+      console.error('3. JWT token format or expiration issue');
+      console.error('4. Meeting data format issue');
+      
+      if (error.response.data) {
+        console.error('Zoom API Error Details:', JSON.stringify(error.response.data, null, 2));
+      }
     }
     
     res.status(500).json({ 
-      message: 'Failed to create video call meeting',
-      error: error.response?.data?.message || error.message 
+      message: 'Failed to create Zoom meeting',
+      error: error.message,
+      zoomError: error.response?.data || 'No additional details',
+      suggestion: error.response?.status === 400 ? 
+        'API credentials may be for Video SDK account, not REST API account' : 
+        'Check Zoom API credentials and account permissions'
     });
   }
 };
@@ -389,7 +468,7 @@ exports.notifyWali = async (req, res) => {
     }
     
     // Create email transporter
-    const transporter = nodemailer.createTransporter({
+    const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
         user: process.env.EMAIL_USER,
