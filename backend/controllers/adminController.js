@@ -880,7 +880,7 @@ const sendAdminPushNotification = async (req, res) => {
 
     const usersToNotify = await User.find(query).select('_id pushToken');
 
-    if (usersToNotify.length === 0) {
+    if (usersToNotify.length === 0){
       return res.status(404).json({ message: 'No users found for the selected target.' });
     }
 
