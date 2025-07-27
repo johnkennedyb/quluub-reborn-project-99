@@ -24,7 +24,8 @@ const {
   getPremiumUsers,
   getPaymentHistory,
   getPotentialMatches,
-  sendPushNotification
+  sendPushNotification,
+  sendMatchSuggestions
 } = require('../controllers/adminController');
 const { getAllPayments, processRefund } = require('../controllers/paymentController');
 const { protect, admin } = require('../middlewares/authMiddleware');
@@ -51,7 +52,7 @@ router.post('/users/:id/verify-email', verifyUserEmail);
 router.post('/users/:id/reset-password', sendPasswordResetLink);
 router.get('/users/:id/potential-matches', getPotentialMatches);
 router.post('/users/:id/impersonate', (req, res) => res.json({ token: 'test-impersonation-token', user: { username: 'impersonated' } }));
-router.post('/users/:id/send-suggestions', (req, res) => res.json({ message: 'Suggestions sent' }));
+router.post('/users/:id/send-suggestions', sendMatchSuggestions);
 router.post('/users/:id/test-push', (req, res) => res.json({ message: 'Test push sent' }));
 
 // Call management

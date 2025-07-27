@@ -53,10 +53,7 @@
   padding: 0 1rem;
 }
 
-/* Add padding to the bottom of the main content area to accommodate the bottom navbar */
-.content-area {
-  padding-bottom: 4rem; /* Height of the bottom navbar */
-}
+
 
 /* Style for the bottom navbar */
 .bottom-nav {

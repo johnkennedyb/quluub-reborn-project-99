@@ -99,7 +99,7 @@ const UserCard: React.FC<UserCardProps> = ({ user, isSearch = false, showChatBut
         <div className="border-t my-3"></div>
 
         <p className="text-sm text-muted-foreground mb-3">
-          {summary.length > maxLength ? `${summary.substring(0, maxLength)}...` : summary || 'User summary not set.'}
+          {summary.length > maxLength ? `${summary.substring(0, maxLength)}...` : summary || '✨ This user hasn\'t shared their story yet. Send them a message to learn more!'}
         </p>
 
         <div className="flex items-center text-xs text-muted-foreground gap-2">

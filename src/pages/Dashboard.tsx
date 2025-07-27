@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import TopNavbar from "@/components/TopNavbar";
 import Navbar from "@/components/Navbar";
 import Advert from "@/components/Advert";
+import DashboardFeeds from "@/components/DashboardFeeds";
+import DashboardTabs from "@/components/DashboardTabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { relationshipService, userService, feedService } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
@@ -23,7 +25,7 @@ import {
 } from "lucide-react";
 
 // Dashboard components matching taofeeq_UI structure
-const DashboardTopBar = ({ topBar, setTop }: { topBar: any[], setTop: (index: number) => void }) => {
+const DashboardTopBar = ({ topBar }: { topBar: any[] }) => {
   const navigate = useNavigate();
 
   return (
@@ -33,11 +35,12 @@ const DashboardTopBar = ({ topBar, setTop }: { topBar: any[], setTop: (index: nu
           key={title}
           className="cursor-pointer hover:shadow-md transition-shadow"
           style={{ borderLeft: `3px solid ${color}` }}
-          onClick={() =>
-            index === arr.length - 1
-              ? navigate("/notifications")
-              : setTop(index)
-          }
+          onClick={() => {
+            if (index === arr.length - 1) {
+              navigate("/notifications");
+            }
+            // The setTop functionality is removed as it's no longer needed
+          }}
         >
           <CardContent className="p-4">
             <div className="flex items-start justify-between">
@@ -74,200 +77,25 @@ const DashboardTopBar = ({ topBar, setTop }: { topBar: any[], setTop: (index: nu
   );
 };
 
-const DashboardTabs = ({ 
-  receivedRequestArray, 
-  sentRequestArray, 
-  matchesArray, 
-  favoritesArray,
-  isLoading, 
-  top 
-}: {
-  receivedRequestArray: any[];
-  sentRequestArray: any[];
-  matchesArray: any[];
-  favoritesArray: any[];
-  isLoading: boolean;
-  top: number;
-}) => {
-  const navigate = useNavigate();
-  const tabData = [
-    { title: "Matches", data: matchesArray },
-    { title: "Received Requests", data: receivedRequestArray },
-    { title: "Sent Requests", data: sentRequestArray }
-  ];
 
-  const currentTab = tabData[top];
-
-  if (isLoading) {
-    return <Skeleton className="h-64 w-full" />;
-  }
-
-  return (
-    <Card>
-      <CardContent className="p-6">
-        {/* Tab Navigation */}
-        <div className="flex flex-wrap gap-2 mb-6 border-b">
-          {tabData.map((tab, index) => (
-            <button
-              key={tab.title}
-              onClick={() => window.dispatchEvent(new CustomEvent('dashboardTabChange', { detail: index }))}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-                index === top
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {tab.title.toUpperCase()} ({tab.data.length})
-            </button>
-          ))}
-        </div>
-        
-        <h3 className="text-lg font-semibold mb-4">{currentTab.title}</h3>
-        {currentTab.data.length > 0 ? (
-          <div className="space-y-4">
-            {currentTab.data.slice(0, 6).map((item, index) => (
-              <div key={index} className="flex items-center space-x-4 p-3 border rounded-lg">
-                <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
-                  {item.profileImage ? (
-                    <img 
-                      src={item.profileImage} 
-                      alt={item.name}
-                      className="w-12 h-12 rounded-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-lg font-semibold text-gray-600">
-                      {item.fname?.charAt(0) || item.name?.charAt(0) || item.firstName?.charAt(0) || '?'}
-                    </span>
-                  )}
-                </div>
-                <div className="flex-1">
-                  <p className="font-medium">{item.name || `${item.fname} ${item.lname}` || `${item.firstName} ${item.lastName}`}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {item.age && `${item.age} years old`}
-                    {item.location && ` • ${item.location}`}
-                  </p>
-                </div>
-                {/* Chat button for matches only */}
-                {currentTab.title === "Matches" && (
-                  <Button
-                    size="sm"
-                    onClick={() => navigate(`/messages?user=${item._id}`)}
-                    className="ml-2"
-                  >
-                    <MessageCircle className="w-4 h-4 mr-1" />
-                    Chat
-                  </Button>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-gray-100 rounded-lg mx-auto mb-4 flex items-center justify-center">
-              <Heart className="w-8 h-8 text-gray-400" />
-            </div>
-            <p className="text-lg text-muted-foreground">Nothing here yet</p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-};
-
-const DashboardFeeds = ({ feed }: { feed: any[] }) => {
-  const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp);
-    const now = new Date();
-    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
-    
-    if (diffInHours < 1) return 'Just now';
-    if (diffInHours < 24) return `${diffInHours}h ago`;
-    if (diffInHours < 48) return 'Yesterday';
-    return date.toLocaleDateString();
-  };
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'message':
-        return <MessageCircle className="w-4 h-4 text-blue-500" />;
-      case 'request':
-        return <Send className="w-4 h-4 text-purple-500" />;
-      case 'view':
-        return <Eye className="w-4 h-4 text-green-500" />;
-      case 'match':
-        return <Heart className="w-4 h-4 text-red-500" />;
-      default:
-        return <Heart className="w-4 h-4 text-gray-500" />;
-    }
-  };
-
-  return (
-    <Card>
-      <CardContent className="p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">Feed</h3>
-          <button className="text-primary text-sm font-medium hover:underline">
-            SEE ALL
-          </button>
-        </div>
-        <p className="text-sm text-muted-foreground mb-6">
-          Recent information you may find useful
-        </p>
-        
-        {feed.length > 0 ? (
-          <div className="space-y-3">
-            {feed.slice(0, 10).map((item, index) => (
-              <div key={item.id || index} className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-gray-50 transition-colors">
-                <div className="flex-shrink-0">
-                  {item.user?.profile_pic ? (
-                    <img 
-                      src={item.user.profile_pic} 
-                      alt={item.user.username}
-                      className="w-8 h-8 rounded-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-                      <span className="text-xs font-semibold text-gray-600">
-                        {item.user?.username?.charAt(0)?.toUpperCase() || '?'}
-                      </span>
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center space-x-2">
-                    {getTypeIcon(item.type)}
-                    <p className="text-sm text-gray-900">{item.message}</p>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {formatTimestamp(item.timestamp)}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-gray-100 rounded-lg mx-auto mb-4 flex items-center justify-center">
-              <MessageCircle className="w-8 h-8 text-gray-400" />
-            </div>
-            <p className="text-lg text-muted-foreground">Nothing here yet</p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Your activity feed will appear here
-            </p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-};
 
 const Dashboard = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [top, setTop] = useState(0);
+
+  const [feedPage, setFeedPage] = useState(1);
+  const [allFeedItems, setAllFeedItems] = useState([]);
+  const [feedHasMore, setFeedHasMore] = useState(false);
 
   // Fetch dashboard data matching taofeeq_UI structure
-  const { isLoading, data } = useQuery({
+  const { isLoading, data } = useQuery<{
+    matches: { count: number; percentageDifference: number; matchedUsers: any[] };
+    received: { count: number; percentageDifference: number; receivedUsers: any[] };
+    sent: { count: number; percentageDifference: number; sentUsers: any[] };
+    views: { count: number; percentageDifference: number };
+    favorites: { count: number; percentageDifference: number; favoriteUsers: any[] };
+    feed: any[];
+  }>({
     queryKey: ["dashboard"],
     queryFn: async () => {
       try {
@@ -276,6 +104,7 @@ const Dashboard = () => {
         
         // Fetch pending requests (received)
         const pendingData = await relationshipService.getPendingRequests();
+        console.log('Pending requests data:', pendingData);
         
         // Task #25: Fetch sent requests
         const sentData = await relationshipService.getSentRequests();
@@ -313,7 +142,7 @@ const Dashboard = () => {
             sentUsers: sentData?.requests || []
           },
           views: {
-            count: profileViewsResponse?.count || 0,
+            count: profileViewsResponse?.profileViews || 0,
             percentageDifference: mockPercentageDifference()
           },
           favorites: {
@@ -332,8 +161,35 @@ const Dashboard = () => {
         });
         throw err;
       }
-    },
+    }
   });
+
+  // Initialize feed state when data is loaded
+  useEffect(() => {
+    if (data?.feed) {
+      setAllFeedItems(data.feed);
+      setFeedHasMore(false); // No pagination support in current API
+    }
+  }, [data?.feed]);
+
+  // Load more feed items (simplified for existing API)
+  const handleLoadMoreFeed = async () => {
+    try {
+      const feedData = await feedService.getFeed();
+      
+      // For now, just refresh the feed since the existing API doesn't support pagination
+      const feedItems = feedData?.data?.feed || feedData?.data || [];
+      setAllFeedItems(feedItems);
+      setFeedHasMore(false); // No pagination support in current API
+    } catch (error) {
+      console.error('Error loading more feed items:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load more feed items",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Create topBar data matching taofeeq_UI structure
   const topBar = isLoading
@@ -401,26 +257,29 @@ const Dashboard = () => {
 
         {/* Top Bar Stats */}
         <div className="mb-6">
-          <DashboardTopBar topBar={topBar} setTop={setTop} />
+          <DashboardTopBar topBar={topBar} />
         </div>
 
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Tabs */}
           <div className="lg:col-span-2">
-            <DashboardTabs
+            <DashboardTabs 
               receivedRequestArray={data?.received?.receivedUsers || []}
               sentRequestArray={data?.sent?.sentUsers || []}
               matchesArray={data?.matches?.matchedUsers || []}
               favoritesArray={data?.favorites?.favoriteUsers || []}
               isLoading={isLoading}
-              top={top}
             />
           </div>
 
           {/* Right Column - Feed and Ads */}
           <div className="space-y-6">
-            <DashboardFeeds feed={data?.feed || []} />
+            <DashboardFeeds 
+              feed={allFeedItems} 
+              isLoading={isLoading}
+              onLoadMore={handleLoadMoreFeed}
+              hasMore={feedHasMore}
+            />
             <Advert />
           </div>
         </div>

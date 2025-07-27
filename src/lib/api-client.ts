@@ -277,7 +277,7 @@ export const chatService = {
   },
   
   sendMessage: async (receiverId: string, message: string) => {
-    const response = await apiClient.post('/chats/send', { userId: receiverId, message });
+    const response = await apiClient.post('/chats/chat', { userId: receiverId, message });
     return response.data;
   },
   

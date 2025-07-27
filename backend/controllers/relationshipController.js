@@ -136,15 +136,23 @@ exports.withdrawRequest = async (req, res) => {
     
     console.log(`Withdrawing request: relationship=${relationshipId}`);
     
-    // Find relationship
-    const relationship = await Relationship.findOne({ id: relationshipId });
+    // Find relationship using raw MongoDB query to avoid Mongoose casting
+    const relationship = await Relationship.collection.findOne({ id: relationshipId });
+    
+    console.log(`Relationship found:`, relationship ? 'Yes' : 'No');
+    if (relationship) {
+      console.log(`Relationship details: follower=${relationship.follower_user_id}, followed=${relationship.followed_user_id}, status=${relationship.status}`);
+    }
     
     if (!relationship) {
       return res.status(404).json({ message: "Relationship not found" });
     }
     
     // Check if user is the follower (only they can withdraw)
-    if (relationship.follower_user_id !== req.user._id.toString()) {
+    const currentUserId = req.user._id.toString();
+    console.log(`Checking authorization: follower=${relationship.follower_user_id}, current=${currentUserId}`);
+    
+    if (relationship.follower_user_id !== currentUserId) {
       return res.status(403).json({ message: "Not authorized to withdraw this relationship" });
     }
     
@@ -153,8 +161,8 @@ exports.withdrawRequest = async (req, res) => {
       return res.status(400).json({ message: `Cannot withdraw relationship that is already ${relationship.status}` });
     }
     
-    // Delete relationship
-    await Relationship.deleteOne({ id: relationshipId });
+    // Delete relationship using raw MongoDB query to avoid Mongoose casting
+    await Relationship.collection.deleteOne({ id: relationshipId });
     console.log("Relationship deleted");
     
     // Log the activity
@@ -213,7 +221,7 @@ exports.getMatches = async (req, res) => {
     const matches = await User.find({
       _id: { $in: matchedUserIds },
       gender: oppositeGender,
-    }).select('-password');
+    }).select('fname lname username profilePicture gender dob country region summary');
 
     res.json({
       count: matches.length,
@@ -261,7 +269,7 @@ exports.getPendingRequests = async (req, res) => {
     // Get user details for followers
     const requestUsers = await User.find({
       _id: { $in: followerUserIds }
-    }).select('-password');
+    }).select('fname lname username profilePicture gender dob country region summary');
     
     console.log(`Found ${requestUsers.length} requesting users`);
     
@@ -294,20 +302,21 @@ exports.getSentRequests = async (req, res) => {
     }).populate({
       path: 'followed_user_id',
       model: 'User',
-      select: 'fname lname username profilePicture gender dob country region'
+      select: 'fname lname username profilePicture gender dob country region summary'
     });
     
     console.log(`Found ${sentRequests.length} sent requests`);
     
-    // Transform the data to match expected format
+    // Transform the data to match expected format - return user objects directly
     const transformedRequests = sentRequests.map(request => ({
-      id: request.id, // Custom relationship ID
-      _id: request._id, // MongoDB ID
-      status: request.status,
-      createdAt: request.createdAt,
-      user: request.followed_user_id, // The user we sent the request to
-      recipient: request.followed_user_id, // For compatibility
-      relationshipId: request.id // Use custom id for frontend
+      ...request.followed_user_id._doc, // Spread the user data directly
+      relationship: {
+        id: request.id,
+        _id: request._id,
+        status: request.status,
+        createdAt: request.createdAt,
+        relationshipId: request.id
+      }
     }));
     
     res.json({ requests: transformedRequests });
@@ -327,13 +336,8 @@ exports.withdrawRequest = async (req, res) => {
     
     console.log(`Withdrawing relationship: ${relationshipId} by user: ${userId}`);
     
-    // Find the relationship by MongoDB _id or custom id field
-    let relationship = await Relationship.findById(relationshipId);
-    
-    if (!relationship) {
-      // Try finding by custom id field if _id doesn't work
-      relationship = await Relationship.findOne({ id: relationshipId });
-    }
+    // Only find by custom id field, never by _id
+    const relationship = await Relationship.findOne({ id: relationshipId });
     
     if (!relationship) {
       console.log(`Relationship not found with id: ${relationshipId}`);

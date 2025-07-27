@@ -44,6 +44,7 @@
     "@radix-ui/react-toggle-group": "^1.1.0",
     "@radix-ui/react-tooltip": "^1.1.4",
     "@tanstack/react-query": "^5.56.2",
+    "@zoom/videosdk": "^2.2.5",
     "antd": "^5.26.2",
     "axios": "^1.6.7",
     "class-variance-authority": "^0.7.1",

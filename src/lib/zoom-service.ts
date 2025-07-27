@@ -53,7 +53,7 @@ export const zoomService = {
   },
 
   // Send video call invitation via chat
-  sendVideoCallInvitation: async (conversationId: string, meetingData: ZoomMeeting): Promise<void> => {
+  sendVideoCallInvitation: async (userId: string, meetingData: ZoomMeeting): Promise<void> => {
     try {
       const invitationMessage = `📹 Video call invitation: ${meetingData.topic}
       
@@ -64,7 +64,7 @@ Meeting ID: ${meetingData.id}
 This is a premium feature. Upgrade to Pro to enjoy unlimited video calls!`;
 
       await apiClient.post('/chat/send-message', {
-        conversationId,
+        userId,
         message: invitationMessage,
         messageType: 'video_call_invitation',
         meetingData: {

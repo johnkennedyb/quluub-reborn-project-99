@@ -88,7 +88,7 @@ const UserProfile = ({ userId }: UserProfileProps) => {
           {renderDetail('Region', user.region)}
           {renderDetail('Marital Status', user.maritalStatus)}
           {renderDetail('Practicing Since', user.startedPracticing ? new Date(user.startedPracticing).toLocaleDateString() : 'N/A')}
-          {renderDetail('Summary', user.summary)}
+          {renderDetail('Summary', user.summary || 'No summary provided - user should be encouraged to complete profile')}
           {renderDetail('Work/Education', user.workEducation)}
           {renderDetail('Last Active', user.stats?.lastActive ? (() => {
             const lastActiveDate = new Date(user.stats.lastActive);

@@ -41,7 +41,7 @@ const VideoCallManagement = () => {
           <TableBody>
             {paginatedCalls && paginatedCalls.length > 0 ? (
               paginatedCalls.map((call) => {
-                // Use caller and recipient from backend, not participants array
+                // Extract caller and recipient from the actual call structure
                 const caller = call.caller || { fname: 'Unknown', lname: 'User', username: 'unknown' };
                 const recipient = call.recipient || { fname: 'Unknown', lname: 'User', username: 'unknown' };
                 
@@ -59,11 +59,21 @@ const VideoCallManagement = () => {
                 
                 return (
                   <TableRow key={call._id}>
-                    <TableCell>{caller.fname} {caller.lname} (@{caller.username})</TableCell>
-                    <TableCell>{recipient.fname} {recipient.lname} (@{recipient.username})</TableCell>
+                    <TableCell>
+                      {caller.fname && caller.lname ? 
+                        `${caller.fname} ${caller.lname} (@${caller.username || 'unknown'})` : 
+                        'Unknown User'
+                      }
+                    </TableCell>
+                    <TableCell>
+                      {recipient.fname && recipient.lname ? 
+                        `${recipient.fname} ${recipient.lname} (@${recipient.username || 'unknown'})` : 
+                        'Unknown User'
+                      }
+                    </TableCell>
                     <TableCell>{formatDate(call.startedAt || call.createdAt)}</TableCell>
                     <TableCell>{Math.round((call.duration || 0) / 60)} mins</TableCell>
-                    <TableCell><Badge>{call.status}</Badge></TableCell>
+                    <TableCell><Badge variant={call.status === 'completed' ? 'default' : call.status === 'failed' ? 'destructive' : 'secondary'}>{call.status}</Badge></TableCell>
                     <TableCell>
                       {call.recordingUrl ? (
                         <a href={call.recordingUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">

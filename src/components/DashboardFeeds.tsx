@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import moment from 'moment';
 
 interface FeedItem {
@@ -18,9 +20,17 @@ interface FeedItem {
 interface DashboardFeedsProps {
   feed: FeedItem[];
   isLoading?: boolean;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
 }
 
-const DashboardFeeds: React.FC<DashboardFeedsProps> = ({ feed, isLoading = false }) => {
+const DashboardFeeds: React.FC<DashboardFeedsProps> = ({ feed, isLoading = false, onLoadMore, hasMore = false }) => {
+  const [showAll, setShowAll] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  
+  // Show only first 5 items initially, unless showAll is true
+  const displayedFeed = showAll ? feed : feed.slice(0, 5);
+  const hasHiddenItems = feed.length > 5;
   const getFeedIcon = (type: string) => {
     switch (type) {
       case 'message':
@@ -66,6 +76,21 @@ const DashboardFeeds: React.FC<DashboardFeedsProps> = ({ feed, isLoading = false
     }
   };
 
+  const handleLoadMore = async () => {
+    if (onLoadMore) {
+      setIsLoadingMore(true);
+      try {
+        await onLoadMore();
+      } finally {
+        setIsLoadingMore(false);
+      }
+    }
+  };
+
+  const toggleShowAll = () => {
+    setShowAll(!showAll);
+  };
+
   if (isLoading) {
     return (
       <Card>
@@ -96,26 +121,68 @@ const DashboardFeeds: React.FC<DashboardFeedsProps> = ({ feed, isLoading = false
       </CardHeader>
       <CardContent>
         {feed && feed.length > 0 ? (
-          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
-            {feed.map((item) => (
-              <div key={item.id} className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors">
-                <div className="text-2xl">{getFeedIcon(item.type)}</div>
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {displayedFeed.map((item, index) => (
+              <div key={item.id || index} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+                <div className="flex-shrink-0">
+                  <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-lg">
+                    {getFeedIcon(item.type)}
+                  </div>
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
                     <Badge className={getFeedColor(item.type)}>
-                      {getFeedTitle(item.type)}
+                      {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
                     </Badge>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-gray-500">
                       {moment(item.timestamp).fromNow()}
                     </span>
                   </div>
-                  <p className="text-sm font-medium text-gray-900 mt-1">
-                    {item.user?.username && `${item.user.username} `}
-                    {item.message || `${getFeedTitle(item.type).toLowerCase()}`}
+                  <p className="text-sm text-gray-900 mt-1">
+                    {item.message}
                   </p>
                 </div>
               </div>
             ))}
+            
+            {/* Show More/Less Button */}
+            {hasHiddenItems && (
+              <div className="flex justify-center pt-3">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={toggleShowAll}
+                  className="text-blue-600 hover:text-blue-800"
+                >
+                  {showAll ? (
+                    <>
+                      <ChevronUp className="w-4 h-4 mr-1" />
+                      Show Less
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="w-4 h-4 mr-1" />
+                      See More ({feed.length - 5} more)
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+            
+            {/* Load More Button (for pagination) */}
+            {showAll && hasMore && (
+              <div className="flex justify-center pt-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLoadMore}
+                  disabled={isLoadingMore}
+                  className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                >
+                  {isLoadingMore ? 'Loading...' : 'Load More Activities'}
+                </Button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="text-center py-8">

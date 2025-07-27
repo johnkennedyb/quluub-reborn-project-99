@@ -7,7 +7,9 @@ import TopNavbar from "@/components/TopNavbar";
 import Navbar from "@/components/Navbar";
 import Advert from "@/components/Advert";
 import { useAuth } from "@/contexts/AuthContext";
-import { relationshipService, userService, feedService } from "@/lib/api-client";
+import { relationshipService } from "../lib/relationshipService";
+import { userService } from "../lib/userService";
+import feedService from "../lib/feedService";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { 
@@ -208,6 +210,9 @@ const DashboardNew = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [top, setTop] = useState(0);
+  const [feedPage, setFeedPage] = useState(1);
+  const [allFeedItems, setAllFeedItems] = useState([]);
+  const [feedHasMore, setFeedHasMore] = useState(false);
 
   // Fetch dashboard data matching taofeeq_UI structure
   const { isLoading, data } = useQuery({
@@ -223,8 +228,8 @@ const DashboardNew = () => {
         // Task #25: Fetch sent requests
         const sentData = await relationshipService.getSentRequests();
         
-        // Task #30: Fetch feed data
-        const feedData = await feedService.getFeed();
+        // Task #30: Fetch feed data with pagination
+        const feedData = await feedService.getFeed(1, 10);
         
         // Fetch profile views
         const profileViewsResponse = await userService.getProfileViewsCount();
@@ -256,7 +261,8 @@ const DashboardNew = () => {
             count: profileViewsResponse?.count || 0,
             percentageDifference: mockPercentageDifference()
           },
-          feed: feedData?.feed || []
+          feed: feedData?.feed || [],
+          feedPagination: feedData?.pagination || { hasMore: false }
         };
       } catch (err) {
         console.error("Failed to fetch dashboard data:", err);
@@ -268,7 +274,32 @@ const DashboardNew = () => {
         throw err;
       }
     },
+    onSuccess: (data) => {
+      // Initialize feed state on first load
+      setAllFeedItems(data?.feed || []);
+      setFeedHasMore(data?.feedPagination?.hasMore || false);
+    }
   });
+
+  // Load more feed items
+  const handleLoadMoreFeed = async () => {
+    try {
+      const nextPage = feedPage + 1;
+      const feedData = await feedService.getFeed(nextPage, 10);
+      
+      // Append new items to existing feed
+      setAllFeedItems(prev => [...prev, ...(feedData?.feed || [])]);
+      setFeedHasMore(feedData?.pagination?.hasMore || false);
+      setFeedPage(nextPage);
+    } catch (error) {
+      console.error('Error loading more feed items:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load more feed items",
+        variant: "destructive",
+      });
+    }
+  };
 
   // Create topBar data matching taofeeq_UI structure
   const topBar = isLoading
@@ -342,7 +373,12 @@ const DashboardNew = () => {
                 />
               </div>
               <div className="lg:col-span-1">
-                <DashboardFeeds feed={data?.feed || []} />
+                <DashboardFeeds 
+                  feed={allFeedItems} 
+                  isLoading={isLoading}
+                  onLoadMore={handleLoadMoreFeed}
+                  hasMore={feedHasMore}
+                />
               </div>
             </div>
           </div>

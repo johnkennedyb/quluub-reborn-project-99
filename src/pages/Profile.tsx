@@ -59,21 +59,25 @@ const Profile = () => {
       }
       
       // Check if user has sent a request to current user (received requests)
-      const receivedRequests = await relationshipService.getReceivedRequests();
-      const receivedRequest = receivedRequests.find((req: any) => req.requester._id === targetUserId);
+      const receivedRequestsResponse = await relationshipService.getReceivedRequests();
+      const receivedRequestsArray = receivedRequestsResponse?.requests || receivedRequestsResponse || [];
+      const receivedRequest = Array.isArray(receivedRequestsArray) ? 
+        receivedRequestsArray.find((req: any) => req._id === targetUserId || req.requester?._id === targetUserId) : null;
       
       if (receivedRequest) {
         setRelationshipStatus({
           isMatched: false,
           hasReceivedRequestFrom: true,
-          requestId: receivedRequest._id
+          requestId: receivedRequest._id || receivedRequest.relationship?.id
         });
         return;
       }
       
       // Check if current user has sent a request to target user (sent requests)
-      const sentRequests = await relationshipService.getSentRequests();
-      const sentRequest = sentRequests.find((req: any) => req.recipient._id === targetUserId);
+      const sentRequestsResponse = await relationshipService.getSentRequests();
+      const sentRequestsArray = sentRequestsResponse?.requests || sentRequestsResponse || [];
+      const sentRequest = Array.isArray(sentRequestsArray) ? 
+        sentRequestsArray.find((req: any) => req._id === targetUserId || req.recipient?._id === targetUserId) : null;
       
       if (sentRequest) {
         setRelationshipStatus({

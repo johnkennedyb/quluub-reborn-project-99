@@ -37,6 +37,8 @@ const UserProfileView = ({ user, hasReceivedRequestFrom = false, requestId, isMa
   const [isProcessingRequest, setIsProcessingRequest] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
   const [hasSentRequest, setHasSentRequest] = useState(false);
+  const [showWithdrawConfirm, setShowWithdrawConfirm] = useState(false);
+  const [showAlreadySentModal, setShowAlreadySentModal] = useState(false);
 
   // Report mutation
   const reportMutation = useMutation({
@@ -175,10 +177,10 @@ const UserProfileView = ({ user, hasReceivedRequestFrom = false, requestId, isMa
 
 
   return (
-    <div className="container mx-auto py-6 px-4 sm:px-6 lg:px-8">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="container mx-auto py-4 px-4 sm:px-6 lg:px-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
         {/* Left Column - Main Info & Actions */}
-        <div className="lg:col-span-1 space-y-6">
+        <div className="lg:col-span-1 space-y-4 lg:space-y-6">
           <Card>
             <CardContent className="pt-6 flex flex-col items-center text-center">
               <Avatar className="w-24 h-24 mb-4">
@@ -189,7 +191,7 @@ const UserProfileView = ({ user, hasReceivedRequestFrom = false, requestId, isMa
               <p className="text-sm text-muted-foreground">@{user.username}</p>
               <p className="text-sm text-muted-foreground mt-1">{user.state || 'Unknown'}, {user.country || 'Unknown'}</p>
               {user.lastSeen && <p className="text-xs text-gray-400 mt-2">Last seen: {format(new Date(user.lastSeen), 'PPp')}</p>}
-              <div className="mt-4 flex gap-2 flex-wrap">
+              <div className="mt-4 flex gap-2 flex-wrap justify-center sm:justify-start">
                 {/* Show different buttons based on relationship status */}
                 {hasReceivedRequestFrom ? (
                   // User has received a request from this person - show accept/reject
@@ -197,15 +199,17 @@ const UserProfileView = ({ user, hasReceivedRequestFrom = false, requestId, isMa
                     <Button 
                       onClick={() => handleRequestResponse('accept')}
                       disabled={isProcessingRequest}
-                      className="bg-green-600 hover:bg-green-700"
+                      className="bg-green-600 hover:bg-green-700 text-sm px-3 py-2 sm:px-4 sm:py-2"
+                      size="sm"
                     >
-                      <UserPlus className="mr-2 h-4 w-4" /> Accept
+                      <UserPlus className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Accept
                     </Button>
                     <Button 
                       variant="outline" 
                       onClick={() => handleRequestResponse('reject')}
                       disabled={isProcessingRequest}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 text-sm px-3 py-2 sm:px-4 sm:py-2"
+                      size="sm"
                     >
                       Reject
                     </Button>
@@ -218,27 +222,19 @@ const UserProfileView = ({ user, hasReceivedRequestFrom = false, requestId, isMa
                         // Navigate to chat with this user
                         window.location.href = `/messages?user=${user._id}`;
                       }}
-                      className="bg-blue-600 hover:bg-blue-700"
+                      className="bg-blue-600 hover:bg-blue-700 text-sm px-3 py-2 sm:px-4 sm:py-2"
+                      size="sm"
                     >
-                      <MessageSquare className="mr-2 h-4 w-4" /> Chat
+                      <MessageSquare className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Chat
                     </Button>
                     <Button 
                       variant="outline"
-                      onClick={async () => {
-                        if (relationshipId) {
-                          try {
-                            await relationshipService.withdrawRequest(relationshipId);
-                            toast.success('Connection withdrawn successfully');
-                            window.location.reload();
-                          } catch (error) {
-                            console.error('Error withdrawing connection:', error);
-                            toast.error('Failed to withdraw connection');
-                          }
-                        }
-                      }}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => setShowWithdrawConfirm(true)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 text-sm px-3 py-2 sm:px-4 sm:py-2"
+                      size="sm"
                     >
-                      Withdraw Connection
+                      <span className="hidden sm:inline">Withdraw Connection</span>
+                      <span className="sm:hidden">Withdraw</span>
                     </Button>
                   </>
                 ) : (
@@ -248,7 +244,7 @@ const UserProfileView = ({ user, hasReceivedRequestFrom = false, requestId, isMa
                       variant={hasSentRequest ? "default" : "outline"}
                       onClick={async () => {
                         if (hasSentRequest) {
-                          toast.info('You have already sent a connection request to this user');
+                          setShowAlreadySentModal(true);
                           return;
                         }
                         try {
@@ -257,12 +253,22 @@ const UserProfileView = ({ user, hasReceivedRequestFrom = false, requestId, isMa
                           toast.success('Request sent successfully');
                         } catch (error) {
                           console.error('Error sending request:', error);
-                          toast.error('Failed to send request');
+                          // Check if error is about already sent request
+                          if (error.response?.data?.message?.includes('already sent') || 
+                              error.response?.data?.message?.includes('already')) {
+                            setShowAlreadySentModal(true);
+                            setHasSentRequest(true);
+                          } else {
+                            toast.error('Failed to send request');
+                          }
                         }
                       }}
-                      className={hasSentRequest ? "bg-blue-600 hover:bg-blue-700 text-white" : ""}
+                      className={`text-sm px-3 py-2 sm:px-4 sm:py-2 ${hasSentRequest ? "bg-blue-600 hover:bg-blue-700 text-white" : ""}`}
+                      size="sm"
                     >
-                      <UserPlus className="mr-2 h-4 w-4" /> {hasSentRequest ? 'Request Sent' : 'Send Request'}
+                      <UserPlus className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" /> 
+                      <span className="hidden sm:inline">{hasSentRequest ? 'Request Sent' : 'Send Request'}</span>
+                      <span className="sm:hidden">{hasSentRequest ? 'Sent' : 'Request'}</span>
                     </Button>
                     <Button 
                       variant={isFavorited ? "default" : "outline"}
@@ -282,17 +288,21 @@ const UserProfileView = ({ user, hasReceivedRequestFrom = false, requestId, isMa
                           toast.error('Failed to update favorites');
                         }
                       }}
-                      className={isFavorited ? "bg-yellow-500 hover:bg-yellow-600 text-white" : ""}
+                      className={`text-sm px-3 py-2 sm:px-4 sm:py-2 ${isFavorited ? "bg-yellow-500 hover:bg-yellow-600 text-white" : ""}`}
+                      size="sm"
                     >
-                      <Star className={`mr-2 h-4 w-4 ${isFavorited ? 'fill-current' : ''}`} /> 
-                      {isFavorited ? 'Favorited' : 'Favorite'}
+                      <Star className={`mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4 ${isFavorited ? 'fill-current' : ''}`} /> 
+                      <span className="hidden sm:inline">{isFavorited ? 'Favorited' : 'Favorite'}</span>
+                      <span className="sm:hidden">★</span>
                     </Button>
                   </>
                 )}
                 <Dialog open={showReportDialog} onOpenChange={setShowReportDialog}>
                   <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50">
-                      <Flag className="mr-2 h-4 w-4" /> Report
+                    <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50 text-sm px-3 py-2 sm:px-4 sm:py-2">
+                      <Flag className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" /> 
+                      <span className="hidden sm:inline">Report</span>
+                      <span className="sm:hidden">⚠</span>
                     </Button>
                   </DialogTrigger>
                   <DialogContent>
@@ -338,13 +348,13 @@ const UserProfileView = ({ user, hasReceivedRequestFrom = false, requestId, isMa
               <CardTitle>Summary</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-600">{user.summary || "No summary provided."}</p>
+              <p className="text-sm text-gray-600">{user.summary || "✨ This user hasn't shared their story yet. Encourage them to complete their profile!"}</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Right Column - Detailed Info */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-4 lg:space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Personal Details</CardTitle>
@@ -356,7 +366,7 @@ const UserProfileView = ({ user, hasReceivedRequestFrom = false, requestId, isMa
                 <DetailItem label="Marital Status" value={user.maritalStatus} />
                 <DetailItem label="Children" value={user.noOfChildren} />
                 <DetailItem label="Nationality" value={user.nationality} />
-                <DetailItem label="Ethnicity" value={user.ethnicity?.join(', ')} />
+                <DetailItem label="Ethnicity" value={Array.isArray(user.ethnicity) ? user.ethnicity.join(', ') : user.ethnicity} />
                 <DetailItem label="Height" value={user.height} />
                 <DetailItem label="Weight" value={user.weight} />
               </dl>
@@ -430,6 +440,47 @@ const UserProfileView = ({ user, hasReceivedRequestFrom = false, requestId, isMa
           </Card>
         </div>
       </div>
+
+      {/* Withdrawal Confirmation Modal */}
+      <Dialog open={showWithdrawConfirm} onOpenChange={setShowWithdrawConfirm}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Withdraw Connection</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-gray-600">
+              Are you sure you want to withdraw your connection with <strong>{user.fname}</strong>? 
+              This action cannot be undone and you will no longer be able to chat with them.
+            </p>
+          </div>
+          <div className="flex justify-end space-x-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowWithdrawConfirm(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive"
+              onClick={async () => {
+                if (relationshipId) {
+                  try {
+                    await relationshipService.withdrawRequest(relationshipId);
+                    toast.success('Connection withdrawn successfully');
+                    setShowWithdrawConfirm(false);
+                    window.location.reload();
+                  } catch (error) {
+                    console.error('Error withdrawing connection:', error);
+                    toast.error('Failed to withdraw connection');
+                  }
+                }
+              }}
+            >
+              Withdraw Connection
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

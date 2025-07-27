@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { createMeeting, getMeeting, deleteMeeting, generateSignature, notifyWali } = require('../controllers/zoomController');
+const { createMeeting, getMeeting, deleteMeeting, generateSignature, notifyWali, getSDKToken } = require('../controllers/zoomController');
 const { protect } = require('../middlewares/authMiddleware');
 
 // All Zoom routes require authentication
@@ -20,6 +20,11 @@ router.get('/meeting/:meetingId', getMeeting);
 // @desc    Delete a meeting
 // @access  Private (Premium users only)
 router.delete('/meeting/:meetingId', deleteMeeting);
+
+// @route   POST /api/zoom/get-sdk-token
+// @desc    Generate Video SDK JWT for frontend
+// @access  Private (Premium users only)
+router.post('/get-sdk-token', getSDKToken);
 
 // @route   POST /api/zoom/signature
 // @desc    Generate Zoom SDK signature

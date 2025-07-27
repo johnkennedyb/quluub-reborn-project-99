@@ -25,12 +25,23 @@ const DashboardTabs: React.FC<DashboardTabsProps> = ({
   top,
 }) => {
   const [activeTab, setActiveTab] = useState('matches');
-  const { user } = useAuth();
+  const [mobileAccordion, setMobileAccordion] = useState<string | undefined>('matches');
 
   useEffect(() => {
-    const tabs = ['matches', 'received', 'sent'];
-    setActiveTab(tabs[top] || 'matches');
-  }, [top]);
+    console.log('DashboardTabs mounted, activeTab:', activeTab);
+  }, []);
+  useEffect(() => {
+    console.log('activeTab changed:', activeTab);
+  }, [activeTab]);
+  useEffect(() => {
+    console.log('mobileAccordion changed:', mobileAccordion);
+  }, [mobileAccordion]);
+  const { user } = useAuth();
+
+  const handleTabChange = (value: string) => {
+    console.log('Tab clicked, changing from', activeTab, 'to', value);
+    setActiveTab(value);
+  };
 
   const EmptyState = ({ message }: { message: string }) => (
     <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -48,7 +59,7 @@ const DashboardTabs: React.FC<DashboardTabsProps> = ({
     <div className="hidden sm:block">
       <Card>
         <CardContent className="p-0">
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <Tabs key={activeTab} value={activeTab} onValueChange={handleTabChange}>
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="matches">
                 Matches ({matchesArray?.length || 0})
@@ -110,7 +121,7 @@ const DashboardTabs: React.FC<DashboardTabsProps> = ({
   // Mobile view with accordion
   const MobileView = () => (
     <div className="block sm:hidden pb-4">
-      <Accordion type="single" collapsible value={activeTab} onValueChange={setActiveTab}>
+      <Accordion type="single" collapsible value={mobileAccordion} onValueChange={setMobileAccordion}>
         <AccordionItem value="matches">
           <AccordionTrigger>
             Matches ({matchesArray?.length || 0})

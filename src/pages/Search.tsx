@@ -68,6 +68,7 @@ const Search = () => {
         limit: 20,
       };
 
+      // Only apply gender filter if user is logged in (this is essential for the app logic)
       if (currentUser) {
         params.gender = currentUser.gender === 'male' ? 'female' : 'male';
       }
@@ -99,15 +100,57 @@ const Search = () => {
       if (inputs.genotype) {
         params.genotype = inputs.genotype;
       }
+      
+      // Only apply age range if user has changed from default (22-45)
+      if (inputs.ageRange && inputs.ageRange.length === 2) {
+        if (inputs.ageRange[0] !== 22 || inputs.ageRange[1] !== 45) {
+          params.minAge = inputs.ageRange[0];
+          params.maxAge = inputs.ageRange[1];
+        }
+      }
+      
+      // Add height range parameters (only if not default range)
+      if (inputs.heightRange && inputs.heightRange.length === 2) {
+        // Only apply height filter if user has changed from default
+        if (inputs.heightRange[0] !== 52 || inputs.heightRange[1] !== 80) {
+          params.minHeight = inputs.heightRange[0];
+          params.maxHeight = inputs.heightRange[1];
+        }
+      }
+      
+      // Add weight range parameters (only if not default range)
+      if (inputs.weightRange && inputs.weightRange.length === 2) {
+        // Only apply weight filter if user has changed from default
+        if (inputs.weightRange[0] !== 50 || inputs.weightRange[1] !== 90) {
+          params.minWeight = inputs.weightRange[0];
+          params.maxWeight = inputs.weightRange[1];
+        }
+      }
 
       console.log('🔍 Search params:', params);
       const response = await userService.getBrowseUsers(params);
       console.log('📊 API Response:', response);
       
-      if (response && response.users) {
+      if (response && response.data) {
+        // Handle axios response format
+        const data = response.data;
+        if (data.users && Array.isArray(data.users)) {
+          console.log('✅ Found users:', data.users.length);
+          setResults(data.users);
+          setTotalPages(data.pages || 1);
+        } else {
+          console.warn('⚠️ No users array in response data:', data);
+          setResults([]);
+          setTotalPages(1);
+        }
+      } else if (response && response.users) {
+        // Direct response format
+        console.log('✅ Found users (direct):', response.users.length);
         setResults(response.users);
         setTotalPages(response.pages || 1);
       } else if (Array.isArray(response)) {
+        // Array response format
+        console.log('✅ Found users (array):', response.length);
         setResults(response);
         setTotalPages(Math.ceil(response.length / 20));
       } else {
@@ -133,7 +176,28 @@ const Search = () => {
   }, [page, currentUser]);
   const [pendingConnections, setPendingConnections] = useState<string[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
-  
+  const [matchedUserIds, setMatchedUserIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    const fetchMatches = async () => {
+      try {
+        const data = await relationshipService.getMatches();
+        let matchesArray: any[] = Array.isArray(data)
+          ? data
+          : data.matches
+          ? data.matches
+          : data.data
+          ? data.data
+          : [];
+        const ids = matchesArray.map((match: any) => match._id);
+        setMatchedUserIds(ids);
+      } catch (err) {
+        console.error("Error fetching matches", err);
+      }
+    };
+    fetchMatches();
+  }, []);
+
   const calculateAge = (dob: string | Date | undefined) => {
     if (!dob) return null;
     const birthDate = new Date(dob);
@@ -262,7 +326,7 @@ const Search = () => {
   };
 
   // Sort users based on selection
-  const sortedUsers = results ? [...results].sort((a, b) => {
+  const sortedUsers = results ? [...results].filter(user => !matchedUserIds.includes(user._id)).sort((a, b) => {
     if (inputs.sortBy === "newest") {
       return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
     } else if (inputs.sortBy === "lastSeen") {

@@ -27,7 +27,7 @@ const Matches = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchMatches = async () => {
@@ -129,7 +129,7 @@ const Matches = () => {
                 );
                 
                 // Add ad card after every 5 matches (only for non-premium users)
-                if (!isPremiumUser(currentUser) && (index + 1) % 5 === 0 && (index + 1) < matches.length) {
+                if (!isPremiumUser(user) && (index + 1) % 5 === 0 && (index + 1) < matches.length) {
                   items.push(
                     <div key={`ad-${index}`} className="col-span-1">
                       <AdComponent />

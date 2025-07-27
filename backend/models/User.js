@@ -164,6 +164,7 @@ const userSchema = new mongoose.Schema(
     dealbreakers: { type: String },
     icebreakers: { type: String },
     lastSeen: { type: Date },
+    profileViews: { type: Number, default: 0 },
     favorites: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     deviceTokens: [{ type: String }],
   },

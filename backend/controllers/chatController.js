@@ -358,9 +358,20 @@ const getChatCountForValidation = async (userId, userInfo) => {
 
 // ADD CHAT / SEND MESSAGE
 const addChat = async (req, res) => {
+  // Enhanced debug logging
+  console.log('📥 Incoming addChat request:', JSON.stringify(req.body));
   const userInfo = req.user;
   const { userId, message } = req.body;
-  
+
+  // Defensive checks for required fields
+  if (!userId || typeof userId !== 'string') {
+    console.error('❌ Invalid or missing userId:', userId);
+    return res.status(400).json({ message: 'Invalid or missing userId' });
+  }
+  if (!message || typeof message !== 'string') {
+    console.error('❌ Invalid or missing message:', message);
+    return res.status(400).json({ message: 'Invalid or missing message' });
+  }
   console.log('🔍 Send Message Debug:', {
     senderId: userInfo._id,
     receiverId: userId,
@@ -416,7 +427,13 @@ const addChat = async (req, res) => {
         return res.status(422).json({ msg: `wali details required to chat` });
       }
 
-      const waliEmail = JSON.parse(currentUser.waliDetails)?.email;
+      let waliEmail = null;
+      try {
+        waliEmail = JSON.parse(currentUser.waliDetails)?.email;
+      } catch (e) {
+        console.error('❌ Malformed waliDetails JSON:', currentUser.waliDetails, e);
+        return res.status(422).json({ msg: 'Malformed waliDetails JSON' });
+      }
       console.log('📧 Wali email check:', {
         hasWaliEmail: !!waliEmail,
         waliEmail: waliEmail ? 'present' : 'missing'

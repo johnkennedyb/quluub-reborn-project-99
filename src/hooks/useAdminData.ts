@@ -106,19 +106,37 @@ interface Payment {
 
 interface AdminCall {
   _id: string;
-  conversationId: string;
-  participants: Array<{
+  conversationId?: string;
+  caller: {
+    _id: string;
+    fname: string;
+    lname: string;
+    username: string;
+    email?: string;
+    profilePicture?: string;
+  };
+  recipient: {
+    _id: string;
+    fname: string;
+    lname: string;
+    username: string;
+    email?: string;
+    profilePicture?: string;
+  };
+  roomId: string;
+  status: 'ringing' | 'ongoing' | 'completed' | 'missed' | 'declined' | 'failed';
+  duration: number;
+  startedAt?: Date;
+  endedAt?: Date;
+  recordingUrl?: string;
+  quality: string;
+  createdAt: Date;
+  // Legacy fields for backward compatibility
+  participants?: Array<{
     userId: { _id: string; fname: string; lname: string; username: string };
     joinedAt: Date;
     leftAt?: Date;
   }>;
-  status: 'started' | 'ended' | 'failed';
-  duration: number;
-  startTime: Date;
-  endTime?: Date;
-  recordingUrl?: string;
-  quality: string;
-  createdAt: Date;
 }
 
 interface CallFilters {
@@ -246,7 +264,15 @@ export const useAdminData = (filters: UserFilters = defaultUserFilters, callFilt
     try {
       const params = new URLSearchParams(currentFilters as any).toString();
       const response = await apiClient.get(`/admin/users?${params}`);
-      setUsers(response.data.users || []);
+      const rawUsers = response.data.users || [];
+      const mappedUsers = rawUsers.map((u: any) => {
+        const createdAt = new Date(u.createdAt);
+        const lastSeenDate = u.lastSeen ? new Date(u.lastSeen) : null;
+        const joinedAgo = Math.floor((Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+        const lastSeenAgo = lastSeenDate ? Math.floor((Date.now() - lastSeenDate.getTime()) / (1000 * 60 * 60 * 24)) : null;
+        return { ...u, fullName: `${u.fname} ${u.lname}`, joinedAgo, lastSeenAgo };
+      });
+      setUsers(mappedUsers);
       setPagination({
         totalUsers: response.data.totalUsers,
         totalPages: response.data.totalPages,

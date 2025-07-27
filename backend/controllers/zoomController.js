@@ -2,11 +2,12 @@ const axios = require('axios');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Call = require('../models/Call');
 const nodemailer = require('nodemailer');
 
 // Zoom API configuration (JWT-based with provided credentials)
-const ZOOM_SDK_KEY = process.env.ZOOM_SDK_KEY || 'GHjLXTPUZv9hAtesC8bt9ADDega3qV56aPdh';
-const ZOOM_SDK_SECRET = process.env.ZOOM_SDK_SECRET || 'qxj4uCkFVd3W1tvtZnagbuTvo31kOcXz5N7y';
+const ZOOM_SDK_KEY = process.env.ZOOM_SDK_KEY;
+const ZOOM_SDK_SECRET = process.env.ZOOM_SDK_SECRET;
 const ZOOM_API_KEY = process.env.ZOOM_API_KEY || 'xO1VYDPwScOmsnNN3CkkuQ';
 const ZOOM_API_SECRET = process.env.ZOOM_API_SECRET || 'Eg6W8odLNcGkZhZ4z6m8gZoH1ZJlJmqcxrOf';
 const ZOOM_SECRET_TOKEN = process.env.ZOOM_SECRET_TOKEN || '02VAnUbtTny7Qku1md-lpQ';
@@ -18,30 +19,35 @@ const MEETING_DURATION_MINUTES = 5; // 5-minute limit
 const generateZoomJWT = () => {
   const payload = {
     iss: ZOOM_API_KEY,
-    exp: Math.floor(Date.now() / 1000) + (60 * 60) // 1 hour expiration
+    exp: Math.floor(Date.now() / 1000) + (60 * 60), // 1 hour expiration
   };
   
   return jwt.sign(payload, ZOOM_API_SECRET);
 };
 
-// Generate SDK JWT for client-side Zoom SDK
-const generateZoomSDKJWT = (sessionNumber, role = 1, sessionName = "") => {
-  // See: https://marketplace.zoom.us/docs/sdk/video/web/reference/jwt/
+// Generate SDK JWT for client-side Zoom Video SDK
+const generateZoomSDKJWT = (sessionName, role = 1) => {
   const iat = Math.floor(Date.now() / 1000);
   const exp = iat + 60 * 60; // 1 hour
+  
+  // Ensure sessionName is a string
+  const sessionNameStr = String(sessionName);
+  
   const payload = {
+    iss: ZOOM_SDK_KEY,
+    exp,
+    iat,
+    aud: 'zoom',
     appKey: ZOOM_SDK_KEY,
-    sdkKey: ZOOM_SDK_KEY,
-    mn: sessionNumber,
-    role: role, // 1 = host, 0 = participant
-    iat: iat,
-    exp: exp,
     tokenExp: exp,
-    sessionName: sessionName || `quluub_${sessionNumber}`,
+    sessionName: sessionNameStr,
     roleType: role
   };
-  return jwt.sign(payload, ZOOM_SDK_SECRET);
+  
+  console.log('🔑 JWT Payload for Video SDK:', JSON.stringify(payload, null, 2));
+  return jwt.sign(payload, ZOOM_SDK_SECRET, { algorithm: 'HS256' });
 };
+
 
 // Send notification to Wali about video call
 const sendWaliVideoCallNotification = async (hostUserId, participantUserId, meetingDetails) => {
@@ -144,7 +150,7 @@ const sendWaliNotificationEmail = async (waliEmail, waliName, userFname, partner
   }
 };
 
-// @desc    Create a real Zoom meeting using API credentials
+// @desc    Create a Zoom Video SDK session
 // @route   POST /api/zoom/create-meeting
 // @access  Private (Premium users only)
 exports.createMeeting = async (req, res) => {
@@ -159,7 +165,7 @@ exports.createMeeting = async (req, res) => {
   
   try {
     const userId = req.user._id;
-    const { participantId, topic = 'Quluub Video Call' } = req.body;
+    const { topic = 'Quluub Video Call', duration = 5, waiting_room = false, join_before_host = true } = req.body;
     
     // Check if user is premium
     const user = await User.findById(userId);
@@ -182,10 +188,12 @@ exports.createMeeting = async (req, res) => {
       });
     }
     
+    const { participantId } = req.body;
+    
     if (!participantId) {
       return res.status(400).json({ message: 'Participant ID is required' });
     }
-    
+
     // Fetch participant details
     const participant = await User.findById(participantId).select('fname lname email');
     if (!participant) {
@@ -194,57 +202,59 @@ exports.createMeeting = async (req, res) => {
     
     const participantName = participant.fname || 'Chat Partner';
     
-    console.log('🔑 Creating Video SDK session for real video calls...');
-    
-    // Generate unique session data for Video SDK
-    const sessionName = `quluub_${userId}_${participantId}_${Date.now()}`;
+    console.log('🔄 Creating Zoom SDK session...');
+    // Generate unique session identifiers
     const sessionNumber = Math.floor(Math.random() * 1000000000);
+    const sessionName = `QuluubCall_${userId}_${participantId}_${Date.now()}`;
     
-    console.log('🔑 Generating Video SDK signature for real video session...');
+    // Create a call record in database
+    const callRecord = new Call({
+      caller: userId,
+      recipient: participantId,
+      roomId: sessionName,
+      status: 'ringing',
+      startedAt: new Date(),
+      duration: 0
+    });
     
-    // Generate SDK signature for Video SDK (enables real video calls)
-    const sdkSignature = generateZoomSDKJWT(sessionNumber, 1); // Role 1 = host
+    await callRecord.save();
     
-    console.log('✅ Video SDK session prepared for real video calling:', {
+    // Generate session data for Zoom Video SDK
+    const sdkJWT = generateZoomSDKJWT(sessionNumber, 1);
+    const sessionData = {
+      callId: callRecord._id,
       sessionName: sessionName,
       sessionNumber: sessionNumber,
-      sdkKey: ZOOM_SDK_KEY ? 'Present' : 'Missing',
-      signature: sdkSignature ? 'Generated' : 'Failed'
-    });
-    
-    // Send notification to Wali about the video call
-    await sendWaliVideoCallNotification(userId, participantId, {
-      sessionId: sessionName,
-      sessionNumber: sessionNumber,
-      startTime: new Date().toISOString(),
       topic: `${topic} - ${user.fname} & ${participantName}`,
-      duration: MEETING_DURATION_MINUTES,
-      sdkSession: true
-    });
-    
-    // Return Video SDK session data for real video calling
-    res.json({
-      sessionId: sessionName,
-      sessionNumber: sessionNumber,
-      topic: `${topic} - ${user.fname} & ${participantName}`,
-      sdkKey: ZOOM_SDK_KEY,
-      signature: sdkSignature,
-      duration: MEETING_DURATION_MINUTES,
-      maxDuration: MEETING_DURATION_MINUTES,
       userName: user.fname || 'User',
       userEmail: user.email,
       participantName: participantName,
-      videoSDKSession: true, // Flag to indicate this uses Video SDK
-      realVideoCall: true, // Flag to indicate this enables real video calling
-      leaveUrl: `${process.env.FRONTEND_URL || 'http://localhost:8080'}/messages`,
-      // Additional data for frontend SDK integration
-      role: 1, // Host role
-      password: '', // No password needed for SDK sessions
-      apiKey: ZOOM_SDK_KEY // Frontend needs this for SDK initialization
+      participantId: participantId,
+      sdkJWT: sdkJWT,
+      sdkKey: ZOOM_SDK_KEY,
+      leaveUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/messages`
+    };
+    
+    console.log('✅ Zoom SDK session created:', {
+      callId: callRecord._id,
+      sessionName: sessionData.sessionName,
+      useWebRTC: true
     });
+    
+    // Fire-and-forget Wali notification (don’t block on failures)
+    sendWaliVideoCallNotification(userId, participantId, {
+      meetingId: sessionData.sessionName,
+      joinUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/video-call/${sessionData.sessionName}`,
+      startTime: new Date().toISOString(),
+      topic: sessionData.topic
+    }).catch(err => console.error('Error sending Wali notification:', err));
+    
+    // Return Zoom SDK session data
+    res.json(sessionData);
     
   } catch (error) {
     console.error('❌ Error creating Zoom meeting:', {
+  stack: error.stack,
       message: error.message,
       status: error.response?.status,
       statusText: error.response?.statusText,
@@ -384,6 +394,52 @@ exports.deleteMeeting = async (req, res) => {
   }
 };
 
+// @desc    Generate Video SDK JWT for frontend
+// @route   POST /api/zoom/get-sdk-token
+// @access  Private (Premium users only)
+exports.getSDKToken = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { sessionKey, role = 1 } = req.body;
+    
+    // Check if user is premium
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    if (user.plan !== 'premium' && user.plan !== 'pro') {
+      return res.status(403).json({ 
+        message: 'Video calls are available for Premium users only.',
+        requiresUpgrade: true 
+      });
+    }
+    
+    if (!ZOOM_SDK_KEY || !ZOOM_SDK_SECRET) {
+      return res.status(500).json({ message: 'Zoom SDK credentials not configured' });
+    }
+    
+    // Generate Video SDK JWT
+    const sdkJWT = generateZoomSDKJWT(sessionKey, role);
+    
+    console.log('✅ Video SDK JWT generated for session:', sessionKey);
+    console.log('🔑 SDK Key being used:', ZOOM_SDK_KEY);
+    
+    res.json({ 
+      sdkJWT,
+      sessionKey,
+      sdkKey: ZOOM_SDK_KEY
+    });
+    
+  } catch (error) {
+    console.error('Error generating Video SDK JWT:', error.message);
+    res.status(500).json({ 
+      message: 'Failed to generate Video SDK JWT',
+      error: error.message 
+    });
+  }
+};
+
 // @desc    Generate Zoom SDK signature
 // @route   POST /api/zoom/signature
 // @access  Private (Premium users only)
@@ -405,14 +461,14 @@ exports.generateSignature = async (req, res) => {
       });
     }
     
-    if (!ZOOM_CLIENT_ID || !ZOOM_CLIENT_SECRET) {
+    if (!ZOOM_SDK_KEY || !ZOOM_SDK_SECRET) {
       return res.status(500).json({ message: 'Zoom SDK credentials not configured' });
     }
     
     const timestamp = new Date().getTime() - 30000; // 30 seconds ago to account for clock skew
-    const msg = Buffer.from(ZOOM_CLIENT_ID + meetingNumber + timestamp + role, 'utf8');
-    const hash = crypto.createHmac('sha256', ZOOM_CLIENT_SECRET).update(msg).digest('base64');
-    const signature = Buffer.from(`${ZOOM_CLIENT_ID}.${meetingNumber}.${timestamp}.${role}.${hash}`).toString('base64');
+    const msg = Buffer.from(ZOOM_SDK_KEY + meetingNumber + timestamp + role, 'utf8');
+    const hash = crypto.createHmac('sha256', ZOOM_SDK_SECRET).update(msg).digest('base64');
+    const signature = Buffer.from(`${ZOOM_SDK_KEY}.${meetingNumber}.${timestamp}.${role}.${hash}`).toString('base64');
     
     console.log('✅ Zoom SDK signature generated for meeting:', meetingNumber);
     

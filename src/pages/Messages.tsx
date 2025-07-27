@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import apiClient from "@/lib/api-client";
 import socket from "@/lib/socket";
 import { isPremiumUser, hasFeatureAccess, getUpgradeMessage, PREMIUM_FEATURES } from "@/utils/premiumUtils";
-import ZoomVideoCall from "@/components/ZoomVideoCall";
+import { ZoomVideoCall } from "@/components/ZoomVideoCall";
 
 interface Message {
   _id: string;
@@ -431,28 +431,6 @@ const Messages = () => {
     }
   };
 
-  const startVideoCall = async () => {
-    if (!recipientId) {
-      toast({ title: "Error", description: "Cannot identify the other user for video call", variant: "destructive" });
-      return;
-    }
-    
-    // Check if user has video call access
-    if (!hasFeatureAccess(user, 'VIDEO_CALLS')) {
-      toast({
-        title: "Premium Feature",
-        description: getUpgradeMessage('VIDEO_CALLS'),
-        variant: "destructive",
-      });
-      // Redirect to upgrade page
-      navigate('/upgrade');
-      return;
-    }
-    
-    // Removed old video call functionality
-    // Now using Zoom only
-  };
-
   // ... (rest of the code remains the same)
 
   if (!conversationId && !targetUserId) {
@@ -506,33 +484,7 @@ const Messages = () => {
             {/* Video Call Button */}
             {recipientId && isPremiumUser(user) && (
               <Button
-                onClick={async () => {
-                  try {
-                    // Send chat notification to match about video call invitation
-                    await chatService.sendMessage({
-                      conversationId: conversationId!,
-                      message: `🎥 ${user?.firstName || 'Someone'} is inviting you to a video call. Click the video call button to join!`,
-                      messageType: 'video_call_invitation'
-                    });
-                    
-                    toast({
-                      title: "Video Call Invitation Sent",
-                      description: `${recipientName} has been notified about the video call invitation.`,
-                      variant: "default"
-                    });
-                    
-                    // Start the video call
-                    setShowZoomCall(true);
-                  } catch (error) {
-                    console.error('Error sending video call invitation:', error);
-                    toast({
-                      title: "Invitation Failed",
-                      description: "Failed to send video call invitation. Starting call anyway...",
-                      variant: "destructive"
-                    });
-                    setShowZoomCall(true);
-                  }
-                }}
+                onClick={() => setShowZoomCall(true)}
                 className="bg-blue-600 hover:bg-blue-700 text-white"
                 size="sm"
               >

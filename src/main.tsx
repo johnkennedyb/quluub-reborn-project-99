@@ -12,7 +12,7 @@ createRoot(document.getElementById('root')!).render(
     <Router>
       <AuthProvider>
         <AdminAuthProvider>
-          <div className="content-area pb-20">
+          <div>
             <App />
           </div>
         </AdminAuthProvider>

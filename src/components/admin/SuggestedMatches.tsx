@@ -56,6 +56,9 @@ const SuggestedMatches = () => {
           <CardDescription>
             Send curated match suggestions to Premium users to improve their experience.
           </CardDescription>
+          <div className="mt-4 p-3 bg-blue-50 border border-blue-300 rounded text-blue-800">
+            <strong>Note:</strong> In addition to manual suggestions, all premium users automatically receive a curated list of opposite-gender matches (with names and emails) via email every month.
+          </div>
         </CardHeader>
         <CardContent className="space-y-6">
           <div>

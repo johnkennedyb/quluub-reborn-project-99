@@ -26,6 +26,12 @@ const getStats = async (req, res) => {
     const sixMonthsAgo = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000);
     const oneYearAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
 
+    console.log('Date ranges for inactivity:');
+    console.log('oneMonthAgo:', oneMonthAgo);
+    console.log('threeMonthsAgo:', threeMonthsAgo);
+    console.log('sixMonthsAgo:', sixMonthsAgo);
+    console.log('oneYearAgo:', oneYearAgo);
+
     // User Stats
     const totalMembers = await User.countDocuments();
     const maleMembers = await User.countDocuments({ gender: 'male' });
@@ -42,34 +48,28 @@ const getStats = async (req, res) => {
     const activeThisMonth = await User.countDocuments({ lastSeen: { $gte: oneMonthAgo } });
 
     // Inactivity Stats - Handle users with null/undefined lastSeen
-    const inactiveUsers = await User.countDocuments({ 
+    const inactiveUsers = await User.countDocuments({
       $or: [
         { lastSeen: { $lt: oneMonthAgo } },
         { lastSeen: { $exists: false } },
         { lastSeen: null }
       ]
     });
-    const inactiveQuarter = await User.countDocuments({ 
-      $or: [
-        { lastSeen: { $lt: threeMonthsAgo } },
-        { lastSeen: { $exists: false } },
-        { lastSeen: null }
-      ]
+    const inactiveQuarter = await User.countDocuments({
+        lastSeen: { $lt: threeMonthsAgo }
     });
-    const inactiveSixMonths = await User.countDocuments({ 
-      $or: [
-        { lastSeen: { $lt: sixMonthsAgo } },
-        { lastSeen: { $exists: false } },
-        { lastSeen: null }
-      ]
+    const inactiveSixMonths = await User.countDocuments({
+        lastSeen: { $lt: sixMonthsAgo }
     });
-    const inactiveYear = await User.countDocuments({ 
-      $or: [
-        { lastSeen: { $lt: oneYearAgo } },
-        { lastSeen: { $exists: false } },
-        { lastSeen: null }
-      ]
+    const inactiveYear = await User.countDocuments({
+        lastSeen: { $lt: oneYearAgo }
     });
+
+    console.log('Inactive user counts:');
+    console.log('inactiveUsers (1 month):', inactiveUsers);
+    console.log('inactiveQuarter (3 months):', inactiveQuarter);
+    console.log('inactiveSixMonths (6 months):', inactiveSixMonths);
+    console.log('inactiveYear (1 year):', inactiveYear);
 
     // Match Stats
     const totalMatches = await Relationship.countDocuments({ status: 'matched' });
@@ -85,16 +85,36 @@ const getStats = async (req, res) => {
     const matchToChatRate = totalMatches > 0 ? (await Chat.distinct('conversationId')).length / totalMatches * 100 : 0;
 
     // Financial & Growth Stats
-    const totalSubscriptions = await Subscription.countDocuments({ status: 'active' });
+    const totalSubscriptions = premiumMembers + proMembers; // Use actual premium/pro counts instead of Subscription model
     const conversionRate = totalMembers > 0 ? (totalSubscriptions / totalMembers) * 100 : 0;
-    const freeToProConversions = await Subscription.countDocuments({ plan: { $in: ['premium', 'pro'] }, createdAt: { $gte: oneMonthAgo } });
+    const freeToProConversions = await User.countDocuments({ 
+      plan: { $in: ['premium', 'pro'] }, 
+      premiumExpirationDate: { $gte: oneMonthAgo } // Users who became premium in last month
+    });
 
     const membersAtStartOfMonth = await User.countDocuments({ createdAt: { $lt: oneMonthAgo } });
-    const churnedUsersLastMonth = await User.countDocuments({ status: 'inactive', lastSeen: { $lt: oneMonthAgo, $gte: threeMonthsAgo } });
+    
+    // Fix churn rate calculation - users who were active but haven't been seen recently
+    const churnedUsersLastMonth = await User.countDocuments({
+      createdAt: { $lt: oneMonthAgo }, // Existing users from before this month
+      $or: [
+        { lastSeen: { $lt: oneMonthAgo } }, // Haven't been active in the last month
+        { lastSeen: { $exists: false } },
+        { lastSeen: null }
+      ]
+    });
+    
+    // Fix growth rate calculation with better logic
+    const newUsersThisMonth = await User.countDocuments({ createdAt: { $gte: oneMonthAgo } });
+    const growthRate = membersAtStartOfMonth > 0 ? (newUsersThisMonth / membersAtStartOfMonth) * 100 : 0;
+    
+    // Limit growth rate to reasonable maximum (e.g., 1000%)
+    const cappedGrowthRate = Math.min(growthRate, 1000);
+    
     const churnRate = membersAtStartOfMonth > 0 ? (churnedUsersLastMonth / membersAtStartOfMonth) * 100 : 0;
-    const growthRate = membersAtStartOfMonth > 0 ? ((totalMembers - membersAtStartOfMonth) / membersAtStartOfMonth) * 100 : 0;
 
-    const engagementRate = totalMembers > 0 ? (activeThisWeek / totalMembers) * 100 : 0;
+    // Fix engagement rate - use monthly active users instead of weekly for better metric
+    const engagementRate = totalMembers > 0 ? (activeThisMonth / totalMembers) * 100 : 0;
 
     const geographicDistribution = await User.aggregate([
       { $group: { _id: '$country', count: { $sum: 1 } } },
@@ -156,7 +176,7 @@ const getStats = async (req, res) => {
       conversionRate: parseFloat(conversionRate.toFixed(2)), 
       freeToProConversions, 
       churnRate: parseFloat(churnRate.toFixed(2)), 
-      growthRate: parseFloat(growthRate.toFixed(2)), 
+      growthRate: parseFloat(cappedGrowthRate.toFixed(2)), 
       engagementRate: parseFloat(engagementRate.toFixed(2)),
       totalReferrals, activeReferrals,
       geographicDistribution, topReferrers, ageDistribution
@@ -562,6 +582,8 @@ const getAllCalls = async (req, res) => {
       dateTo
     } = req.query;
 
+    console.log(`Admin getAllCalls called with query:`, req.query);
+
     let query = {};
 
     // Filter by status
@@ -578,17 +600,60 @@ const getAllCalls = async (req, res) => {
 
     const totalCalls = await Call.countDocuments(query);
     const calls = await Call.find(query)
-      .populate('caller', 'fname lname username email profilePicture')
-      .populate('recipient', 'fname lname username email profilePicture')
+      .populate({
+        path: 'caller',
+        select: 'fname lname username email profilePicture',
+        options: { strictPopulate: false }
+      })
+      .populate({
+        path: 'recipient', 
+        select: 'fname lname username email profilePicture',
+        options: { strictPopulate: false }
+      })
       .limit(parseInt(limit))
       .skip((page - 1) * parseInt(limit))
       .sort({ createdAt: -1 });
 
-    // If search is provided, filter populated results
-    let filteredCalls = calls;
+    console.log(`Found ${calls.length} calls matching the query`);
+
+    // Process calls to handle missing user references
+    const processedCalls = calls.map(call => {
+      const callObj = call.toObject();
+      
+      // Handle missing caller
+      if (!callObj.caller) {
+        console.log(`Call ${callObj._id} has missing caller with ID: ${callObj.caller}`);
+        callObj.caller = {
+          _id: callObj.caller,
+          fname: 'Deleted',
+          lname: 'User',
+          username: '@deleted',
+          email: 'deleted@user.com',
+          profilePicture: ''
+        };
+      }
+      
+      // Handle missing recipient
+      if (!callObj.recipient) {
+        console.log(`Call ${callObj._id} has missing recipient with ID: ${callObj.recipient}`);
+        callObj.recipient = {
+          _id: callObj.recipient,
+          fname: 'Deleted',
+          lname: 'User', 
+          username: '@deleted',
+          email: 'deleted@user.com',
+          profilePicture: ''
+        };
+      }
+      
+      return callObj;
+    });
+
+    // If search is provided, filter processed results
+    let filteredCalls = processedCalls;
     if (search) {
       const searchLower = search.toLowerCase();
-      filteredCalls = calls.filter(call => 
+      filteredCalls = processedCalls.filter(call => 
         call.caller?.fname?.toLowerCase().includes(searchLower) ||
         call.caller?.lname?.toLowerCase().includes(searchLower) ||
         call.caller?.username?.toLowerCase().includes(searchLower) ||
@@ -1086,6 +1151,11 @@ const getPaymentHistory = async (req, res) => {
       plan
     } = req.query;
 
+    console.log('Getting payment history with query:', req.query);
+
+    // Import Payment model
+    const Payment = require('../models/Payment');
+
     let query = {};
 
     // Filter by status
@@ -1105,18 +1175,47 @@ const getPaymentHistory = async (req, res) => {
       if (dateTo) query.createdAt.$lte = new Date(dateTo);
     }
 
+    console.log('Payment query:', query);
+
     const totalPayments = await Payment.countDocuments(query);
+    console.log('Total payments found:', totalPayments);
+
     const payments = await Payment.find(query)
-      .populate('user', 'fname lname username email')
+      .populate({
+        path: 'user',
+        select: 'fname lname username email',
+        options: { strictPopulate: false }
+      })
       .limit(parseInt(limit))
       .skip((page - 1) * parseInt(limit))
       .sort({ createdAt: -1 });
 
-    // If search is provided, filter populated results
-    let filteredPayments = payments;
+    console.log('Payments retrieved:', payments.length);
+
+    // Process payments to handle missing user references
+    const processedPayments = payments.map(payment => {
+      const paymentObj = payment.toObject();
+      
+      // Handle missing user
+      if (!paymentObj.user) {
+        console.log(`Payment ${paymentObj._id} has missing user with ID: ${paymentObj.user}`);
+        paymentObj.user = {
+          _id: paymentObj.user,
+          fname: 'Deleted',
+          lname: 'User',
+          username: '@deleted',
+          email: 'deleted@user.com'
+        };
+      }
+      
+      return paymentObj;
+    });
+
+    // If search is provided, filter processed results
+    let filteredPayments = processedPayments;
     if (search) {
       const searchLower = search.toLowerCase();
-      filteredPayments = payments.filter(payment => 
+      filteredPayments = processedPayments.filter(payment => 
         payment.user?.fname?.toLowerCase().includes(searchLower) ||
         payment.user?.lname?.toLowerCase().includes(searchLower) ||
         payment.user?.username?.toLowerCase().includes(searchLower) ||
@@ -1126,6 +1225,7 @@ const getPaymentHistory = async (req, res) => {
       );
     }
 
+    console.log('Filtered payment records:', JSON.stringify(filteredPayments, null, 2));
     res.json({
       payments: filteredPayments,
       pagination: {
@@ -1299,6 +1399,92 @@ const processRefund = async (req, res) => {
   }
 };
 
+// @desc    Send manual match suggestions to a premium user
+// @route   POST /api/admin/users/:id/send-suggestions
+// @access  Private/Admin
+const sendMatchSuggestions = async (req, res) => {
+  try {
+    const { id: userId } = req.params;
+    const { suggestedUserIds } = req.body;
+
+    if (!suggestedUserIds || !Array.isArray(suggestedUserIds) || suggestedUserIds.length === 0) {
+      return res.status(400).json({ message: 'Please provide an array of suggested user IDs' });
+    }
+
+    // Get the target user
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Check if user is premium
+    if (!['premium', 'pro'].includes(targetUser.plan)) {
+      return res.status(400).json({ message: 'User must be premium to receive match suggestions' });
+    }
+
+    // Get suggested users with details
+    const suggestedUsers = await User.find({
+      _id: { $in: suggestedUserIds },
+      status: 'active',
+      emailVerified: true
+    }).select('fname lname username email gender');
+
+    if (suggestedUsers.length === 0) {
+      return res.status(400).json({ message: 'No valid suggested users found' });
+    }
+
+    // Format match suggestions for email
+    const matchSuggestions = suggestedUsers.map(user => ({
+      name: `${user.fname} ${user.lname}`,
+      username: user.username,
+      email: user.email
+    }));
+
+    // Send email with match suggestions
+    const emailSubject = 'Your Curated Match Suggestions from Quluub';
+    const emailContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+        <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+          <h2 style="color: #2c5aa0; text-align: center; margin-bottom: 20px;">Assalamu Alaikum ${targetUser.fname}!</h2>
+          
+          <p style="color: #333; font-size: 16px; line-height: 1.6;">We hope this message finds you in good health and high spirits. Our team has carefully curated some special match suggestions just for you:</p>
+          
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="color: #2c5aa0; margin-bottom: 15px;">Your Curated Matches:</h3>
+            ${matchSuggestions.map(match => `
+              <div style="padding: 10px; border-bottom: 1px solid #e9ecef; margin-bottom: 10px;">
+                <strong style="color: #2c5aa0;">${match.name}</strong> (@${match.username})<br>
+                <span style="color: #6c757d; font-size: 14px;">Email: ${match.email}</span>
+              </div>
+            `).join('')}
+          </div>
+          
+          <p style="color: #333; font-size: 16px; line-height: 1.6;">These suggestions have been personally selected by our team based on compatibility factors. We encourage you to reach out and start meaningful conversations, insha'Allah.</p>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${process.env.FRONTEND_URL}/matches" style="background-color: #2c5aa0; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">View Your Matches</a>
+          </div>
+          
+          <p style="color: #666; font-size: 14px; text-align: center; margin-top: 30px;">May Allah bless your search for a righteous spouse.<br>Barakallahu feeki,<br><strong>The Quluub Team</strong></p>
+        </div>
+      </div>
+    `;
+
+    await sendEmail(targetUser.email, emailSubject, emailContent);
+
+    console.log(`Manual match suggestions sent to ${targetUser.username} (${targetUser.email})`);
+    
+    res.json({ 
+      message: 'Match suggestions sent successfully',
+      sentTo: targetUser.email,
+      suggestionsCount: suggestedUsers.length
+    });
+  } catch (error) {
+    console.error('Error sending manual match suggestions:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 module.exports = {
   getStats,
   getAllUsers,
@@ -1322,6 +1508,7 @@ module.exports = {
   getPaymentHistory,
   getPotentialMatches,
   processRefund,
+  sendMatchSuggestions,
   sendAdminPushNotification,
   getAdminPushNotifications,
 };

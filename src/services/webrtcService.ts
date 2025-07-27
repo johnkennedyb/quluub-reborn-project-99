@@ -9,6 +9,8 @@ export interface CallData {
   recipientName: string;
   recipientAvatar?: string;
   timestamp: string;
+  meetingUrl?: string;
+  joinLink?: string;
 }
 
 export interface WebRTCCallbacks {
@@ -120,15 +122,20 @@ class WebRTCService {
     this.socket.on('video-call-offer', async (data) => {
       console.log('📞 Received video call offer:', data);
       const userData = JSON.parse(localStorage.getItem('user') || '{}');
+      const callId = data.callId || Date.now().toString();
+      const meetingUrl = this.generateMeetingUrl(callId);
+      
       this.currentCallData = {
-        callId: Date.now().toString(),
+        callId,
         callerId: data.callerId,
         recipientId: userData._id,
         callerName: data.callerName,
         callerAvatar: data.callerAvatar,
         recipientName: `${userData.fname} ${userData.lname}`,
         recipientAvatar: userData.profilePicture,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        meetingUrl,
+        joinLink: meetingUrl
       };
       
       if (this.callbacks?.onIncomingCall) {
@@ -152,11 +159,25 @@ class WebRTCService {
     });
 
     // ICE candidate received
-    this.socket.on('ice-candidate', async (data) => {
-      console.log('Received ICE candidate:', data);
+    this.socket.on('ice-candidate', (data) => {
+      console.log('🧊 Received ICE candidate');
       if (this.peerConnection && data.candidate) {
-        await this.peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+        this.peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
       }
+    });
+
+    // Join link received
+    this.socket.on('join-link-received', (data) => {
+      console.log('🔗 Join link received:', data.meetingUrl);
+      if (this.currentCallData) {
+        this.currentCallData.meetingUrl = data.meetingUrl;
+        this.currentCallData.joinLink = data.meetingUrl;
+      }
+    });
+
+    // Join link sent confirmation
+    this.socket.on('join-link-sent', (data) => {
+      console.log('✅ Join link sent successfully to:', data.recipientId);
     });
 
     // Call rejected
@@ -432,6 +453,25 @@ class WebRTCService {
   }
 
 
+
+  // Generate meeting URL for the call
+  public generateMeetingUrl(callId: string): string {
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/video-call/${callId}`;
+  }
+
+  // Send join link to participant
+  public sendJoinLink(recipientId: string, meetingUrl: string): void {
+    if (this.socket && this.currentCallData) {
+      this.socket.emit('send-join-link', {
+        callId: this.currentCallData.callId,
+        recipientId,
+        meetingUrl,
+        senderName: this.currentCallData.callerName
+      });
+      console.log('📤 Join link sent to participant:', meetingUrl);
+    }
+  }
 
   // Get current call data
   public getCurrentCallData(): CallData | null {

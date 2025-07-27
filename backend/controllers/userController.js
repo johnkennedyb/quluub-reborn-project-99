@@ -70,6 +70,8 @@ exports.getUserProfile = async (req, res) => {
       selectFields += ' -email -phoneNumber -parentEmail -waliDetails -favorites -blockedUsers -reportedUsers';
     }
     
+    // Note: summary field will be included by default since we're only excluding specific fields
+    
     // Determine if userId is a valid ObjectId or a username
     let user;
     if (mongoose.Types.ObjectId.isValid(userId)) {
@@ -291,6 +293,54 @@ exports.getBrowseUsers = async (req, res) => {
     
     if (req.query.genotype) {
       filters.genotype = req.query.genotype;
+    }
+    
+    if (req.query.maritalStatus) {
+      filters.maritalStatus = req.query.maritalStatus;
+    }
+    
+    if (req.query.patternOfSalaah) {
+      filters.patternOfSalaah = req.query.patternOfSalaah;
+    }
+    
+    // Age range filter
+    if (req.query.minAge || req.query.maxAge) {
+      const now = new Date();
+      const ageFilter = {};
+      
+      if (req.query.maxAge) {
+        const minBirthDate = new Date(now.getFullYear() - parseInt(req.query.maxAge) - 1, now.getMonth(), now.getDate());
+        ageFilter.$gte = minBirthDate;
+      }
+      
+      if (req.query.minAge) {
+        const maxBirthDate = new Date(now.getFullYear() - parseInt(req.query.minAge), now.getMonth(), now.getDate());
+        ageFilter.$lte = maxBirthDate;
+      }
+      
+      if (Object.keys(ageFilter).length > 0) {
+        filters.dob = ageFilter;
+      }
+    }
+    
+    // Height range filter (assuming height is stored as number in inches)
+    if (req.query.minHeight || req.query.maxHeight) {
+      const heightFilter = {};
+      if (req.query.minHeight) heightFilter.$gte = parseInt(req.query.minHeight);
+      if (req.query.maxHeight) heightFilter.$lte = parseInt(req.query.maxHeight);
+      if (Object.keys(heightFilter).length > 0) {
+        filters.height = heightFilter;
+      }
+    }
+    
+    // Weight range filter (assuming weight is stored as number in kg/lbs)
+    if (req.query.minWeight || req.query.maxWeight) {
+      const weightFilter = {};
+      if (req.query.minWeight) weightFilter.$gte = parseInt(req.query.minWeight);
+      if (req.query.maxWeight) weightFilter.$lte = parseInt(req.query.maxWeight);
+      if (Object.keys(weightFilter).length > 0) {
+        filters.weight = weightFilter;
+      }
     }
     
     console.log("Applying filters:", filters);
@@ -629,12 +679,31 @@ exports.logProfileView = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     
-    // Log the profile view activity
-    await UserActivityLog.create({
+    // Check if this viewer has already viewed this profile recently (within last hour)
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const existingView = await UserActivityLog.findOne({
       userId: viewerId,
       receiverId: userId,
       action: 'PROFILE_VIEW',
+      createdAt: { $gte: oneHourAgo }
     });
+    
+    // Only log and increment if no recent view exists
+    if (!existingView) {
+      // Log the profile view activity
+      await UserActivityLog.create({
+        userId: viewerId,
+        receiverId: userId,
+        action: 'PROFILE_VIEW',
+      });
+      
+      // Increment the profile views count on the target user
+      await User.findByIdAndUpdate(userId, {
+        $inc: { profileViews: 1 }
+      });
+      
+      console.log(`Profile view logged: ${viewerId} viewed ${userId}`);
+    }
     
     res.status(200).json({ message: 'Profile view logged successfully' });
   } catch (error) {

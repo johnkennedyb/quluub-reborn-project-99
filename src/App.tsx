@@ -177,7 +177,7 @@ function App() {
 
   return (
     <VideoCallProvider>
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen w-full bg-background overflow-auto">
         <Routes>
         {/* Public routes */}
         <Route path="/" element={<Index />} />

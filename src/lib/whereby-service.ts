@@ -65,7 +65,7 @@ export const wherebyService = {
         endDate: roomData.endDate
       };
 
-      await apiClient.post(`/chats/send-invitation/${conversationId}`, invitationData);
+      await apiClient.post(`/send-invitation/${conversationId}`, invitationData);
     } catch (error) {
       console.error('Error sending video call invitation:', error);
       throw error;

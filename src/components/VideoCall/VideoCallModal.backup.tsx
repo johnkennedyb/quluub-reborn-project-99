@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { X, Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Monitor, Circle, Users, Shield, Clock, Copy, ExternalLink, Maximize2, Minimize2 } from 'lucide-react';
+import { X, Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Monitor, Circle, Users, Shield, Clock, Copy, ExternalLink } from 'lucide-react';
 import { webrtcService, CallData } from '../../services/webrtcService';
 import { useVideoCall } from '../../contexts/VideoCallContext';
 import { toast } from 'react-hot-toast';
@@ -92,7 +92,7 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
     let interval: NodeJS.Timeout;
     if (callStatus === 'connected') {
       interval = setInterval(() => {
-        // Timer is handled by context
+        setCallDuration(prev => prev + 1);
       }, 1000);
     }
     return () => clearInterval(interval);
@@ -171,7 +171,7 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className={`relative bg-white rounded-2xl overflow-hidden shadow-2xl border border-gray-200 transition-all duration-300 ${
+      <div className={`relative bg-white rounded-2xl overflow-hidden shadow-2xl border border-gray-200 ${
         isFullscreen ? 'w-full h-full' : 'w-full max-w-6xl h-[700px]'
       }`}>
         
@@ -181,7 +181,7 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
             {/* Call Info */}
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-lg shadow-lg">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-lg">
                   {callData.recipientName?.charAt(0) || callData.callerName?.charAt(0) || 'U'}
                 </div>
                 <div>
@@ -202,14 +202,14 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
               </div>
               
               {/* Professional Features Badge */}
-              <div className="flex items-center space-x-2 px-3 py-1.5 bg-blue-50 rounded-full border border-blue-100">
+              <div className="flex items-center space-x-2 px-3 py-1.5 bg-blue-50 rounded-full">
                 <Shield className="w-4 h-4 text-blue-600" />
                 <span className="text-sm font-medium text-blue-700">Professional Call</span>
               </div>
               
               {/* Recording Indicator */}
               {isRecording && (
-                <div className="flex items-center space-x-2 px-3 py-1.5 bg-red-50 rounded-full border border-red-100">
+                <div className="flex items-center space-x-2 px-3 py-1.5 bg-red-50 rounded-full">
                   <Circle className="w-3 h-3 fill-red-500 text-red-500 animate-pulse" />
                   <span className="text-sm font-medium text-red-700">Recording</span>
                 </div>
@@ -223,14 +223,14 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={copyJoinLink}
-                    className="flex items-center space-x-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-sm font-medium text-gray-700 border border-gray-200"
+                    className="flex items-center space-x-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-sm font-medium text-gray-700"
                   >
                     <Copy className="w-4 h-4" />
                     <span>Copy Link</span>
                   </button>
                   <button
                     onClick={openJoinLink}
-                    className="flex items-center space-x-2 px-3 py-2 bg-blue-100 hover:bg-blue-200 rounded-lg transition-colors text-sm font-medium text-blue-700 border border-blue-200"
+                    className="flex items-center space-x-2 px-3 py-2 bg-blue-100 hover:bg-blue-200 rounded-lg transition-colors text-sm font-medium text-blue-700"
                   >
                     <ExternalLink className="w-4 h-4" />
                     <span>Open</span>
@@ -242,16 +242,57 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
               <button
                 onClick={toggleFullscreen}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-800"
-                title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
               >
-                {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+                <Monitor className="w-5 h-5" />
               </button>
               
               {/* Close Button */}
               <button
                 onClick={onClose}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-gray-800"
-                title="Close Call"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+          <div className="flex items-center justify-between text-white">
+            <div className="flex items-center space-x-3">
+              {callData.callerAvatar || callData.recipientAvatar ? (
+                <img
+                  src={isIncoming ? callData.callerAvatar : callData.recipientAvatar}
+                  alt="Profile"
+                  className="w-10 h-10 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center">
+                  <span className="text-sm font-medium">
+                    {(isIncoming ? callData.callerName : callData.recipientName)?.charAt(0)}
+                  </span>
+                </div>
+              )}
+              <div>
+                <h3 className="font-semibold">
+                  {isIncoming ? callData.callerName : callData.recipientName}
+                </h3>
+                <p className="text-sm text-gray-300">
+                  {callStatus === 'connecting' && (isIncoming ? 'Incoming call...' : 'Calling...')}
+                  {callStatus === 'connected' && formatDuration(callDuration)}
+                  {callStatus === 'ended' && 'Call ended'}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={toggleFullscreen}
+                className="p-2 rounded-full bg-black/30 hover:bg-black/50 transition-colors"
+              >
+                <Monitor className="w-5 h-5" />
+              </button>
+              <button
+                onClick={onClose}
+                className="p-2 rounded-full bg-black/30 hover:bg-black/50 transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -259,8 +300,8 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
           </div>
         </div>
 
-        {/* Video Area */}
-        <div className="relative w-full h-full bg-gradient-to-br from-gray-900 via-gray-800 to-black">
+        {/* Video Container */}
+        <div className="relative w-full h-full">
           {/* Remote Video (Main) */}
           <video
             ref={remoteVideoRef}
@@ -269,35 +310,50 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
             className="w-full h-full object-cover"
           />
           
-          {/* No Remote Video Placeholder */}
+          {/* Remote Video Placeholder */}
           {callStatus !== 'connected' && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
-              <div className="w-32 h-32 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-4xl font-bold mb-6 shadow-2xl">
-                {callData.recipientName?.charAt(0) || callData.callerName?.charAt(0) || 'U'}
-              </div>
-              <h2 className="text-2xl font-semibold mb-2">
-                {isIncoming ? callData.callerName : callData.recipientName}
-              </h2>
-              <p className="text-gray-300 text-lg">
-                {callStatus === 'connecting' && (isIncoming ? 'Incoming call...' : 'Calling...')}
-                {callStatus === 'ended' && 'Call ended'}
-              </p>
-              
-              {/* Islamic Compliance Notice */}
-              <div className="mt-8 text-center max-w-md">
-                <div className="flex items-center justify-center space-x-2 mb-2">
-                  <Users className="w-5 h-5 text-blue-400" />
-                  <span className="text-blue-400 font-medium">Islamic Compliance</span>
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
+              <div className="text-center text-white">
+                {callData.callerAvatar || callData.recipientAvatar ? (
+                  <img
+                    src={isIncoming ? callData.callerAvatar : callData.recipientAvatar}
+                    alt="Profile"
+                    className="w-32 h-32 rounded-full object-cover mx-auto mb-4"
+                  />
+                ) : (
+                  <div className="w-32 h-32 rounded-full bg-gray-600 flex items-center justify-center mx-auto mb-4">
+                    <span className="text-4xl font-medium">
+                      {(isIncoming ? callData.callerName : callData.recipientName)?.charAt(0)}
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center space-x-4 text-white">
+                  {/* Recording Status */}
+                  {isRecording && (
+                    <div className="flex items-center space-x-2">
+                      <Circle className="w-3 h-3 fill-red-500 text-red-500 animate-pulse" />
+                      <span className="text-sm font-medium">REC</span>
+                    </div>
+                  )}
+                  
+                  {/* Call Status */}
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-2 h-2 rounded-full animate-pulse ${
+                      connectionStatus === 'connected' ? 'bg-green-500' : 
+                      connectionStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
+                    }`}></div>
+                    <span className="text-sm">
+                      {connectionStatus === 'connecting' ? 'Connecting...' : 
+                       connectionStatus === 'connected' ? formatDuration(callDuration) : 'Call Ended'}
+                    </span>
+                  </div>
                 </div>
-                <p className="text-sm text-gray-400 leading-relaxed">
-                  All video calls are automatically recorded and reported to Wali for supervision and Islamic compliance
-                </p>
               </div>
             </div>
           )}
 
           {/* Local Video (Picture-in-Picture) */}
-          <div className="absolute top-24 right-6 w-48 h-36 bg-gray-800 rounded-xl overflow-hidden shadow-2xl border-2 border-white/20">
+          <div className="absolute top-20 right-4 w-48 h-36 bg-gray-800 rounded-lg overflow-hidden shadow-lg">
             <video
               ref={localVideoRef}
               autoPlay
@@ -310,16 +366,11 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
                 <VideoOff className="w-8 h-8 text-gray-400" />
               </div>
             )}
-            
-            {/* Local Video Label */}
-            <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/50 rounded text-xs text-white font-medium">
-              You
-            </div>
           </div>
         </div>
 
         {/* Controls */}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white/95 to-transparent p-6 border-t border-gray-100">
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-6">
           <div className="flex items-center justify-center space-x-4">
             
             {/* Incoming Call Controls */}
@@ -327,15 +378,13 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
               <>
                 <button
                   onClick={handleReject}
-                  className="p-4 rounded-full bg-red-500 hover:bg-red-600 transition-all duration-200 text-white shadow-lg hover:shadow-xl transform hover:scale-105"
-                  title="Reject Call"
+                  className="p-4 rounded-full bg-red-500 hover:bg-red-600 transition-colors text-white"
                 >
                   <PhoneOff className="w-6 h-6" />
                 </button>
                 <button
                   onClick={handleAccept}
-                  className="p-4 rounded-full bg-green-500 hover:bg-green-600 transition-all duration-200 text-white shadow-lg hover:shadow-xl transform hover:scale-105"
-                  title="Accept Call"
+                  className="p-4 rounded-full bg-green-500 hover:bg-green-600 transition-colors text-white"
                 >
                   <Phone className="w-6 h-6" />
                 </button>
@@ -347,50 +396,35 @@ const VideoCallModal: React.FC<VideoCallModalProps> = ({
               <>
                 <button
                   onClick={toggleAudio}
-                  className={`p-3 rounded-full transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 ${
+                  className={`p-3 rounded-full transition-colors ${
                     isAudioEnabled 
-                      ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200' 
+                      ? 'bg-gray-700 hover:bg-gray-600 text-white' 
                       : 'bg-red-500 hover:bg-red-600 text-white'
                   }`}
-                  title={isAudioEnabled ? "Mute Audio" : "Unmute Audio"}
                 >
                   {isAudioEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
                 </button>
                 
                 <button
                   onClick={toggleVideo}
-                  className={`p-3 rounded-full transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 ${
+                  className={`p-3 rounded-full transition-colors ${
                     isVideoEnabled 
-                      ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200' 
+                      ? 'bg-gray-700 hover:bg-gray-600 text-white' 
                       : 'bg-red-500 hover:bg-red-600 text-white'
                   }`}
-                  title={isVideoEnabled ? "Turn Off Video" : "Turn On Video"}
                 >
                   {isVideoEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
                 </button>
 
                 <button
                   onClick={callStatus === 'connecting' && !isIncoming ? handleCancelCall : handleEndCall}
-                  className="p-4 rounded-full bg-red-500 hover:bg-red-600 transition-all duration-200 text-white shadow-lg hover:shadow-xl transform hover:scale-105"
-                  title="End Call"
+                  className="p-4 rounded-full bg-red-500 hover:bg-red-600 transition-colors text-white"
                 >
                   <PhoneOff className="w-6 h-6" />
                 </button>
               </>
             )}
           </div>
-          
-          {/* Call Duration Display */}
-          {callStatus === 'connected' && (
-            <div className="flex items-center justify-center mt-4">
-              <div className="flex items-center space-x-2 px-4 py-2 bg-green-50 rounded-full border border-green-200">
-                <Clock className="w-4 h-4 text-green-600" />
-                <span className="text-sm font-medium text-green-700">
-                  {formatDuration(callDuration)}
-                </span>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

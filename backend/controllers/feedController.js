@@ -9,6 +9,8 @@ const UserActivityLog = require('../models/UserActivityLog');
 exports.getFeed = async (req, res) => {
   try {
     const userId = req.user._id.toString();
+    const { page = 1, limit = 10 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
     const feedItems = [];
 
     // Get recent connection requests received
@@ -140,10 +142,21 @@ exports.getFeed = async (req, res) => {
     // Sort all feed items by timestamp (most recent first)
     feedItems.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-    // Limit to 50 most recent items
-    const limitedFeed = feedItems.slice(0, 50);
+    // Apply pagination
+    const totalItems = feedItems.length;
+    const paginatedFeed = feedItems.slice(skip, skip + parseInt(limit));
+    const hasMore = skip + parseInt(limit) < totalItems;
 
-    res.json({ feed: limitedFeed });
+    res.json({ 
+      feed: paginatedFeed,
+      pagination: {
+        currentPage: parseInt(page),
+        totalItems,
+        itemsPerPage: parseInt(limit),
+        hasMore,
+        totalPages: Math.ceil(totalItems / parseInt(limit))
+      }
+    });
   } catch (error) {
     console.error('Get feed error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
