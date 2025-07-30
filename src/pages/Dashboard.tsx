@@ -238,15 +238,9 @@ const Dashboard = () => {
   return (
     <div className="min-h-screen bg-background">
       <TopNavbar />
-      <div className="container mx-auto px-4 py-6 pb-20">
+      <div className="container mx-auto px-4 py-6" style={{paddingBottom: '200px'}}>
         {/* Email validation alert */}
-        {showValidationAlert && (
-          <Alert className="mb-6 border-yellow-200 bg-yellow-50">
-            <AlertDescription className="text-yellow-800">
-              Please verify your email address to access all features.
-            </AlertDescription>
-          </Alert>
-        )}
+        
 
         {/* Task #11: Show first name at top of page */}
         {user?.fname && (

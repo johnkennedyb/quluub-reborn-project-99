@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
+import { Loader2 } from 'lucide-react';
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AdminAuthProvider } from "@/contexts/AdminAuthContext";
 import { VideoCallProvider } from "@/contexts/VideoCallContext";
@@ -39,10 +40,12 @@ import ValidateEmail from "@/pages/ValidateEmail";
 import ResetPassword from "@/pages/ResetPassword";
 import NotFound from "@/pages/NotFound";
 import Alerts from "@/pages/Alerts";
+import PaymentSuccess from "@/pages/PaymentSuccess";
 import UserProfilePage from "@/pages/admin/UserProfilePage";
 
 // Socket
-import { io, Socket } from "socket.io-client";
+import socket from "@/lib/socket";
+import { Socket } from "socket.io-client";
 
 
 
@@ -51,8 +54,8 @@ export const queryClient = new QueryClient();
 
 function App() {
   const navigate = useNavigate();
-    const { user } = useAuth();
-  const [socket, setSocket] = useState<Socket | null>(null);
+    const { user, isLoading } = useAuth();
+  const [socketConnected, setSocketConnected] = useState(false);
   const [incomingCall, setIncomingCall] = useState<{
     callerName: string;
     callerImage?: string;
@@ -62,63 +65,91 @@ function App() {
   // Setup socket connection when user is authenticated
   useEffect(() => {
     if (!user?._id) {
-      if (socket) {
+      if (socket.connected) {
         console.log('Disconnecting socket - no user');
         socket.disconnect();
-        setSocket(null);
+        setSocketConnected(false);
       }
       return;
     }
 
     console.log('Setting up socket connection for user:', user._id);
 
-        const socketUrl = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace('/api', '');
-
-    const newSocket = io(socketUrl, {
-      query: { userId: user._id },
-      transports: ["websocket"],
-      withCredentials: true,
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionAttempts: 5,
-    });
-
-    setSocket(newSocket);
+    // Update socket query and connect
+    socket.io.opts.query = { userId: user._id };
+    if (!socket.connected) {
+      socket.connect();
+    }
 
     // Connection event handlers
-    newSocket.on('connect', () => {
-      console.log('Socket connected:', newSocket.id);
-      console.log('User ID set to:', user._id);
+    socket.on('connect', () => {
+      console.log('🔗 Socket connected:', socket.id);
+      console.log('👤 User ID set to:', user._id);
+      setSocketConnected(true);
       
       // Join notifications room
-      newSocket.emit('joinNotifications', user._id);
+      socket.emit('joinNotifications', user._id);
+      console.log('🔔 Joined notifications room for userId:', user._id);
+      
+      // CRITICAL: Join main room for video call notifications
+      socket.emit('join', user._id);
+      console.log('🏠 Joined main room for video calls with userId:', user._id);
     });
 
-    newSocket.on('disconnect', (reason) => {
+    socket.on('disconnect', (reason) => {
       console.log('Socket disconnected:', reason);
+      setSocketConnected(false);
     });
 
-    newSocket.on('connect_error', (error) => {
-      console.error('Socket connection error:', error);
+    socket.on('connect_error', (error: any) => {
+      console.error('❌ Socket connection error:', error);
+      console.error('❌ Error type:', error.type || 'unknown');
+      console.error('❌ Error message:', error.message || 'no message');
+      console.error('❌ Error description:', error.description || 'no description');
+      setSocketConnected(false);
     });
 
-    newSocket.on('reconnect', (attemptNumber) => {
+    socket.on('reconnect', (attemptNumber) => {
       console.log('Socket reconnected after', attemptNumber, 'attempts');
+      setSocketConnected(true);
       // Re-join notifications room after reconnection
-      newSocket.emit('joinNotifications', user._id);
+      socket.emit('joinNotifications', user._id);
+      
+      // CRITICAL: Re-join main room for video call notifications
+      socket.emit('join', user._id);
+      console.log('🏠 Re-joined main room for video calls with userId:', user._id);
     });
 
     // Debug ping to test connection
-    newSocket.emit('debug-ping', { userId: user._id, timestamp: Date.now() });
+    socket.emit('debug-ping', { userId: user._id, timestamp: Date.now() });
 
     // Handle debug responses
-    newSocket.on('debug-pong', (data) => {
-      console.log('Debug pong received:', data);
+    socket.on('debug-pong', (data) => {
+      console.log('🏓 Debug pong received:', data);
+    });
+    
+    // GLOBAL VIDEO CALL LISTENERS (for debugging)
+    socket.on('video-call-invitation', (data) => {
+      console.log('🎯 GLOBAL: Video call invitation received in App.tsx:', data);
+      console.log('🎯 GLOBAL: Current user:', user._id);
+      console.log('🎯 GLOBAL: Target recipient:', data.recipientId);
+    });
+    
+    socket.on('new_message', (message) => {
+      if (message.messageType === 'video_call_invitation') {
+        console.log('🎯 GLOBAL: Video call invitation via new_message in App.tsx:', message);
+        console.log('🎯 GLOBAL: Current user:', user._id);
+        console.log('🎯 GLOBAL: Target recipient:', message.recipientId);
+      }
+    });
+    
+    socket.on('video-call-failed', (data) => {
+      console.log('🎯 GLOBAL: Video call failed event received:', data);
     });
 
     // Handle incoming video call notifications (multiple methods)
-    newSocket.on('newNotification', (data) => {
-      console.log('Received notification:', data);
+    socket.on('newNotification', (data) => {
+      console.log('🔔 Received notification:', data);
       if (data.type === 'video_call') {
         console.log('Video call notification received');
         setIncomingCall({
@@ -130,7 +161,7 @@ function App() {
     });
 
     // Direct video call events
-    newSocket.on('video-call-incoming', ({ from, roomId, callerImage }) => {
+    socket.on('video-call-incoming', ({ from, roomId, callerImage }) => {
       console.log('Direct video call notification from:', from, 'Room:', roomId);
       setIncomingCall({
         callerName: from || 'Someone',
@@ -140,7 +171,7 @@ function App() {
     });
 
     // Broadcast notifications (fallback method)
-    newSocket.on('video-call-notification-broadcast', ({ targetUserId, from, roomId, callerImage }) => {
+    socket.on('video-call-notification-broadcast', ({ targetUserId, from, roomId, callerImage }) => {
       console.log('Broadcast video call notification - Target:', targetUserId, 'From:', from);
       if (targetUserId === user._id) {
         console.log('This broadcast notification is for me!');
@@ -153,8 +184,15 @@ function App() {
     });
 
     return () => {
-      console.log('Cleaning up socket connection');
-      newSocket.disconnect();
+      console.log('Cleaning up socket event listeners');
+      socket.off('connect');
+      socket.off('disconnect');
+      socket.off('connect_error');
+      socket.off('reconnect');
+      socket.off('debug-pong');
+      socket.off('newNotification');
+      socket.off('video-call-incoming');
+      socket.off('video-call-notification-broadcast');
     };
   }, [user]);
 
@@ -174,6 +212,14 @@ function App() {
     }
     setIncomingCall(null);
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <VideoCallProvider>
@@ -201,6 +247,7 @@ function App() {
         <Route path="/profile" element={<PrivateRoute element={<Profile />} />} />
         <Route path="/profile/:userId" element={<PrivateRoute element={<Profile />} />} />
         <Route path="/settings" element={<PrivateRoute element={<Settings />} />} />
+        <Route path="/payment-success" element={<PrivateRoute element={<PaymentSuccess />} />} />
         <Route path="/notifications" element={<PrivateRoute element={<Notifications />} />} />
         <Route path="/alerts" element={<PrivateRoute element={<Alerts />} />} />
 

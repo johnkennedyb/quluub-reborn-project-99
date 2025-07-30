@@ -221,16 +221,22 @@ const createPaystackPayment = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    // Generate a unique reference for this transaction
+    const reference = `quluub_${userId}_${Date.now()}`;
+    
     const paystackResponse = await axios.post(
       'https://api.paystack.co/transaction/initialize',
       {
         email: user.email,
         amount: amount,
-        callback_url: `${process.env.CLIENT_URL}/settings?payment_success=true&provider=paystack`,
+        reference: reference,
+        callback_url: `${process.env.CLIENT_URL}/payment-success?payment_success=true&provider=paystack&trxref=${reference}`,
         metadata: {
           user_id: userId,
           plan: plan,
+          cancel_action: `${process.env.CLIENT_URL}/settings?payment_canceled=true`
         },
+        channels: ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'],
       },
       {
         headers: {

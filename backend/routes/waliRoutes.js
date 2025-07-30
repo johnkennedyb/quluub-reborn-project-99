@@ -9,6 +9,9 @@ const router = express.Router();
 // Video call notification to Wali
 router.post('/video-call-notification', protect, sendVideoCallNotificationToWali);
 
+// Video call start notification (alias for compatibility)
+router.post('/video-call-start', protect, sendVideoCallNotificationToWali);
+
 // Message notification to Wali
 router.post('/message', protect, sendMessageToWali);
 

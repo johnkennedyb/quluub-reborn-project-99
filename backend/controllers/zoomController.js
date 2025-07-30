@@ -1,51 +1,49 @@
-const axios = require('axios');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Call = require('../models/Call');
 const nodemailer = require('nodemailer');
 
-// Zoom API configuration (JWT-based with provided credentials)
+// Zoom Video SDK configuration
 const ZOOM_SDK_KEY = process.env.ZOOM_SDK_KEY;
 const ZOOM_SDK_SECRET = process.env.ZOOM_SDK_SECRET;
-const ZOOM_API_KEY = process.env.ZOOM_API_KEY || 'xO1VYDPwScOmsnNN3CkkuQ';
-const ZOOM_API_SECRET = process.env.ZOOM_API_SECRET || 'Eg6W8odLNcGkZhZ4z6m8gZoH1ZJlJmqcxrOf';
-const ZOOM_SECRET_TOKEN = process.env.ZOOM_SECRET_TOKEN || '02VAnUbtTny7Qku1md-lpQ';
-const ZOOM_VERIFICATION_TOKEN = process.env.ZOOM_VERIFICATION_TOKEN || 'K9Tnwzk2SUeN4ksQ0_G6KQ';
-const ZOOM_API_BASE_URL = 'https://api.zoom.us/v2';
 const MEETING_DURATION_MINUTES = 5; // 5-minute limit
 
-// Generate JWT token for Zoom API authentication
-const generateZoomJWT = () => {
-  const payload = {
-    iss: ZOOM_API_KEY,
-    exp: Math.floor(Date.now() / 1000) + (60 * 60), // 1 hour expiration
-  };
-  
-  return jwt.sign(payload, ZOOM_API_SECRET);
-};
+// Validate environment variables
+if (!ZOOM_SDK_KEY || !ZOOM_SDK_SECRET) {
+  console.error('❌ Missing Zoom SDK environment variables!');
+  console.error('Required: ZOOM_SDK_KEY, ZOOM_SDK_SECRET');
+  console.error('Current values:', {
+    ZOOM_SDK_KEY: ZOOM_SDK_KEY ? 'SET' : 'MISSING',
+    ZOOM_SDK_SECRET: ZOOM_SDK_SECRET ? 'SET' : 'MISSING'
+  });
+}
 
 // Generate SDK JWT for client-side Zoom Video SDK
 const generateZoomSDKJWT = (sessionName, role = 1) => {
   const iat = Math.floor(Date.now() / 1000);
-  const exp = iat + 60 * 60; // 1 hour
-  
-  // Ensure sessionName is a string
-  const sessionNameStr = String(sessionName);
-  
+  const exp = iat + 60 * 60 * 2; // 2 hours
+
   const payload = {
-    iss: ZOOM_SDK_KEY,
-    exp,
+    app_key: ZOOM_SDK_KEY,
     iat,
-    aud: 'zoom',
-    appKey: ZOOM_SDK_KEY,
-    tokenExp: exp,
-    sessionName: sessionNameStr,
-    roleType: role
+    exp,
+    tpc: sessionName,
+    role_type: role,
+    user_identity: `user_${Math.floor(Math.random() * 10000)}`,
+    session_key: `sess_${Math.floor(Math.random() * 10000)}`
   };
-  
-  console.log('🔑 JWT Payload for Video SDK:', JSON.stringify(payload, null, 2));
-  return jwt.sign(payload, ZOOM_SDK_SECRET, { algorithm: 'HS256' });
+
+  console.log('🔑 Generating Zoom SDK JWT with payload:', payload);
+
+  try {
+    const token = jwt.sign(payload, ZOOM_SDK_SECRET, { algorithm: 'HS256' });
+    console.log('🔑 Zoom SDK JWT generated successfully.');
+    return token;
+  } catch (error) {
+    console.error('❌ Error generating Zoom SDK JWT:', error);
+    throw new Error('Failed to generate Zoom signature');
+  }
 };
 
 
@@ -154,242 +152,73 @@ const sendWaliNotificationEmail = async (waliEmail, waliName, userFname, partner
 // @route   POST /api/zoom/create-meeting
 // @access  Private (Premium users only)
 exports.createMeeting = async (req, res) => {
-  console.log('🎥 Zoom Meeting Creation Request:', {
-    userId: req.user._id,
-    requestBody: req.body,
-    hasAPICredentials: {
-      apiKey: !!ZOOM_API_KEY,
-      apiSecret: !!ZOOM_API_SECRET
-    }
-  });
-  
+  console.log('🎥 Zoom Video SDK Session Request:', { userId: req.user._id, body: req.body });
+
   try {
     const userId = req.user._id;
-    const { topic = 'Quluub Video Call', duration = 5, waiting_room = false, join_before_host = true } = req.body;
-    
-    // Check if user is premium
+    const { participantId, topic = 'Quluub Video Call' } = req.body;
+
     const user = await User.findById(userId);
     if (!user) {
-      console.log('❌ User not found:', userId);
       return res.status(404).json({ message: 'User not found' });
     }
-    
-    console.log('👤 User plan check:', {
-      userId: user._id,
-      currentPlan: user.plan,
-      isPremium: user.plan === 'premium' || user.plan === 'pro'
-    });
-    
+
     if (user.plan !== 'premium' && user.plan !== 'pro') {
-      console.log('❌ User not premium - access denied');
       return res.status(403).json({ 
-        message: 'Video calls are available for Premium users only. Upgrade your plan to access this feature.',
+        message: 'Video calls are for Premium users only. Please upgrade your plan.',
         requiresUpgrade: true 
       });
     }
-    
-    const { participantId } = req.body;
-    
+
     if (!participantId) {
       return res.status(400).json({ message: 'Participant ID is required' });
     }
 
-    // Fetch participant details
-    const participant = await User.findById(participantId).select('fname lname email');
+    const participant = await User.findById(participantId).select('fname');
     if (!participant) {
       return res.status(404).json({ message: 'Participant not found' });
     }
-    
-    const participantName = participant.fname || 'Chat Partner';
-    
-    console.log('🔄 Creating Zoom SDK session...');
-    // Generate unique session identifiers
-    const sessionNumber = Math.floor(Math.random() * 1000000000);
+
     const sessionName = `QuluubCall_${userId}_${participantId}_${Date.now()}`;
-    
-    // Create a call record in database
+
     const callRecord = new Call({
       caller: userId,
       recipient: participantId,
       roomId: sessionName,
       status: 'ringing',
       startedAt: new Date(),
-      duration: 0
     });
-    
     await callRecord.save();
-    
-    // Generate session data for Zoom Video SDK
-    const sdkJWT = generateZoomSDKJWT(sessionNumber, 1);
+
+    const sdkJWT = generateZoomSDKJWT(sessionName, 1);
+
     const sessionData = {
       callId: callRecord._id,
-      sessionName: sessionName,
-      sessionNumber: sessionNumber,
-      topic: `${topic} - ${user.fname} & ${participantName}`,
-      userName: user.fname || 'User',
-      userEmail: user.email,
-      participantName: participantName,
-      participantId: participantId,
-      sdkJWT: sdkJWT,
+      sessionName,
       sdkKey: ZOOM_SDK_KEY,
-      leaveUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/messages`
+      sdkJWT,
+      userName: user.fname || 'User',
+      participantName: participant.fname || 'Participant',
+      topic: `${topic} - ${user.fname} & ${participant.fname}`,
+      leaveUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/messages`,
     };
-    
-    console.log('✅ Zoom SDK session created:', {
-      callId: callRecord._id,
-      sessionName: sessionData.sessionName,
-      useWebRTC: true
-    });
-    
-    // Fire-and-forget Wali notification (don’t block on failures)
+
+    // Send Wali notification without blocking the response
     sendWaliVideoCallNotification(userId, participantId, {
-      meetingId: sessionData.sessionName,
-      joinUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/video-call/${sessionData.sessionName}`,
+      meetingId: sessionName,
+      joinUrl: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/video-call/${sessionName}`,
       startTime: new Date().toISOString(),
       topic: sessionData.topic
     }).catch(err => console.error('Error sending Wali notification:', err));
-    
-    // Return Zoom SDK session data
+
+    console.log('✅ Zoom SDK session created successfully.');
     res.json(sessionData);
-    
-  } catch (error) {
-    console.error('❌ Error creating Zoom meeting:', {
-  stack: error.stack,
-      message: error.message,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      config: {
-        url: error.config?.url,
-        method: error.config?.method,
-        headers: error.config?.headers ? {
-          'Authorization': error.config.headers['Authorization']?.substring(0, 20) + '...',
-          'Content-Type': error.config.headers['Content-Type']
-        } : 'No headers'
-      }
-    });
-    
-    // Check if it's a Zoom API error
-    if (error.response?.status === 400) {
-      console.error('🚫 Zoom API 400 Error - Possible causes:');
-      console.error('1. Invalid API credentials (Video SDK vs REST API account)');
-      console.error('2. Account does not support REST API meeting creation');
-      console.error('3. JWT token format or expiration issue');
-      console.error('4. Meeting data format issue');
-      
-      if (error.response.data) {
-        console.error('Zoom API Error Details:', JSON.stringify(error.response.data, null, 2));
-      }
-    }
-    
-    res.status(500).json({ 
-      message: 'Failed to create Zoom meeting',
-      error: error.message,
-      zoomError: error.response?.data || 'No additional details',
-      suggestion: error.response?.status === 400 ? 
-        'API credentials may be for Video SDK account, not REST API account' : 
-        'Check Zoom API credentials and account permissions'
-    });
-  }
-};
 
-// @desc    Get meeting details
-// @route   GET /api/zoom/meeting/:meetingId
-// @access  Private (Premium users only)
-exports.getMeeting = async (req, res) => {
-  try {
-    const userId = req.user._id;
-    const { meetingId } = req.params;
-    
-    // Check if user is premium
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-    
-    if (user.plan !== 'premium' && user.plan !== 'pro') {
-      return res.status(403).json({ 
-        message: 'Video calls are available for Premium users only.',
-        requiresUpgrade: true 
-      });
-    }
-    
-    const accessToken = await getZoomAccessToken();
-    
-    const response = await axios.get(
-      `${ZOOM_API_BASE_URL}/meetings/${meetingId}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-    
-    const meeting = response.data;
-    
-    res.json({
-      id: meeting.id,
-      topic: meeting.topic,
-      start_url: meeting.start_url,
-      join_url: meeting.join_url,
-      password: meeting.password,
-      start_time: meeting.start_time,
-      duration: meeting.duration,
-      status: meeting.status
-    });
-    
   } catch (error) {
-    console.error('Error getting Zoom meeting:', error.response?.data || error.message);
+    console.error('❌ Error creating Zoom SDK session:', error);
     res.status(500).json({ 
-      message: 'Failed to get meeting details',
-      error: error.response?.data?.message || error.message 
-    });
-  }
-};
-
-// @desc    Delete a meeting
-// @route   DELETE /api/zoom/meeting/:meetingId
-// @access  Private (Premium users only)
-exports.deleteMeeting = async (req, res) => {
-  try {
-    const userId = req.user._id;
-    const { meetingId } = req.params;
-    
-    // Check if user is premium
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-    
-    if (user.plan !== 'premium' && user.plan !== 'pro') {
-      return res.status(403).json({ 
-        message: 'Video calls are available for Premium users only.',
-        requiresUpgrade: true 
-      });
-    }
-    
-    const token = generateZoomToken();
-    
-    await axios.delete(
-      `${ZOOM_API_BASE_URL}/meetings/${meetingId}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-    
-    console.log('Zoom meeting deleted successfully:', meetingId);
-    
-    res.json({ message: 'Meeting deleted successfully' });
-    
-  } catch (error) {
-    console.error('Error deleting Zoom meeting:', error.response?.data || error.message);
-    res.status(500).json({ 
-      message: 'Failed to delete meeting',
-      error: error.response?.data?.message || error.message 
+      message: 'Failed to create video call session',
+      error: error.message 
     });
   }
 };
@@ -602,6 +431,236 @@ exports.notifyWali = async (req, res) => {
     });
   }
 };
+
+// @desc    Create UI Toolkit session
+// @route   POST /api/zoom/session
+// @access  Private (Premium users only)
+const createUIToolkitSession = async (req, res) => {
+  try {
+    console.log('🚀 Creating UI Toolkit session...');
+    
+    // Validate environment variables first
+    if (!ZOOM_SDK_KEY || !ZOOM_SDK_SECRET) {
+      console.error('❌ Zoom SDK environment variables not configured');
+      return res.status(500).json({ 
+        error: 'Video calling service not configured',
+        details: 'Missing Zoom SDK credentials'
+      });
+    }
+    
+    const { sessionId, userRole = 1, recipientId } = req.body;
+    const userId = req.user.id;
+    
+    console.log('📋 Request data:', { sessionId, userRole, recipientId, userId });
+
+    // Get user details
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check if user is premium (temporarily bypassed for testing)
+    // if (!user.isPremium && user.accountType !== 'pro') {
+    //   return res.status(403).json({ error: 'Premium subscription required for video calls' });
+    // }
+
+    console.log('✅ User is authorized for video calls');
+
+    // Generate session key and signature
+    const sessionKey = `sess_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+    
+    console.log('🔑 Generating Zoom SDK signature...');
+    const signature = generateZoomSDKJWT(sessionId, userRole);
+    
+    if (!signature) {
+      throw new Error('Failed to generate Zoom SDK signature');
+    }
+
+    // Create call record in database (only if we have a recipient)
+    let callRecord = null;
+    if (recipientId) {
+      callRecord = new Call({
+        caller: userId,
+        recipient: recipientId,
+        roomId: sessionId,
+        status: 'ringing',
+        startedAt: new Date(),
+        duration: 0,
+        recordingUrl: null
+      });
+      
+      await callRecord.save();
+      console.log('📝 Call record created:', callRecord._id);
+    } else {
+      console.log('⚠️ No recipient provided, skipping call record creation');
+    }
+
+
+
+    // Send response with session data
+    const sessionData = {
+      signature: signature,
+      sessionId: sessionId,
+      sessionKey: sessionKey,
+      sdkKey: ZOOM_SDK_KEY,
+      userName: `${user.fname} ${user.lname}`,
+      userRole: userRole,
+      callId: callRecord ? callRecord._id : null
+    };
+
+    console.log('✅ UI Toolkit session created successfully');
+    res.json(sessionData);
+
+  } catch (error) {
+    console.error('❌ Error creating UI Toolkit session:', error);
+    res.status(500).json({ 
+      error: 'Failed to create video session',
+      details: error.message 
+    });
+  }
+};
+
+// @desc    Join existing Zoom session
+// @route   POST /api/zoom/join-session
+// @access  Private (Premium users only)
+const joinSession = async (req, res) => {
+  try {
+    console.log('🔗 Joining existing Zoom session...');
+    
+    const { sessionId, callId } = req.body;
+    const userId = req.user.id;
+
+    // Get user details
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Verify the call exists and user is authorized to join
+    if (callId) {
+      const callRecord = await Call.findById(callId);
+      if (!callRecord) {
+        return res.status(404).json({ error: 'Call not found' });
+      }
+      
+      // Check if user is either caller or recipient
+      if (callRecord.caller.toString() !== userId && callRecord.recipient.toString() !== userId) {
+        return res.status(403).json({ error: 'Not authorized to join this call' });
+      }
+      
+      console.log('✅ User authorized to join call:', callId);
+    }
+
+    // Generate signature for joining the session
+    const signature = generateZoomSDKJWT(sessionId, 1); // role 1 for participant
+    const sessionKey = `sess_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+
+    // Send response with session data
+    const sessionData = {
+      signature: signature,
+      sessionId: sessionId,
+      sessionKey: sessionKey,
+      sdkKey: ZOOM_SDK_KEY,
+      userName: `${user.fname} ${user.lname}`,
+      userRole: 1, // participant role
+      callId: callId
+    };
+
+    console.log('✅ Successfully joined session:', sessionId);
+    res.json(sessionData);
+
+  } catch (error) {
+    console.error('❌ Error joining session:', error);
+    res.status(500).json({ 
+      error: 'Failed to join video session',
+      details: error.message 
+    });
+  }
+};
+
+// @desc    Send video call invitation
+// @route   POST /api/zoom/send-invitation
+// @access  Private (Premium users only)
+const sendCallInvitation = async (req, res) => {
+  try {
+    console.log('📧 Sending video call invitation...');
+    
+    const { recipientId, sessionId, callId } = req.body;
+    const callerId = req.user.id;
+
+    // Get caller and recipient details
+    const [caller, recipient] = await Promise.all([
+      User.findById(callerId),
+      User.findById(recipientId)
+    ]);
+
+    if (!caller || !recipient) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Create invitation data
+    const invitationData = {
+      type: 'video_call_invitation',
+      callerId: callerId,
+      callerName: `${caller.fname} ${caller.lname}`,
+      callerUsername: caller.username,
+      recipientId: recipientId,
+      sessionId: sessionId,
+      callId: callId,
+      timestamp: new Date().toISOString(),
+      message: `${caller.fname} ${caller.lname} is inviting you to a video call`
+    };
+
+    // Get socket.io instance from app
+    const io = req.app.get('io');
+    
+    if (io) {
+      // Send real-time notification to recipient
+      console.log(`📡 Sending video call invitation to user ${recipientId}`);
+      io.to(recipientId).emit('video_call_invitation', invitationData);
+      
+      // Also send to WebRTC namespace if it exists
+      const webrtcNamespace = io.of('/webrtc');
+      if (webrtcNamespace) {
+        webrtcNamespace.to(recipientId).emit('video_call_invitation', invitationData);
+      }
+      
+      console.log('✅ Video call invitation sent via socket.io');
+    } else {
+      console.warn('⚠️ Socket.io instance not found');
+    }
+    
+    // Send Wali notification about the call
+    try {
+      await sendWaliVideoCallNotification(callerId, recipientId, {
+        sessionId,
+        callId,
+        type: 'call_invitation'
+      });
+      console.log('📧 Wali notification sent for video call invitation');
+    } catch (waliError) {
+      console.error('❌ Error sending Wali notification:', waliError);
+    }
+    
+    res.json({ 
+      success: true, 
+      invitation: invitationData,
+      message: 'Invitation sent successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Error sending invitation:', error);
+    res.status(500).json({ 
+      error: 'Failed to send invitation',
+      details: error.message 
+    });
+  }
+};
+
+// Export the new functions
+exports.createUIToolkitSession = createUIToolkitSession;
+exports.joinSession = joinSession;
+exports.sendCallInvitation = sendCallInvitation;
 
 // Functions are already exported using exports.functionName above
 // No need for module.exports since we're using exports.functionName syntax

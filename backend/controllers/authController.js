@@ -10,7 +10,16 @@ const { sendValidationEmail, sendWelcomeEmail, sendWaliNewJoinerEmail } = requir
 // Regular signup
 const signup = async (req, res) => {
   try {
-    const { username, email, password, fname, lname, gender, parentEmail, ethnicity, dateOfBirth, countryOfResidence, stateOfResidence, cityOfResidence, summary } = req.body;
+    const { 
+      username, email, password, fname, lname, gender, parentEmail, 
+      ethnicity, dob, dateOfBirth, 
+      country, state, city, countryOfResidence, stateOfResidence, cityOfResidence,
+      summary, kunya, nationality, region, height, weight, build, appearance,
+      hijab, beard, maritalStatus, noOfChildren, patternOfSalaah, revert,
+      sect, scholarsSpeakers, dressingCovering, islamicPractice, genotype,
+      workEducation, traits, interests, openToMatches, dealbreakers, icebreakers,
+      waliDetails
+    } = req.body;
 
     console.log('Signup attempt:', { username, email, fname, lname, gender });
 
@@ -46,12 +55,61 @@ const signup = async (req, res) => {
       gender,
       parentEmail: parentEmail || email, // Use parentEmail if provided, otherwise use user email
       type: 'USER',
+      
+      // Basic Profile Info
+      kunya,
+      
+      // Date of Birth
+      dob: dob || dateOfBirth, // Accept both dob and dateOfBirth fields
+      
+      // Location and Demographics
+      nationality,
+      country: country || countryOfResidence, // Accept both formats
+      state: state || stateOfResidence, // Accept both formats
+      city: city || cityOfResidence, // Accept both formats
+      region,
+      
+      // Physical Appearance
+      height,
+      weight,
+      build,
+      appearance,
+      hijab: hijab || 'No',
+      beard: beard || 'No',
+      
+      // Family and Marital
+      maritalStatus,
+      noOfChildren,
+      
+      // Ethnicity
       ethnicity: ethnicity || [],
-      dateOfBirth,
-      country: countryOfResidence,
-      state: stateOfResidence,
-      city: cityOfResidence,
-      summary
+      
+      // Islamic Practice and Deen
+      patternOfSalaah,
+      revert,
+      sect,
+      scholarsSpeakers,
+      dressingCovering,
+      islamicPractice,
+      
+      // Medical and Health
+      genotype,
+      
+      // Profile Content
+      summary,
+      workEducation,
+      
+      // Lifestyle and Personality (JSON strings for arrays)
+      traits,
+      interests,
+      
+      // Matching Preferences
+      openToMatches,
+      dealbreakers,
+      icebreakers,
+      
+      // Wali Details
+      waliDetails: waliDetails || ''
     });
 
     if (user) {

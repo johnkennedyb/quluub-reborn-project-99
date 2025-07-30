@@ -16,12 +16,16 @@ const createSocket = (userId?: string) => {
   
   return io(socketUrl, {
     query: { userId: userId || '' },
-    transports: ['websocket'],
-    withCredentials: true,
+    transports: ['polling', 'websocket'], // Start with polling, then upgrade to websocket
+    withCredentials: false, // Disable credentials for local development
     autoConnect: false, // We'll connect manually when user is available
     reconnection: true,
     reconnectionDelay: 1000,
-    reconnectionAttempts: 5,
+    reconnectionAttempts: 10, // Increase attempts
+    timeout: 30000, // 30 second timeout
+    forceNew: false,
+    upgrade: true, // Allow transport upgrades
+    rememberUpgrade: false, // Don't remember failed upgrades
   });
 };
 

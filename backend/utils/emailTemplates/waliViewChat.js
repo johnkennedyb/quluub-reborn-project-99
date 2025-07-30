@@ -12,11 +12,16 @@ const waliViewChatEmail = (waliName, wardName, brotherName, chatLink) => {
           Salaamun alaekum ${waliName},
         </p>
         <p style="color: #333; line-height: 1.6; font-size: 16px;">
-          We wanted to inform you that your ward, ${wardName}, is currently chatting with ${brotherName} on Quluub. As her guardian, you can view the conversation through the following link:
+          We wanted to inform you that your ward, ${wardName}, is currently chatting with ${brotherName} on Quluub. As her guardian, you can view the conversation through the following link, and we have also attached the complete chat transcript files (PDF and TXT formats) to this email for your review:
         </p>
         <p style="color: #333; line-height: 1.6; font-size: 16px; text-align: center; margin: 30px 0;">
           <a href="${chatLink}" style="background-color: #075e54; color: white; padding: 15px 25px; text-decoration: none; border-radius: 5px; font-size: 16px;">View Chat</a>
         </p>
+        <div style="background-color: #e8f5e8; padding: 15px; border-radius: 8px; margin: 20px 0;">
+          <p style="color: #2d5a2d; margin: 0; font-size: 14px;">
+            <strong>📎 Attachments:</strong> This email includes chat transcript files in both PDF and TXT formats for your convenience and record-keeping.
+          </p>
+        </div>
         <p style="color: #333; line-height: 1.6; font-size: 16px;">
           Thank you for your attention to this matter.
         </p>

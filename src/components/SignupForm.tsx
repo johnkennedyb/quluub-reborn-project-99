@@ -21,7 +21,7 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { format, differenceInYears } from "date-fns";
-import { ChevronLeft, ChevronRight, RefreshCcw, Eye, EyeOff } from "lucide-react";
+import { ChevronLeft, ChevronRight, Eye, EyeOff } from "lucide-react";
 
 // Task #2: Major Nigerian cities list
 const majorNigerianCities = [
@@ -35,7 +35,7 @@ const majorNigerianCities = [
 ];
 
 interface SignupFormProps {
-  onSignup: (data: Omit<RegistrationData, 'username'>) => void;
+  onSignup: (data: any) => void;
   onSwitchToLogin: () => void;
 }
 
@@ -103,14 +103,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
     }));
   };
 
-  const handleGeneratePassword = () => {
-    if (formData.password === "") { 
-      setFormData(prev => ({
-        ...prev,
-        password: generatePassword(10)
-      }));
-    }
-  };
+
 
   useEffect(() => {
     if (formData.firstName && step === 6) { 
@@ -156,14 +149,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
     }
   }, [selectedState]);
 
-  const generatePassword = (length: number) => {
-    const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
-    let password = "";
-    for (let i = 0; i < length; i++) {
-      password += charset.charAt(Math.floor(Math.random() * charset.length));
-    }
-    return password;
-  };
+
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -270,7 +256,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
     setError('');
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/email/verify-email`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/email/verify-code`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -365,18 +351,25 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
         username: formData.username,
         email: formData.email,
         password: formData.password,
-        firstName: formData.firstName, 
-        lastName: formData.lastName,   
+        fname: formData.firstName, 
+        lname: formData.lastName,   
         gender: formData.gender,
-        dateOfBirth: formData.dateOfBirth!,
+        dob: formData.dateOfBirth!.toISOString(), // Convert Date object to ISO string
         ethnicity: formData.ethnicity,
-        countryOfResidence: formData.countryOfResidence,
-        stateOfResidence: formData.countryOfResidence, 
-        cityOfResidence: formData.cityOfResidence,
+        country: formData.countryOfResidence,
+        state: formData.stateOfResidence || formData.countryOfResidence, // Fallback if state is empty
+        city: formData.cityOfResidence,
         summary: formData.summary,
       };
 
-      console.log('Submitting registration data:', dataToSubmit);
+      // Debug logging for signup data
+      console.log('=== SIGNUP DATA DEBUG ===');
+      console.log('Full signup data being sent:', dataToSubmit);
+      console.log('DOB field specifically:', dataToSubmit.dob);
+      console.log('DOB type:', typeof dataToSubmit.dob);
+      console.log('Original dateOfBirth from form:', formData.dateOfBirth);
+      console.log('========================');
+
       await onSignup(dataToSubmit);
     } catch (error) {
       console.error('Registration error:', error);
@@ -393,33 +386,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
       case 1:
         return (
           <div className="space-y-6">
-            <div className="space-y-4">
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full flex items-center justify-center gap-2 py-3"
-                onClick={() => {
-                  console.log('Google sign-in clicked');
-                }}
-              >
-                <svg className="w-5 h-5" viewBox="0 0 24 24">
-                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                </svg>
-                Continue with Google
-              </Button>
-              
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">Or continue with email</span>
-                </div>
-              </div>
-            </div>
+
 
             <form onSubmit={handleSubmitInitial} className="space-y-6">
               <div className="space-y-2">
@@ -492,15 +459,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                         <Eye className="h-4 w-4" />
                       )}
                     </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-10 px-3"
-                      onClick={handleGeneratePassword}
-                    >
-                      <RefreshCcw className="h-4 w-4" />
-                    </Button>
+
                   </div>
                 </div>
               </div>
@@ -519,9 +478,37 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                 className="w-full"
                 disabled={isLoading}
               >
-                {isLoading ? "Processing..." : "Submit"}
+                {isLoading ? "Processing..." : "Continue"}
               </Button>
             </form>
+
+            <div className="mt-6">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full mt-4 flex items-center justify-center gap-2 py-3"
+                onClick={() => {
+                  console.log('Google sign-in clicked');
+                }}
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                Continue with Google
+              </Button>
+            </div>
           </div>
         );
 

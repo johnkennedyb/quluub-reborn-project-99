@@ -13,7 +13,7 @@ interface DashboardTabsProps {
   matchesArray: User[];
   favoritesArray?: User[];
   isLoading: boolean;
-  top: number;
+
 }
 
 const DashboardTabs: React.FC<DashboardTabsProps> = ({
@@ -22,7 +22,7 @@ const DashboardTabs: React.FC<DashboardTabsProps> = ({
   matchesArray,
   favoritesArray = [],
   isLoading,
-  top,
+
 }) => {
   const [activeTab, setActiveTab] = useState('matches');
   const [mobileAccordion, setMobileAccordion] = useState<string | undefined>('matches');

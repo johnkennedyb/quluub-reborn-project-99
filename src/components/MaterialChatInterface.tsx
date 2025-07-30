@@ -8,6 +8,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { chatService } from "@/lib/api-client";
 import VideoCallLinkButton from "@/components/VideoCall/VideoCallLinkButton";
+import VideoCallInvitationMessage from "@/components/VideoCall/VideoCallInvitationMessage";
+import { 
+  fetchPendingVideoCallInvitations, 
+  updateVideoCallInvitationStatus,
+  removePendingInvitationFromStorage,
+  type PendingVideoCallInvitation 
+} from "@/services/videoCallPersistence";
 
 interface ChatMessage {
   id: string;
@@ -27,6 +34,7 @@ const MaterialChatInterface: React.FC<MaterialChatInterfaceProps> = ({ setChatCo
   const [chat, setChat] = useState<ChatMessage[]>([]);
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportReason, setReportReason] = useState("");
+  const [pendingInvitations, setPendingInvitations] = useState<PendingVideoCallInvitation[]>([]);
   const endOfDivRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const location = useLocation();
@@ -38,10 +46,31 @@ const MaterialChatInterface: React.FC<MaterialChatInterfaceProps> = ({ setChatCo
   const currentUserPlan = user?.plan || 'freemium';
   const planLimits = {
     freemium: { messageAllowance: 10, wordCountPerMessage: 20 },
-    premium: { messageAllowance: 50, wordCountPerMessage: 100 }
+    premium: { messageAllowance: 10, wordCountPerMessage: 20 }
   };
 
   const { messageAllowance, wordCountPerMessage } = planLimits[currentUserPlan as keyof typeof planLimits] || planLimits.freemium;
+
+  // Fetch pending video call invitations
+  useEffect(() => {
+    const loadPendingInvitations = async () => {
+      if (user && userId) {
+        try {
+          const invitations = await fetchPendingVideoCallInvitations();
+          // Filter invitations for this specific chat
+          const relevantInvitations = invitations.filter(
+            inv => (inv.callerId === userId && inv.recipientId === user._id) ||
+                   (inv.callerId === user._id && inv.recipientId === userId)
+          );
+          setPendingInvitations(relevantInvitations);
+        } catch (error) {
+          console.error('Failed to fetch pending invitations:', error);
+        }
+      }
+    };
+    
+    loadPendingInvitations();
+  }, [user, userId]);
 
   useEffect(() => {
     if (setChatCount && user) {
@@ -151,11 +180,48 @@ const MaterialChatInterface: React.FC<MaterialChatInterfaceProps> = ({ setChatCo
       message.error('Please provide a reason for reporting');
       return;
     }
+    
     reportMutation.mutate({
       reportedUserId: userId!,
       reason: reportReason,
-      type: 'chat'
+      type: 'user'
     });
+  };
+
+  const handleAcceptVideoCall = async (invitation: PendingVideoCallInvitation) => {
+    try {
+      // Update backend status
+      await updateVideoCallInvitationStatus(invitation._id, 'accepted');
+      
+      // Remove from local state and storage
+      setPendingInvitations(prev => prev.filter(inv => inv._id !== invitation._id));
+      removePendingInvitationFromStorage(invitation._id);
+      
+      // Navigate to video call with session data
+      const callUrl = `/video-call?sessionId=${invitation.sessionId}&callerId=${invitation.callerId}&callerName=${encodeURIComponent(invitation.callerName)}`;
+      window.open(callUrl, '_blank');
+      
+      message.success('Joining video call...');
+    } catch (error) {
+      console.error('Failed to accept video call:', error);
+      message.error('Failed to join video call');
+    }
+  };
+
+  const handleDeclineVideoCall = async (invitation: PendingVideoCallInvitation) => {
+    try {
+      // Update backend status
+      await updateVideoCallInvitationStatus(invitation._id, 'declined');
+      
+      // Remove from local state and storage
+      setPendingInvitations(prev => prev.filter(inv => inv._id !== invitation._id));
+      removePendingInvitationFromStorage(invitation._id);
+      
+      message.success('Video call declined');
+    } catch (error) {
+      console.error('Failed to decline video call:', error);
+      message.error('Failed to decline video call');
+    }
   };
 
   if (!userId) {
@@ -185,6 +251,17 @@ const MaterialChatInterface: React.FC<MaterialChatInterfaceProps> = ({ setChatCo
       >
         {chat.length > 0 ? (
           <>
+            {/* Render pending video call invitations */}
+            {pendingInvitations.map((invitation) => (
+              <div key={invitation._id} className="mb-4">
+                <VideoCallInvitationMessage
+                  callerName={invitation.callerName}
+                  onJoinCall={() => handleAcceptVideoCall(invitation)}
+                  onDeclineCall={() => handleDeclineVideoCall(invitation)}
+                />
+              </div>
+            ))}
+            
             {chat.map(({ message: msgContent, sender, timestamp, status }, ind) => (
               <Paper
                 key={`${timestamp}-${msgContent}-${ind}`}

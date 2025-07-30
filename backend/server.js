@@ -27,8 +27,16 @@ dotenv.config();
 
 connectDB();
 
+const { ExpressPeerServer } = require('peer');
 const app = express();
-const httpServer = http.createServer(app);
+const server = http.createServer(app);
+
+const peerServer = ExpressPeerServer(server, {
+  debug: false,
+  path: '/'
+});
+
+app.use('/peerjs', peerServer);
 
 const corsOptions = {
   origin: [process.env.FRONTEND_URL, 'http://localhost:8080', 'https://preview--quluub-reborn-project-99.lovable.app'].filter(Boolean),
@@ -40,8 +48,18 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-const io = new Server(httpServer, {
+const io = new Server(server, {
   cors: corsOptions,
+  transports: ['polling', 'websocket'], // Start with polling, allow websocket upgrade
+  allowEIO3: true, // Allow Engine.IO v3 clients
+  pingTimeout: 60000, // 60 seconds
+  pingInterval: 25000, // 25 seconds
+  upgradeTimeout: 30000, // 30 seconds for upgrade
+  maxHttpBufferSize: 1e6, // 1MB
+  allowRequest: (req, callback) => {
+    // Allow all requests for now
+    callback(null, true);
+  },
 });
 
 // Attach Socket.IO instance to Express app for route access
@@ -95,6 +113,173 @@ io.on('connection', (socket) => {
     onlineUsers.set(userId, socket.id);
     io.emit('getOnlineUsers', Array.from(onlineUsers.keys()));
     console.log(`🏠 User ${userId} joined main room with socket ${socket.id}`);
+    console.log(`👥 Total online users: ${onlineUsers.size}`);
+    console.log(`📋 Online users list:`, Array.from(onlineUsers.entries()));
+  });
+
+  // Video Call Invitation Handlers
+  socket.on('send-video-call-invitation', (data) => {
+    console.log('📞 Video call invitation from', data.callerName, 'to', data.recipientId);
+    console.log('📄 Full invitation data:', JSON.stringify(data, null, 2));
+    console.log('👥 Current online users:', Array.from(onlineUsers.keys()));
+    console.log('🗺️ Online users map:', Array.from(onlineUsers.entries()));
+    
+    // Check if recipient is online
+    const recipientSocketId = onlineUsers.get(data.recipientId);
+    console.log('🔍 Looking for recipient socket ID:', recipientSocketId);
+    console.log('🔍 Recipient ID type:', typeof data.recipientId);
+    console.log('🔍 Caller ID type:', typeof data.callerId);
+    
+    if (recipientSocketId) {
+      console.log('✅ Recipient is online, sending invitation to socket:', recipientSocketId);
+      console.log('📡 Sending video call invitation as chat message...');
+      
+      // Send video call invitation as a chat message
+      const videoCallMessage = {
+        senderId: data.callerId,
+        recipientId: data.recipientId,
+        message: `${data.callerName} is inviting you to a video call`,
+        messageType: 'video_call_invitation',
+        videoCallData: {
+          callerId: data.callerId,
+          callerName: data.callerName,
+          sessionId: data.sessionId,
+          timestamp: data.timestamp,
+          status: 'pending'
+        },
+        createdAt: new Date().toISOString()
+      };
+      
+      // Emit as a new message to both users
+      io.to(data.callerId).emit('new_message', videoCallMessage);
+      io.to(data.recipientId).emit('new_message', videoCallMessage);
+      
+      // Direct popup notification event for recipient
+      io.to(data.recipientId).emit('video_call_invitation', videoCallMessage);
+      
+      // Also emit to recipient's socket directly
+      io.to(recipientSocketId).emit('video_call_invitation', videoCallMessage);
+      io.to(recipientSocketId).emit('new_message', videoCallMessage);
+      
+      console.log('✅ Video call invitation sent as chat message');
+      console.log('📤 Sent to caller room:', data.callerId);
+      console.log('📤 Sent to recipient room:', data.recipientId);
+      console.log('📤 Sent to recipient socket:', recipientSocketId);
+    } else {
+      console.log('❌ Recipient is not online:', data.recipientId);
+      console.log('👥 Available online users:', Array.from(onlineUsers.entries()));
+      console.log('🔍 Searching for similar user IDs...');
+      
+      // Try to find similar user IDs (in case of string vs ObjectId issues)
+      const similarUsers = Array.from(onlineUsers.keys()).filter(userId => 
+        userId.toString().includes(data.recipientId.toString()) || 
+        data.recipientId.toString().includes(userId.toString())
+      );
+      console.log('🔍 Similar user IDs found:', similarUsers);
+      
+      socket.emit('video-call-failed', { 
+        message: 'Recipient is not online',
+        recipientId: data.recipientId,
+        onlineUsers: Array.from(onlineUsers.keys()),
+        similarUsers
+      });
+    }
+  });
+
+  socket.on('accept-video-call', (data) => {
+    console.log('✅ Video call accepted by', data.recipientId, 'for caller', data.callerId);
+    io.to(data.callerId).emit('video-call-accepted', {
+      callerId: data.callerId,
+      recipientId: data.recipientId,
+      sessionId: data.sessionId
+    });
+  });
+
+  socket.on('decline-video-call', (data) => {
+    console.log('❌ Video call declined by', data.recipientId, 'for caller', data.callerId);
+    io.to(data.callerId).emit('video-call-declined', {
+      callerId: data.callerId,
+      recipientId: data.recipientId,
+      sessionId: data.sessionId
+    });
+  });
+
+  socket.on('end-video-call', (data) => {
+    console.log('📞 Video call ended:', data.sessionId);
+    // Notify both participants
+    io.to(data.callerId).emit('video-call-ended', {
+      sessionId: data.sessionId,
+      endedBy: data.callerId === data.callerId ? 'caller' : 'recipient'
+    });
+    io.to(data.recipientId).emit('video-call-ended', {
+      sessionId: data.sessionId,
+      endedBy: data.callerId === data.callerId ? 'caller' : 'recipient'
+    });
+  });
+
+  // Handle new messages (including video call invitations)
+  socket.on('new_message', async (data) => {
+    console.log('📨 New message received:', data);
+    console.log('📄 Message type:', data.messageType);
+    console.log('👤 From:', data.senderId, 'To:', data.recipientId);
+    
+    try {
+      // Save video call invitation messages to database for persistence
+      if (data.messageType === 'video_call_invitation') {
+        console.log('💾 Saving video call invitation to database...');
+        
+        // Find or create conversation between sender and recipient
+        let conversation = await Conversation.findOne({
+          $or: [
+            { user1: data.senderId, user2: data.recipientId },
+            { user1: data.recipientId, user2: data.senderId }
+          ]
+        });
+        
+        if (!conversation) {
+          conversation = new Conversation({
+            user1: data.senderId,
+            user2: data.recipientId
+          });
+          await conversation.save();
+          console.log('🆕 Created new conversation:', conversation._id);
+        }
+        
+        // Create and save the video call invitation message
+        const message = new Message({
+          conversationId: conversation._id,
+          senderId: data.senderId,
+          message: data.message,
+          messageType: data.messageType,
+          videoCallData: data.videoCallData,
+          createdAt: data.createdAt || new Date()
+        });
+        
+        await message.save();
+        console.log('✅ Video call invitation saved to database:', message._id);
+        
+        // Update the data with the saved message ID
+        data._id = message._id;
+        data.conversationId = conversation._id;
+      }
+    } catch (error) {
+      console.error('❌ Error saving video call invitation to database:', error);
+    }
+    
+    // Check if recipient is online
+    const recipientSocketId = onlineUsers.get(data.recipientId);
+    
+    if (recipientSocketId) {
+      console.log('✅ Recipient is online, sending message to socket:', recipientSocketId);
+      // Send to recipient
+      io.to(recipientSocketId).emit('new_message', data);
+    } else {
+      console.log('❌ Recipient is offline:', data.recipientId);
+    }
+    
+    // Also send back to sender for confirmation
+    socket.emit('new_message', data);
+    console.log('📤 Message sent to both sender and recipient');
   });
 
   socket.on('disconnect', () => {
@@ -229,6 +414,6 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-httpServer.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
 });

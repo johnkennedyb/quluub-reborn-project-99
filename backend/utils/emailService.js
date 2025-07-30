@@ -131,6 +131,51 @@ const sendEmail = async (to, templateFunction, ...args) => {
   }
 };
 
+// Enhanced email sending function with attachment support
+const sendEmailWithAttachments = async (to, templateFunction, attachments = [], ...args) => {
+  console.log(`\n--- Attempting to send email with attachments to: ${to} ---`);
+  
+  try {
+    const { subject, html } = templateFunction(...args);
+    console.log('Subject:', subject);
+    console.log('Attachments:', attachments.length);
+    
+    const mailOptions = {
+      from: `"${emailSettings.fromName}" <${emailSettings.fromEmail}>`,
+      to,
+      subject,
+      html,
+      replyTo: emailSettings.replyTo,
+      attachments: attachments
+    };
+    
+    console.log('Sending email with options:', {
+      from: mailOptions.from,
+      to: mailOptions.to,
+      subject: mailOptions.subject,
+      hasHtml: !!mailOptions.html,
+      attachmentCount: attachments.length
+    });
+    
+    const info = await transporter.sendMail(mailOptions);
+    console.log('✅ Email with attachments sent successfully');
+    console.log('Message ID:', info.messageId);
+    console.log('Preview URL:', nodemailer.getTestMessageUrl(info));
+    return true;
+    
+  } catch (error) {
+    console.error('❌ Email with attachments sending failed:', error.message);
+    if (error.response) {
+      console.error('SMTP Error:', {
+        code: error.responseCode,
+        response: error.response
+      });
+    }
+    console.error('Error stack:', error.stack);
+    return false;
+  }
+};
+
 // Function to update email configuration
 const updateEmailConfig = async (newConfig) => {
   try {
@@ -191,7 +236,14 @@ const sendEncourageUnhideEmail = (email, recipientName) => sendEmail(email, enco
 const sendSuggestedAccountsEmail = (email, recipientName) => sendEmail(email, suggestedAccountsEmail, recipientName);
 const sendContactWaliEmail = (email, brotherName) => sendEmail(email, contactWaliEmail, brotherName);
 const sendWaliViewChatEmail = (email, waliName, wardName, brotherName, chatLink) => sendEmail(email, waliViewChatEmail, waliName, wardName, brotherName, chatLink);
+
+// Enhanced Wali email functions with file attachments
+const sendWaliViewChatEmailWithAttachments = (email, waliName, wardName, brotherName, chatLink, attachments = []) => 
+  sendEmailWithAttachments(email, waliViewChatEmail, attachments, waliName, wardName, brotherName, chatLink);
 const sendVideoCallNotificationEmail = (parentEmail, waliName, wardName, brotherName, callDetails, reportLink) => sendEmail(parentEmail, videoCallNotificationEmail, waliName, wardName, brotherName, callDetails, reportLink);
+
+const sendVideoCallNotificationEmailWithAttachments = (parentEmail, waliName, wardName, brotherName, callDetails, reportLink, attachments = []) => 
+  sendEmailWithAttachments(parentEmail, videoCallNotificationEmail, attachments, waliName, wardName, brotherName, callDetails, reportLink);
 
 const sendValidationEmail = (email, recipientName, validationToken) => {
   const validationUrl = `${process.env.FRONTEND_URL}/validate-email?token=${validationToken}`;
@@ -308,7 +360,9 @@ module.exports = {
   sendSuggestedAccountsEmail,
   sendContactWaliEmail,
   sendWaliViewChatEmail,
+  sendWaliViewChatEmailWithAttachments,
   sendVideoCallNotificationEmail,
+  sendVideoCallNotificationEmailWithAttachments,
   sendBulkEmail,
   sendTestEmail,
   getEmailConfigService,

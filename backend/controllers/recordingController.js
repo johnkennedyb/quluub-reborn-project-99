@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const User = require('../models/User');
-const { sendVideoCallNotificationEmail } = require('../utils/emailService');
+const { sendVideoCallNotificationEmail, sendVideoCallNotificationEmailWithAttachments } = require('../utils/emailService');
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -59,8 +59,9 @@ const uploadRecording = async (req, res) => {
       recordingUrl
     });
 
-    // Send recording to Wali emails
-    await sendRecordingToWali(userId, callId, recordingUrl);
+    // Send recording to Wali emails with file attachment
+    const recordingFilePath = req.file.path;
+    await sendRecordingToWali(userId, callId, recordingUrl, recordingFilePath);
 
     res.json({
       message: 'Recording uploaded successfully',
@@ -79,7 +80,7 @@ const uploadRecording = async (req, res) => {
 };
 
 // Helper function to send recording to Wali
-const sendRecordingToWali = async (userId, callId, recordingUrl) => {
+const sendRecordingToWali = async (userId, callId, recordingUrl, recordingFilePath = null) => {
   try {
     const user = await User.findById(userId);
     if (!user) return;
@@ -103,20 +104,45 @@ const sendRecordingToWali = async (userId, callId, recordingUrl) => {
 
     const videoCallReportLink = `${process.env.FRONTEND_URL}/wali/video-call-report?caller=${callerId}&recipient=${recipientId}&callId=${callId}`;
 
+    // Prepare video recording attachment if file path is provided
+    let attachments = [];
+    if (recordingFilePath && require('fs').existsSync(recordingFilePath)) {
+      attachments = [{
+        filename: `video-call-recording-${callId}.webm`,
+        path: recordingFilePath,
+        contentType: 'video/webm'
+      }];
+      console.log(`📹 Video recording file attached: ${recordingFilePath}`);
+    } else {
+      console.log('⚠️ No video recording file path provided or file not found, sending link only');
+    }
+
     // Send to caller's wali if female and has wali details
     if (caller.gender === 'female' && caller.waliDetails) {
       try {
         const waliDetails = JSON.parse(caller.waliDetails);
         if (waliDetails.email) {
-          await sendVideoCallNotificationEmail(
-            waliDetails.email,
-            waliDetails.name || 'Wali',
-            caller.fname,
-            recipient.fname,
-            callDetails,
-            videoCallReportLink
-          );
-          console.log('📧 Recording sent to caller\'s Wali:', waliDetails.email);
+          if (attachments.length > 0) {
+            await sendVideoCallNotificationEmailWithAttachments(
+              waliDetails.email,
+              waliDetails.name || 'Wali',
+              caller.fname,
+              recipient.fname,
+              callDetails,
+              videoCallReportLink,
+              attachments
+            );
+          } else {
+            await sendVideoCallNotificationEmail(
+              waliDetails.email,
+              waliDetails.name || 'Wali',
+              caller.fname,
+              recipient.fname,
+              callDetails,
+              videoCallReportLink
+            );
+          }
+          console.log(`📧 Recording ${attachments.length > 0 ? 'with file attachment' : 'with link only'} sent to caller's Wali:`, waliDetails.email);
         }
       } catch (e) {
         console.error('Error parsing wali details for caller:', e);
@@ -128,15 +154,27 @@ const sendRecordingToWali = async (userId, callId, recordingUrl) => {
       try {
         const waliDetails = JSON.parse(recipient.waliDetails);
         if (waliDetails.email) {
-          await sendVideoCallNotificationEmail(
-            waliDetails.email,
-            waliDetails.name || 'Wali',
-            recipient.fname,
-            caller.fname,
-            callDetails,
-            videoCallReportLink
-          );
-          console.log('📧 Recording sent to recipient\'s Wali:', waliDetails.email);
+          if (attachments.length > 0) {
+            await sendVideoCallNotificationEmailWithAttachments(
+              waliDetails.email,
+              waliDetails.name || 'Wali',
+              recipient.fname,
+              caller.fname,
+              callDetails,
+              videoCallReportLink,
+              attachments
+            );
+          } else {
+            await sendVideoCallNotificationEmail(
+              waliDetails.email,
+              waliDetails.name || 'Wali',
+              recipient.fname,
+              caller.fname,
+              callDetails,
+              videoCallReportLink
+            );
+          }
+          console.log(`📧 Recording ${attachments.length > 0 ? 'with file attachment' : 'with link only'} sent to recipient's Wali:`, waliDetails.email);
         }
       } catch (e) {
         console.error('Error parsing wali details for recipient:', e);

@@ -1,4 +1,5 @@
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
+import socket from '@/lib/socket';
 
 export interface CallData {
   callId: string;
@@ -46,9 +47,6 @@ class WebRTCService {
   // Public method to reinitialize socket (useful after login)
   public reinitialize(): void {
     console.log('🔄 Reinitializing WebRTC service...');
-    if (this.socket) {
-      this.socket.disconnect();
-    }
     this.initializeSocket();
   }
 
@@ -57,7 +55,7 @@ class WebRTCService {
     const userStr = localStorage.getItem('user');
     
     if (!token || !userStr) {
-      console.warn('⚠️ No token or user found, cannot initialize socket. Token:', !!token, 'User:', !!userStr);
+      console.warn('⚠️ No token or user found, cannot initialize WebRTC socket listeners. Token:', !!token, 'User:', !!userStr);
       return;
     }
 
@@ -70,57 +68,67 @@ class WebRTCService {
     }
 
     if (!user || !user._id) {
-      console.warn('⚠️ Invalid user data, cannot initialize socket');
+      console.warn(' Invalid user data, cannot initialize WebRTC socket listeners');
       return;
     }
 
-    console.log('🔌 Initializing WebRTC Socket.IO connection for user:', user.fname);
+    console.log(' Setting up WebRTC Socket.IO listeners on centralized socket for user:', user.fname);
     
-    // Disconnect existing socket if any
+    // Use the centralized socket instance
+    this.socket = socket;
+    
+    // Clean up existing listeners
     if (this.socket) {
-      this.socket.disconnect();
+      this.socket.off('webrtc-offer');
+      this.socket.off('webrtc-answer');
+      this.socket.off('webrtc-ice-candidate');
+      this.socket.off('webrtc-call-ended');
+      this.socket.off('webrtc-call-cancelled');
+      this.socket.off('webrtc-call-accepted');
+      this.socket.off('webrtc-call-rejected');
     }
-    
-    // Use a different namespace to avoid conflicts with main app socket
-    const socketUrl = (import.meta.env.VITE_API_URL || 'http://localhost:5000').replace('/api', '');
-    
-    this.socket = io(`${socketUrl}/webrtc`, {
-      auth: { token },
-      transports: ['websocket', 'polling'],
-      forceNew: true
-    });
 
-    this.setupSocketListeners();
+    try {
+      console.log(' Setting up WebRTC event listeners on centralized socket');
+      this.setupSocketListeners();
+    } catch (error) {
+      console.error(' Failed to initialize WebRTC socket listeners:', error);
+    }
   }
 
   private setupSocketListeners() {
     if (!this.socket) return;
 
+    // WebRTC event handlers (using centralized socket)
+    this.socket.on('connect', () => {
+      console.log(' WebRTC listeners ready on centralized socket:', this.socket?.id);
+    });
+
     // Socket connection events
     this.socket.on('connect', () => {
-      console.log('✅ Socket.IO connected:', this.socket?.id);
+      console.log(' Socket.IO connected:', this.socket?.id);
       
       // Join user to their room for receiving calls
       const userData = JSON.parse(localStorage.getItem('user') || '{}');
       if (userData._id) {
-        console.log('🏠 Joining room for user:', userData._id);
+        console.log(' Joining room for user:', userData._id);
         this.socket?.emit('join', userData._id);
       } else {
-        console.warn('⚠️ No user data found, cannot join room');
+        console.warn(' No user data found, cannot join room');
       }
     });
 
     this.socket.on('connect_error', (error) => {
-      console.error('❌ Socket.IO connection error:', error);
+      console.error(' Socket.IO connection error:', error);
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('🔌 Socket.IO disconnected:', reason);
+      console.log(' Socket.IO disconnected:', reason);
     });
 
     // Incoming call offer
     this.socket.on('video-call-offer', async (data) => {
-      console.log('📞 Received video call offer:', data);
+      console.log(' Received video call offer:', data);
       const userData = JSON.parse(localStorage.getItem('user') || '{}');
       const callId = data.callId || Date.now().toString();
       const meetingUrl = this.generateMeetingUrl(callId);
@@ -149,7 +157,7 @@ class WebRTCService {
 
     // Call answer received
     this.socket.on('video-call-answer', async (data) => {
-      console.log('Received video call answer:', data);
+      console.log(' Received video call answer:', data);
       if (this.peerConnection && data.answer) {
         await this.peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
         if (this.callbacks?.onCallAccepted) {
@@ -160,7 +168,7 @@ class WebRTCService {
 
     // ICE candidate received
     this.socket.on('ice-candidate', (data) => {
-      console.log('🧊 Received ICE candidate');
+      console.log(' Received ICE candidate');
       if (this.peerConnection && data.candidate) {
         this.peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
       }
@@ -168,7 +176,7 @@ class WebRTCService {
 
     // Join link received
     this.socket.on('join-link-received', (data) => {
-      console.log('🔗 Join link received:', data.meetingUrl);
+      console.log(' Join link received:', data.meetingUrl);
       if (this.currentCallData) {
         this.currentCallData.meetingUrl = data.meetingUrl;
         this.currentCallData.joinLink = data.meetingUrl;
@@ -177,12 +185,12 @@ class WebRTCService {
 
     // Join link sent confirmation
     this.socket.on('join-link-sent', (data) => {
-      console.log('✅ Join link sent successfully to:', data.recipientId);
+      console.log(' Join link sent successfully to:', data.recipientId);
     });
 
     // Call rejected
     this.socket.on('video-call-rejected', () => {
-      console.log('Call was rejected');
+      console.log(' Call was rejected');
       this.cleanup();
       if (this.callbacks?.onCallRejected) {
         this.callbacks.onCallRejected();
@@ -191,7 +199,7 @@ class WebRTCService {
 
     // Call ended
     this.socket.on('video-call-ended', () => {
-      console.log('Call was ended');
+      console.log(' Call was ended');
       this.cleanup();
       if (this.callbacks?.onCallEnded) {
         this.callbacks.onCallEnded();
@@ -200,7 +208,7 @@ class WebRTCService {
 
     // Call cancelled
     this.socket.on('video-call-cancelled', () => {
-      console.log('Call was cancelled');
+      console.log(' Call was cancelled');
       this.cleanup();
       if (this.callbacks?.onCallCancelled) {
         this.callbacks.onCallCancelled();

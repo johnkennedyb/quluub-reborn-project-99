@@ -104,15 +104,22 @@ const Profile = () => {
     try {
       setLoading(true);
       
-      // For own profile, use current user data if available to avoid API call
-      if (isOwnProfile && currentUser) {
-        setProfileUser(currentUser);
-        setLoading(false);
-        return;
-      }
-      
-      // Only make API call for other users' profiles or when current user data is not available
+      // Always fetch fresh data from backend to ensure DOB and other fields are up-to-date
       const userData = await userService.getProfile(displayUserId);
+      
+      // Debug logging for DOB issue
+      console.log('=== PROFILE DATA DEBUG ===');
+      console.log('Full user data from backend:', userData);
+      console.log('DOB field specifically:', userData?.dob);
+      console.log('DOB type:', typeof userData?.dob);
+      console.log('All date-related fields:', {
+        dob: userData?.dob,
+        dateOfBirth: userData?.dateOfBirth,
+        createdAt: userData?.createdAt,
+        updatedAt: userData?.updatedAt
+      });
+      console.log('========================');
+      
       setProfileUser(userData || null);
       
       // Fetch relationship status for other users' profiles
@@ -193,7 +200,7 @@ const Profile = () => {
   // Always show edit mode for own profile, or regular view for others
   if (isOwnProfile) {
     return (
-      <div className="min-h-screen bg-gray-50 pt-16">
+      <div className="min-h-screen bg-gray-50 pt-16" style={{paddingBottom: '200px'}}>
         <TopNavbar />
         <ProfileEditSections
           user={profileUser}

@@ -63,7 +63,7 @@ Meeting ID: ${meetingData.id}
       
 This is a premium feature. Upgrade to Pro to enjoy unlimited video calls!`;
 
-      await apiClient.post('/chat/send-message', {
+      await apiClient.post('/chats/send', {
         userId,
         message: invitationMessage,
         messageType: 'video_call_invitation',

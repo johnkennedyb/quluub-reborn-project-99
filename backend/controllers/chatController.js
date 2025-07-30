@@ -3,7 +3,9 @@ const Chat = require('../models/Chat');
 const User = require('../models/User');
 const Relationship = require('../models/Relationship');
 const WaliChat = require('../models/WaliChat');
-const { sendWaliViewChatEmail, sendContactWaliEmail } = require('../utils/emailService');
+const Message = require('../models/Message');
+const Conversation = require('../models/Conversation');
+const { sendWaliViewChatEmail, sendWaliViewChatEmailWithAttachments, sendContactWaliEmail } = require('../utils/emailService');
 
 // Helper functions
 const plans = {
@@ -12,8 +14,8 @@ const plans = {
     wordCountPerMessage: 20
   },
   premium: {
-    messageAllowance: 50,
-    wordCountPerMessage: 100,
+    messageAllowance: 10,
+    wordCountPerMessage: 20,
     videoCall: true
   }
 };
@@ -112,17 +114,60 @@ const sendChatReportToParents = async (userId1, userId2) => {
 
     if (!user1 || !user2) return;
 
+    console.log(`📄 Generating chat transcript files for ${user1.fname} and ${user2.fname}`);
+    
+    // Generate chat transcript files
+    const { generateChatTranscriptPDF, generateChatTranscriptTXT } = require('../utils/chatTranscriptGenerator');
+    
+    let pdfPath, txtPath;
+    let attachments = [];
+    
+    try {
+      // Generate both PDF and TXT transcripts
+      [pdfPath, txtPath] = await Promise.all([
+        generateChatTranscriptPDF(userId1, userId2, 50),
+        generateChatTranscriptTXT(userId1, userId2, 50)
+      ]);
+      
+      // Prepare attachments
+      attachments = [
+        {
+          filename: `chat-transcript-${user1.username}-${user2.username}.pdf`,
+          path: pdfPath,
+          contentType: 'application/pdf'
+        },
+        {
+          filename: `chat-transcript-${user1.username}-${user2.username}.txt`,
+          path: txtPath,
+          contentType: 'text/plain'
+        }
+      ];
+      
+      console.log(`✅ Chat transcript files generated successfully`);
+    } catch (transcriptError) {
+      console.error('❌ Error generating chat transcripts:', transcriptError);
+      // Continue without attachments if transcript generation fails
+    }
+
     // This link should ideally lead to a page where the guardian can view the chat
     const chatLink = `${process.env.FRONTEND_URL}/wali/chat-view?user1=${userId1}&user2=${userId2}`;
 
     // Send to user1's parent if they have parentEmail
     if (user1.parentEmail && user1.parentEmail !== user1.email) {
-      await sendWaliViewChatEmail(user1.parentEmail, "Guardian", user1.fname, user2.fname, chatLink);
+      if (attachments.length > 0) {
+        await sendWaliViewChatEmailWithAttachments(user1.parentEmail, "Guardian", user1.fname, user2.fname, chatLink, attachments);
+      } else {
+        await sendWaliViewChatEmail(user1.parentEmail, "Guardian", user1.fname, user2.fname, chatLink);
+      }
     }
 
     // Send to user2's parent if they have parentEmail
     if (user2.parentEmail && user2.parentEmail !== user2.email) {
-      await sendWaliViewChatEmail(user2.parentEmail, "Guardian", user2.fname, user1.fname, chatLink);
+      if (attachments.length > 0) {
+        await sendWaliViewChatEmailWithAttachments(user2.parentEmail, "Guardian", user2.fname, user1.fname, chatLink, attachments);
+      } else {
+        await sendWaliViewChatEmail(user2.parentEmail, "Guardian", user2.fname, user1.fname, chatLink);
+      }
     }
 
     // Send to wali if user is female and has wali details
@@ -130,7 +175,11 @@ const sendChatReportToParents = async (userId1, userId2) => {
       try {
         const waliDetails = JSON.parse(user1.waliDetails);
         if (waliDetails.email) {
-          await sendWaliViewChatEmail(waliDetails.email, waliDetails.name || 'Wali', user1.fname, user2.fname, chatLink);
+          if (attachments.length > 0) {
+            await sendWaliViewChatEmailWithAttachments(waliDetails.email, waliDetails.name || 'Wali', user1.fname, user2.fname, chatLink, attachments);
+          } else {
+            await sendWaliViewChatEmail(waliDetails.email, waliDetails.name || 'Wali', user1.fname, user2.fname, chatLink);
+          }
         }
       } catch (e) {
         console.error('Error parsing wali details for user1:', e);
@@ -141,14 +190,23 @@ const sendChatReportToParents = async (userId1, userId2) => {
       try {
         const waliDetails = JSON.parse(user2.waliDetails);
         if (waliDetails.email) {
-          await sendWaliViewChatEmail(waliDetails.email, waliDetails.name || 'Wali', user2.fname, user1.fname, chatLink);
+          if (attachments.length > 0) {
+            await sendWaliViewChatEmailWithAttachments(waliDetails.email, waliDetails.name || 'Wali', user2.fname, user1.fname, chatLink, attachments);
+          } else {
+            await sendWaliViewChatEmail(waliDetails.email, waliDetails.name || 'Wali', user2.fname, user1.fname, chatLink);
+          }
         }
       } catch (e) {
         console.error('Error parsing wali details for user2:', e);
       }
     }
 
-    console.log(`Chat report sent to parents/wali for match between ${user1.fname} and ${user2.fname}`);
+    console.log(`📧 Chat report with ${attachments.length} attachments sent to parents/wali for match between ${user1.fname} and ${user2.fname}`);
+    
+    // Clean up transcript files after sending (optional - keep for debugging)
+    // if (pdfPath) fs.unlinkSync(pdfPath);
+    // if (txtPath) fs.unlinkSync(txtPath);
+    
   } catch (error) {
     console.error('Error sending chat report to parents:', error);
   }
@@ -361,7 +419,7 @@ const addChat = async (req, res) => {
   // Enhanced debug logging
   console.log('📥 Incoming addChat request:', JSON.stringify(req.body));
   const userInfo = req.user;
-  const { userId, message } = req.body;
+  const { userId, message, messageType } = req.body;
 
   // Defensive checks for required fields
   if (!userId || typeof userId !== 'string') {
@@ -398,6 +456,9 @@ const addChat = async (req, res) => {
 
     const sentCount = await getChatCountForValidation(contact._id, userInfo);
     
+    // Check if this is a video call invitation (exempt from word limits)
+    const isVideoCallInvitation = messageType === 'video_call_invitation';
+    
     console.log('📊 Message Limits Check:', {
       currentPlan: currentUser.plan,
       sentCount,
@@ -405,12 +466,14 @@ const addChat = async (req, res) => {
       messageWordCount: message.split(" ").length,
       wordCountPerMessage,
       exceedsCount: sentCount >= messageAllowance,
-      exceedsWords: message.split(" ").length >= wordCountPerMessage
+      exceedsWords: message.split(" ").length >= wordCountPerMessage,
+      isVideoCallInvitation,
+      messageType
     });
 
     if (
-      sentCount >= messageAllowance ||
-      message.split(" ").length >= wordCountPerMessage
+      (!isVideoCallInvitation && sentCount >= messageAllowance) ||
+      (!isVideoCallInvitation && message.split(" ").length >= wordCountPerMessage)
     ) {
       console.log('❌ Plan exceeded - returning 422');
       return res.status(422).json({ msg: `plan exceeded` });
@@ -777,6 +840,113 @@ const initiateVideoCall = async (req, res) => {
   }
 };
 
+// UPDATE VIDEO CALL INVITATION STATUS
+const updateVideoCallInvitationStatus = async (req, res) => {
+  try {
+    const { invitationId } = req.params;
+    const { status } = req.body;
+    const userId = req.user.id;
+    
+    console.log(`📝 Updating invitation ${invitationId} status to: ${status}`);
+
+    // Find the invitation and verify user has permission to update it
+    const invitation = await Message.findOne({
+      _id: invitationId,
+      messageType: 'video_call_invitation',
+      $or: [
+        { 'videoCallData.recipientId': userId },
+        { senderId: userId }
+      ]
+    });
+
+    if (!invitation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Video call invitation not found or access denied'
+      });
+    }
+
+    // Update the invitation status
+    invitation.videoCallData = {
+      ...invitation.videoCallData,
+      status: status,
+      updatedAt: new Date()
+    };
+
+    await invitation.save();
+    
+    console.log(`✅ Invitation ${invitationId} status updated to: ${status}`);
+
+    res.json({
+      success: true,
+      message: `Invitation status updated to ${status}`,
+      invitation: {
+        _id: invitation._id,
+        status: invitation.videoCallData.status,
+        updatedAt: invitation.videoCallData.updatedAt
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error updating invitation status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update invitation status',
+      error: error.message
+    });
+  }
+};
+
+// GET PENDING VIDEO CALL INVITATIONS
+const getPendingVideoCallInvitations = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    console.log('📞 Fetching pending video call invitations for user:', userId);
+
+    // Find all video call invitation messages where user is recipient
+    // and the invitation is still pending (not expired, accepted, or declined)
+    const pendingInvitations = await Message.find({
+      messageType: 'video_call_invitation',
+      'videoCallData.recipientId': userId,
+      'videoCallData.status': { $in: ['pending', undefined, null] },
+      // Only get invitations from last 24 hours to avoid old stale invitations
+      createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+    })
+    .populate('senderId', 'fname lname username')
+    .populate('conversationId')
+    .sort({ createdAt: -1 });
+
+    console.log(`✅ Found ${pendingInvitations.length} pending video call invitations`);
+
+    // Format the invitations for frontend
+    const formattedInvitations = pendingInvitations.map(invitation => ({
+      _id: invitation._id,
+      conversationId: invitation.conversationId._id,
+      callerId: invitation.senderId._id,
+      callerName: `${invitation.senderId.fname} ${invitation.senderId.lname}`,
+      recipientId: userId,
+      sessionId: invitation.videoCallData?.sessionId,
+      callId: invitation.videoCallData?.callId,
+      message: invitation.message,
+      createdAt: invitation.createdAt,
+      videoCallData: invitation.videoCallData
+    }));
+
+    res.json({
+      success: true,
+      pendingInvitations: formattedInvitations
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching pending video call invitations:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch pending video call invitations',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   getChat,
   getAllChatReceived,
@@ -789,5 +959,7 @@ module.exports = {
   createOrFindConversation,
   sendVideoCallInvitation,
   contactWali,
-  initiateVideoCall
+  initiateVideoCall,
+  getPendingVideoCallInvitations,
+  updateVideoCallInvitationStatus
 };

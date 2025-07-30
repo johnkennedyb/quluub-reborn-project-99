@@ -276,8 +276,12 @@ export const chatService = {
     return response.data;
   },
   
-  sendMessage: async (receiverId: string, message: string) => {
-    const response = await apiClient.post('/chats/chat', { userId: receiverId, message });
+  sendMessage: async (receiverId: string, message: string, messageType = 'text', data: any = null) => {
+    const payload: any = { userId: receiverId, message, messageType };
+    if (data) {
+      payload.videoCallData = data;
+    }
+    const response = await apiClient.post('/chats/send', payload);
     return response.data;
   },
   

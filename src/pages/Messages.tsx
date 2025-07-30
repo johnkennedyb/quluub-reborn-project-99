@@ -3,29 +3,29 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { chatService } from "@/lib/api-client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { ArrowLeft, Video, Send, ExternalLink, Crown, Flag, User } from "lucide-react";
+import { ArrowLeft, Video, Send, ExternalLink, Crown, Flag, User, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import apiClient from "@/lib/api-client";
 import socket from "@/lib/socket";
 import { isPremiumUser, hasFeatureAccess, getUpgradeMessage, PREMIUM_FEATURES } from "@/utils/premiumUtils";
-import { ZoomVideoCall } from "@/components/ZoomVideoCall";
+import VideoCallInvitationMessage from '@/components/VideoCall/VideoCallInvitationMessage';
+import VideoCallNotificationModal from '@/components/VideoCallNotificationModal';
+import { VideoCallInterface } from "@/components/VideoCallInterface";
 
 interface Message {
   _id: string;
   senderId: string;
+  recipientId?: string; // Add recipientId for context
   message: string;
   createdAt: string;
-  messageType?: string;
+  messageType?: 'text' | 'video_call_invitation';
   videoCallData?: {
-    meetingId?: string;
-    roomUrl: string;
-    hostRoomUrl?: string;
-    roomName: string;
-    startDate?: string;
-    endDate?: string;
-    senderName: string;
-    receiverName: string;
+    callerId: string;
+    callerName: string;
+    sessionId: string;
+    timestamp: string;
+    status: 'pending' | 'accepted' | 'declined' | 'ended' | 'missed';
   };
 }
 
@@ -38,16 +38,24 @@ const Messages = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageText, setMessageText] = useState("");
   const [loading, setLoading] = useState(true);
-  const [sending, setSending] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const [recipientId, setRecipientId] = useState<string | null>(null);
-  const [showZoomCall, setShowZoomCall] = useState(false);
   const [recipientName, setRecipientName] = useState<string>("");
+  const [showVideoCallInterface, setShowVideoCallInterface] = useState(false);
+  const [invitationOpen, setInvitationOpen] = useState(false);
+  const [invitationData, setInvitationData] = useState<{callerName: string; callerId: string; sessionId?: string; callId?: string; message?: string;} | null>(null);
+  const [incomingCall, setIncomingCall] = useState<any>(null);
+
+  // Video call refs and state
+  const localVideoRef = useRef<HTMLDivElement>(null);
+  const [remoteUserIds, setRemoteUserIds] = useState<string[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   
   // Task #29: Message counter state
-  const [messageLimit, setMessageLimit] = useState(10); // Default limit for free users
+  const [messageLimit, setMessageLimit] = useState(10); // Default limit for all users
   const [messagesUsed, setMessagesUsed] = useState(0);
   const [wordCount, setWordCount] = useState(0);
-  const maxWordsPerMessage = 100; // Word limit per message
+  const maxWordsPerMessage = 20; // Word limit per message
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -60,41 +68,78 @@ const Messages = () => {
   const renderMessageContent = (message: string, messageType?: string, videoCallData?: any) => {
     // Check if this is a video call invitation message
     if (messageType === 'video_call_invitation' && videoCallData) {
+      const handleJoinCall = () => {
+        console.log('🎯 Joining video call from chat message:', videoCallData);
+        setIncomingCall(videoCallData);
+      };
+
+      const handleDeclineCall = () => {
+        if (videoCallData?.sessionId && socket) {
+          console.log('📞 Declining call from chat message for session:', videoCallData.sessionId);
+          socket.emit("decline-call", { roomId: videoCallData.sessionId });
+        }
+        // Optionally, update the message status in the UI
+      };
+
       return (
-        <div className="space-y-3 p-4 bg-green-50 rounded-lg border border-green-200">
-          <div className="flex items-center gap-2 text-green-700">
+        <VideoCallInvitationMessage 
+          callerName={videoCallData.callerName}
+          onJoinCall={handleJoinCall}
+          onDeclineCall={handleDeclineCall}
+        />
+      );
+    }
+    
+    // Check for video call invitation with link in message text
+    const videoCallLinkRegex = /🎥 \*\*Video Call Invitation\*\*([\s\S]*?)🔗 \*\*Join Link:\*\* \[([^\]]+)\]\(([^\)]+)\)/;
+    const videoCallLinkMatch = message.match(videoCallLinkRegex);
+    
+    if (videoCallLinkMatch) {
+      const senderMatch = message.match(/📞 ([^\n]+) is inviting you/);
+      const linkText = videoCallLinkMatch[2];
+      const joinUrl = videoCallLinkMatch[3];
+      
+      // Extract session parameters from URL for direct joining
+      const urlParams = new URLSearchParams(joinUrl.split('?')[1]);
+      const sessionId = urlParams.get('sessionId');
+      const callerId = urlParams.get('callerId');
+      const callerName = urlParams.get('callerName');
+      
+      const handleJoinCall = () => {
+        if (sessionId && callerId && callerName) {
+          // Set up the incoming call data to join directly
+          setIncomingCall({
+            sessionId,
+            callerId,
+            callerName: decodeURIComponent(callerName),
+            isOutgoing: false
+          });
+          
+          // Show the video call interface
+          setShowVideoCallInterface(true);
+        }
+      };
+      
+      return (
+        <div className="space-y-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="flex items-center gap-2 text-blue-700">
             <Video className="h-5 w-5" />
-            <span className="font-semibold">Whereby Video Call Invitation</span>
+            <span className="font-semibold">Video Call Invitation</span>
             <Crown className="h-4 w-4 text-yellow-500" />
           </div>
           <div className="text-sm text-gray-700">
-            <p className="font-medium">{videoCallData.roomName}</p>
-            <p className="text-xs text-gray-500 mt-1">
-              From: {videoCallData.senderName} • To: {videoCallData.receiverName}
-            </p>
-            {videoCallData.startDate && (
-              <p className="text-xs text-gray-500">
-                Started: {(() => {
-                  try {
-                    const date = new Date(videoCallData.startDate);
-                    return isNaN(date.getTime()) ? 'Just now' : date.toLocaleString();
-                  } catch {
-                    return 'Just now';
-                  }
-                })()}
-              </p>
-            )}
+            {senderMatch && <p className="text-xs text-gray-500 mt-1">{senderMatch[1]} is inviting you to a video call</p>}
           </div>
           <Button
-            onClick={() => window.open(videoCallData.roomUrl, '_blank')}
-            className="w-full bg-green-600 hover:bg-green-700 text-white gap-2"
+            onClick={handleJoinCall}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white gap-2"
             size="sm"
           >
-            <ExternalLink className="h-4 w-4" />
-            Join Whereby Room
+            <Video className="h-4 w-4" />
+            {linkText}
           </Button>
           <p className="text-xs text-gray-500 text-center">
-            Premium Feature • Powered by Whereby
+            Premium Feature • quluub Video Call
           </p>
         </div>
       );
@@ -225,6 +270,14 @@ const Messages = () => {
     }
   };
 
+  useEffect(() => {
+    if (conversationId) {
+      fetchMessages();
+    } else if (targetUserId) {
+      createOrFindConversation(targetUserId);
+    }
+  }, [conversationId, targetUserId]);
+
   // Function to create or find conversation with a specific user
   const createOrFindConversation = async (userId: string) => {
     try {
@@ -272,78 +325,42 @@ const Messages = () => {
     // No polling needed since we have real-time socket updates
   }, [conversationId, targetUserId]);
 
-  // Socket listeners for messages only (video call functionality removed)
-  useEffect(() => {
-    if (!user) return;
-
-    // Only message-related socket listeners remain
-    // Video call socket listeners have been removed
-
-    return () => {
-      // Cleanup any remaining socket listeners if needed
-    };
-  }, [user]);
-
-  // fetchMessages is already called in the main useEffect above
-
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  // Socket listeners for real-time updates
+  // Listen for real-time message updates via socket (handled by App.tsx)
   useEffect(() => {
-    if (!socket || !user?._id) return;
+    if (!socket || !user?._id || !conversationId) return;
 
-    // Listen for video call invitations
-    const handleVideoCallInvitation = (data: any) => {
-      if (data.receiverId === user._id || data.senderId === user._id) {
-        // Show toast notification for incoming video call
-        if (data.receiverId === user._id) {
-          toast({
-            title: "📞 Incoming Video Call!",
-            description: `${data.senderName} is inviting you to a video call`,
-            action: (
-              <Button 
-                size="sm" 
-                onClick={() => window.open(data.roomUrl, '_blank')}
-                className="bg-green-600 hover:bg-green-700"
-              >
-                Join Call
-              </Button>
-            ),
-          });
-        }
-        
-        // Add the video call invitation message directly instead of refetching all messages
-        if (data.chat && (data.chat.senderId === user._id || data.chat.receiverId === user._id)) {
-          setMessages(prev => [...prev, data.chat]);
-          scrollToBottom();
-        }
-      }
-    };
+    // Join conversation room for real-time message updates
+    socket.emit('join_conversation', conversationId);
 
-    // Listen for new messages
+    // Listen for new messages in this conversation
     const handleNewMessage = (data: any) => {
-      if (data.conversationId === conversationId || 
-          (data.message && (data.message.senderId === user._id || data.message.receiverId === user._id))) {
+      console.log('📨 Received new message:', data);
+      
+      // Check if message belongs to current conversation
+      if (data.conversationId === conversationId) {
         setMessages(prev => {
           // Prevent duplicate messages
-          const messageExists = prev.some(msg => msg._id === data.message._id);
+          const messageExists = prev.some(msg => msg._id === data._id);
           if (messageExists) return prev;
-          return [...prev, data.message];
+          
+          console.log('✅ Adding message to conversation:', data);
+          return [...prev, data];
         });
         scrollToBottom();
       }
     };
 
-    socket.on('video_call_invitation', handleVideoCallInvitation);
     socket.on('new_message', handleNewMessage);
 
     return () => {
-      socket.off('video_call_invitation', handleVideoCallInvitation);
       socket.off('new_message', handleNewMessage);
+      socket.emit('leave_conversation', conversationId);
     };
-  }, [socket, user?._id, conversationId]);
+  }, [socket, user, conversationId]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -375,11 +392,65 @@ const Messages = () => {
     }
   }, [user, messages]);
 
+  const handleStartVideoCall = async () => {
+    if (!recipientId || !user) return;
+
+    if (!isPremiumUser(user)) {
+        toast({
+            title: "👑 Premium Feature",
+            description: "Video calls are available for Premium users only. Please upgrade your plan.",
+            variant: "destructive",
+            duration: 5000
+        });
+        return;
+    }
+
+    const sessionId = crypto.randomUUID();
+    const callId = crypto.randomUUID();
+    setCurrentSessionId(sessionId);
+
+    console.log('🚀 Starting video call invitation process...');
+    const invitationPayload = {
+        type: 'video_call_invitation',
+        callerId: user._id,
+        callerName: `${user.fname} ${user.lname}`,
+        callerUsername: user.username,
+        recipientId: recipientId,
+        sessionId: sessionId,
+        callId: callId,
+        timestamp: new Date().toISOString(),
+        message: `${user.fname} ${user.lname} is inviting you to a video call`
+    };
+
+    socket.emit('video_call_invitation', invitationPayload);
+
+    // Send a message with a clickable video call link to the chat log
+    try {
+        const videoCallLinkMessage = `🎥 **Video Call Invitation**\n\n📞 ${user.fname} ${user.lname} is inviting you to a video call\n\n🔗 **Join Link:** [Click here to join the video call](/video-call?sessionId=${sessionId}&callerId=${user._id}&callerName=${encodeURIComponent(user.fname + ' ' + user.lname)})\n\n_This is a premium feature. Islamic supervision is active._`;
+        await chatService.sendMessage(conversationId, videoCallLinkMessage, 'video_call_invitation', invitationPayload);
+    } catch (error) {
+        console.error("Failed to send video call message to chat", error);
+    }
+
+    setIncomingCall({ 
+        ...invitationPayload,
+        isOutgoing: true 
+    });
+    
+    setShowVideoCallInterface(true);
+    
+    toast({
+        title: "📞 Video Call Started",
+        description: `Invitation sent to ${recipientName}. Waiting for them to join...`,
+        duration: 5000
+    });
+  };
+
   const sendMessage = async () => {
-    if (!messageText.trim() || !conversationId || sending) return;
+    if (!messageText.trim() || !conversationId || isSending) return;
     
     try {
-      setSending(true);
+      setIsSending(true);
       console.log('Sending message:', messageText);
       const newMsg = await chatService.sendMessage(conversationId, messageText.trim());
       console.log('Message sent:', newMsg);
@@ -420,7 +491,7 @@ const Messages = () => {
         variant: "destructive" 
       });
     } finally {
-      setSending(false);
+      setIsSending(false);
     }
   };
 
@@ -481,42 +552,65 @@ const Messages = () => {
               </Button>
             )}
             
-            {/* Video Call Button */}
-            {recipientId && isPremiumUser(user) && (
+            {/* Video Call Button - Premium Feature */}
+            {recipientId && (
               <Button
-                onClick={() => setShowZoomCall(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={handleStartVideoCall}
+                className={isPremiumUser(user) ? "bg-blue-600 hover:bg-blue-700 text-white" : "border-yellow-300 text-yellow-700 hover:bg-yellow-50"}
+                variant={isPremiumUser(user) ? "default" : "outline"}
                 size="sm"
               >
-                <Video className="w-4 h-4 mr-2" />
+                <Video className="h-4 w-4 mr-2" />
                 Video Call
-                <Crown className="w-3 h-3 ml-1 text-yellow-400" />
+                <Crown className="h-3 w-3 ml-1" />
               </Button>
             )}
-            {recipientId && !isPremiumUser(user) && (
-              <Button
-                onClick={() => {
-                  toast({
-                    title: "Premium Feature",
-                    description: "Video calling is available for Premium users only. Upgrade to access this feature.",
-                    variant: "destructive"
-                  });
-                }}
-                variant="outline"
-                size="sm"
-              >
-                <Video className="w-4 h-4 mr-2" />
-                Video Call
-                <Crown className="w-3 h-3 ml-1 text-yellow-400" />
-              </Button>
-            )}
-            
-
           </div>
         </div>
 
+        {/* Video Containers - Show when video call is active */}
+        {showVideoCallInterface && (
+          <div className="p-4 bg-gray-900 border-b">
+            <div className="flex flex-wrap gap-4 justify-center">
+              {/* Local Video Preview */}
+              <div className="relative">
+                <div
+                  ref={localVideoRef}
+                  className="w-64 h-48 bg-black rounded-lg overflow-hidden border-2 border-blue-500"
+                />
+                <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                  You ({user?.fname})
+                </div>
+              </div>
+              
+              {/* Remote Video Previews */}
+              {remoteUserIds.map(uid => (
+                <div key={uid} className="relative">
+                  <div
+                    id={`remote-container-${uid}`}
+                    className="w-64 h-48 bg-black rounded-lg overflow-hidden border-2 border-green-500"
+                  />
+                  <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                    {recipientName || 'Remote User'}
+                  </div>
+                </div>
+              ))}
+
+              {/* Waiting for participant */}
+              {remoteUserIds.length === 0 && (
+                <div className="w-64 h-48 bg-gray-800 rounded-lg border-2 border-dashed border-gray-600 flex items-center justify-center">
+                  <div className="text-center text-gray-400">
+                    <Clock className="w-8 h-8 mx-auto mb-2" />
+                    <p className="text-sm font-medium truncate">{recipientName || "Waiting..."}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Chat Window */}
-        <div className="flex-1 p-4 space-y-4 bg-gray-50 overflow-y-auto">
+        <div id="message-container" className="flex-1 p-4 space-y-4 bg-gray-50 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center h-full">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
@@ -530,36 +624,9 @@ const Messages = () => {
               </div>
             </div>
           ) : (
-            messages.map((msg) => {
-            if (msg.messageType === 'video-call-invitation' || msg.message?.includes('🎥 Professional Video Call Invitation:')) {
-              const urlRegex = /(https?:\/\/[^\s]+)/;
-              const match = msg.message.match(urlRegex);
-              const meetingUrl = match ? match[0] : '#';
-              const senderName = (msg.senderId === user?._id ? 'You' : 'Someone');
-
-              return (
-                <div key={msg._id} className="flex justify-end my-2">
-                  <div className="bg-indigo-100 dark:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800 rounded-lg p-4 max-w-md text-center shadow-md">
-                    <div className="flex items-center justify-center mb-2">
-                      <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center mr-2">
-                        <span className="text-white text-lg">🎥</span>
-                      </div>
-                      <p className="text-md font-semibold text-indigo-800 dark:text-indigo-200">Professional Video Call</p>
-                    </div>
-                    <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">{senderName} has invited you to a video call.</p>
-                    <a href={meetingUrl} target="_blank" rel="noopener noreferrer" className="inline-block w-full">
-                      <button className="w-full bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-50">
-                        Join Call
-                      </button>
-                    </a>
-                  </div>
-                </div>
-              );
-            }
-
-            return (
+            messages.map((msg, index) => (
               <div
-                key={msg._id}
+                key={msg._id || `msg-${index}`}
                 className={`flex ${
                   msg.senderId === user?._id ? "justify-end" : "justify-start"
                 }`}
@@ -594,8 +661,8 @@ const Messages = () => {
                   </div>
                 </div>
               </div>
-            )}
-          ))}
+            ))
+          )}
           <div ref={messagesEndRef} />
         </div>
 
@@ -623,14 +690,14 @@ const Messages = () => {
               onKeyPress={handleKeyPress}
               placeholder="Type your message..."
               className="flex-1"
-              disabled={sending || messagesUsed >= messageLimit}
+              disabled={isSending || messagesUsed >= messageLimit}
             />
             <Button 
               onClick={sendMessage} 
-              disabled={!messageText.trim() || sending}
+              disabled={!messageText.trim() || isSending}
               className="bg-blue-500 hover:bg-blue-600"
             >
-              {sending ? (
+              {isSending ? (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
               ) : (
                 <Send className="h-4 w-4" />
@@ -640,18 +707,30 @@ const Messages = () => {
         </div>
       </div>
       
-      {/* Zoom Video Call Component */}
-      {showZoomCall && recipientId && (
-        <ZoomVideoCall
-          participantId={recipientId}
-          participantName={recipientName || "Chat Partner"}
-          onCallEnd={() => {
-            setShowZoomCall(false);
-            toast({
-              title: "📞 Call Ended",
-              description: "Video call has ended. Recording sent to Wali for review."
-            });
+      {/* Video Call Interface Popup */}
+      {recipientId && (
+        <VideoCallInterface
+          recipientId={recipientId}
+          recipientName={recipientName || "Chat Partner"}
+          conversationId={conversationId || undefined}
+          isOpen={showVideoCallInterface}
+          onClose={() => {
+            setShowVideoCallInterface(false);
+            setIncomingCall(null);
+            setRemoteUserIds([]);
+            setCurrentSessionId(null);
           }}
+          incomingCall={incomingCall}
+          localVideoContainer={localVideoRef}
+          onRemoteUserAdded={(userId: string) => {
+            console.log('👥 Remote user added:', userId);
+            setRemoteUserIds(ids => ids.includes(userId) ? ids : [...ids, userId]);
+          }}
+          onRemoteUserRemoved={(userId: string) => {
+            console.log('👥 Remote user removed:', userId);
+            setRemoteUserIds(ids => ids.filter(id => id !== userId));
+          }}
+          sessionId={currentSessionId}
         />
       )}
     </div>

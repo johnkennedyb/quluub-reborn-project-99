@@ -338,7 +338,7 @@ const Search = () => {
   return (
     <div className="min-h-screen bg-gray-50 pt-16">
       <TopNavbar />
-      <div className="container py-6">
+      <div className="container py-6" style={{paddingBottom: '200px'}}>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           {/* Filter sidebar */}
           <Card className="md:col-span-1 h-fit">

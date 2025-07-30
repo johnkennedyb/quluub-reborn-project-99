@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { createMeeting, getMeeting, deleteMeeting, generateSignature, notifyWali, getSDKToken } = require('../controllers/zoomController');
+const { createMeeting, createUIToolkitSession, joinSession, sendCallInvitation } = require('../controllers/zoomController');
 const { protect } = require('../middlewares/authMiddleware');
 
 // All Zoom routes require authentication
@@ -11,29 +11,19 @@ router.use(protect);
 // @access  Private (Premium users only)
 router.post('/create-meeting', createMeeting);
 
-// @route   GET /api/zoom/meeting/:meetingId
-// @desc    Get meeting details
+// @route   POST /api/zoom/session
+// @desc    Create a UI Toolkit session
 // @access  Private (Premium users only)
-router.get('/meeting/:meetingId', getMeeting);
+router.post('/session', createUIToolkitSession);
 
-// @route   DELETE /api/zoom/meeting/:meetingId
-// @desc    Delete a meeting
+// @route   POST /api/zoom/join-session
+// @desc    Join an existing Zoom session
 // @access  Private (Premium users only)
-router.delete('/meeting/:meetingId', deleteMeeting);
+router.post('/join-session', joinSession);
 
-// @route   POST /api/zoom/get-sdk-token
-// @desc    Generate Video SDK JWT for frontend
+// @route   POST /api/zoom/send-invitation
+// @desc    Send video call invitation to match
 // @access  Private (Premium users only)
-router.post('/get-sdk-token', getSDKToken);
-
-// @route   POST /api/zoom/signature
-// @desc    Generate Zoom SDK signature
-// @access  Private (Premium users only)
-router.post('/signature', generateSignature);
-
-// @route   POST /api/zoom/notify-wali
-// @desc    Notify Wali about video call
-// @access  Private (Premium users only)
-router.post('/notify-wali', notifyWali);
+router.post('/send-invitation', sendCallInvitation);
 
 module.exports = router;

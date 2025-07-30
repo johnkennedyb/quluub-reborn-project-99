@@ -83,15 +83,15 @@ const UserProfile = ({ userId }: UserProfileProps) => {
         <dl className="divide-y divide-gray-200">
           {renderDetail('Email', user.email)}
           {renderDetail('Gender', user.gender)}
-          {renderDetail('Date of Birth', user.birthDate ? new Date(user.birthDate).toLocaleDateString() : 'N/A')}
-          {renderDetail('City', user.cityOfResidence || 'N/A')}
+          {renderDetail('Date of Birth', user.dob ? new Date(user.dob).toLocaleDateString() : 'N/A')}
+          {renderDetail('City', user.city || 'N/A')}
           {renderDetail('Region', user.region)}
           {renderDetail('Marital Status', user.maritalStatus)}
           {renderDetail('Practicing Since', user.startedPracticing ? new Date(user.startedPracticing).toLocaleDateString() : 'N/A')}
           {renderDetail('Summary', user.summary || 'No summary provided - user should be encouraged to complete profile')}
           {renderDetail('Work/Education', user.workEducation)}
-          {renderDetail('Last Active', user.stats?.lastActive ? (() => {
-            const lastActiveDate = new Date(user.stats.lastActive);
+          {renderDetail('Last Active', user.lastSeen ? (() => {
+            const lastActiveDate = new Date(user.lastSeen);
             const now = new Date();
             const diffTime = Math.abs(now.getTime() - lastActiveDate.getTime());
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));

@@ -45,66 +45,39 @@ const Browse = () => {
   const { user } = useAuth();
 
   useEffect(() => {
-    const fetchUsers = async () => {
+    // Parallel fetch of browse data, favorites, and pending requests
+    const fetchData = async () => {
+      setLoading(true);
       try {
-        setLoading(true);
-        const fetchedUsers = await userService.getBrowseUsers({ showAll: true });
-        console.log("Browse users:", fetchedUsers);
-        if (fetchedUsers && fetchedUsers.length > 0) {
-          setUsers(fetchedUsers);
-          setFilteredUsers(fetchedUsers);
-          setTotalPages(Math.ceil(fetchedUsers.length / usersPerPage));
-        } else {
-          // If no users found, show toast
-          toast({
-            title: "No users found",
-            description: "No potential matches were found at this time.",
-            variant: "destructive",
-          });
-        }
+        const [fetchedUsers, favoritesData, pendingData] = await Promise.all([
+          userService.getBrowseUsers({ showAll: true }),
+          userService.getFavorites(),
+          relationshipService.getPendingRequests(),
+        ]);
+        console.log('Browse users:', fetchedUsers);
+
+        setUsers(fetchedUsers);
+        setFilteredUsers(fetchedUsers);
+        setTotalPages(Math.ceil(fetchedUsers.length / usersPerPage));
+
+        const favoriteIds = favoritesData?.favorites?.map((fav: any) => fav._id || fav.id) || [];
+        setFavoriteUsers(favoriteIds);
+
+        const pendingIds = pendingData?.requests?.map((req: any) => req._id) || [];
+        setPendingConnections(pendingIds);
       } catch (error) {
-        console.error("Failed to fetch browse users:", error);
+        console.error('Failed to fetch browse data:', error);
         toast({
-          title: "Error",
-          description: "Failed to load potential matches",
-          variant: "destructive",
+          title: 'Error',
+          description: 'Failed to load browse data',
+          variant: 'destructive',
         });
       } finally {
         setLoading(false);
       }
     };
 
-    fetchUsers();
-
-    // Fetch favorites
-    const fetchFavorites = async () => {
-      try {
-        const favoritesData = await userService.getFavorites();
-        if (favoritesData && favoritesData.favorites) {
-          const favoriteIds = favoritesData.favorites.map((fav: any) => fav._id || fav.id);
-          setFavoriteUsers(favoriteIds);
-        }
-      } catch (error) {
-        console.error("Error fetching favorites:", error);
-      }
-    };
-
-    fetchFavorites();
-
-    // Fetch pending connections to highlight already requested users
-    const fetchPendingRequests = async () => {
-      try {
-        const response = await relationshipService.getPendingRequests();
-        if (response && response.requests) {
-          const pendingIds = response.requests.map((req: any) => req._id);
-          setPendingConnections(pendingIds);
-        }
-      } catch (error) {
-        console.error("Error fetching pending requests:", error);
-      }
-    };
-    
-    fetchPendingRequests();
+    fetchData();
   }, [toast, usersPerPage]);
 
   // Filter users based on search and country filter
@@ -322,7 +295,7 @@ const Browse = () => {
                   </div>
                 );
 
-                if (!isPremiumUser(currentUser) && (index + 1) % 5 === 0 && (index + 1) < currentUsers.length) {
+                if (!isPremiumUser(user) && (index + 1) % 5 === 0 && (index + 1) < currentUsers.length) {
                   acc.push(
                     <div key={`ad-${index}`} className="sm:col-span-2 lg:col-span-4 my-4">
                       <AdComponent />

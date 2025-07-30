@@ -33,11 +33,31 @@ const PushNotificationManagement = () => {
 
   const handleSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
-      await sendPushNotification(values);
-      toast({ title: 'Success', description: 'Push notification sent successfully!' });
-      form.reset();
-    } catch (error) {
-      toast({ title: 'Error', description: 'Failed to send push notification.', variant: 'destructive' });
+      // Send notification directly to backend API
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/notifications/global`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title: values.title,
+          message: values.message,
+          type: 'admin_announcement',
+          target: values.target
+        })
+      });
+      
+      if (response.ok) {
+        toast({ title: 'Success', description: 'Notification sent successfully to user alerts!' });
+        form.reset();
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to send notification');
+      }
+    } catch (error: any) {
+      console.error('Notification send error:', error);
+      toast({ title: 'Error', description: error.message || 'Failed to send notification.', variant: 'destructive' });
     }
   };
 

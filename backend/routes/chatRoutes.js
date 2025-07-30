@@ -12,6 +12,8 @@ const {
   contactWali,
   initiateVideoCall,
   sendVideoCallInvitation,
+  getPendingVideoCallInvitations,
+  updateVideoCallInvitationStatus,
   createOrFindConversation
 } = require('../controllers/chatController');
 const { protect } = require('../middlewares/auth');
@@ -23,6 +25,8 @@ router.get('/conversations', protect, getConversations);
 router.get('/messages/:userId', protect, getMessages);
 router.post('/send', protect, sendMessage);
 router.post('/send-invitation/:conversationId', protect, sendVideoCallInvitation);
+router.get('/pending-invitations', protect, getPendingVideoCallInvitations);
+router.patch('/invitation-status/:invitationId', protect, updateVideoCallInvitationStatus);
 router.get('/unread', protect, getUnreadCount);
 router.post('/contact-wali', protect, contactWali);
 router.post('/video-call', protect, initiateVideoCall);

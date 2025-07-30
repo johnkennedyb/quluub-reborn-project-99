@@ -93,6 +93,14 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
     }
   };
 
+  // Debug logging for DOB in ProfileEditSections
+  console.log('=== PROFILE EDIT SECTIONS DEBUG ===');
+  console.log('User prop passed to ProfileEditSections:', user);
+  console.log('User DOB field:', user.dob);
+  console.log('User DOB type:', typeof user.dob);
+  console.log('Parsed DOB for form:', user.dob ? new Date(user.dob) : undefined);
+  console.log('=====================================');
+
   const [formData, setFormData] = useState({
     kunya: user.kunya || "",
     dob: user.dob ? new Date(user.dob) : undefined,

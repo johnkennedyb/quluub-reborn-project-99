@@ -473,7 +473,7 @@ const Settings = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-gray-50" style={{paddingBottom: '200px'}}>
       <div className="container py-6">
         
         <h1 className="text-2xl font-bold mb-6">Settings</h1>

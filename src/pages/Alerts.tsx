@@ -26,10 +26,11 @@ interface ConnectionRequest {
 
 interface Notification {
   id: string;
-  type: 'connection_request' | 'connection_accepted' | 'message';
+  type: 'connection_request' | 'connection_accepted' | 'message' | 'admin_announcement' | 'system_alert';
   title: string;
   description: string;
   time: string;
+  createdAt: string;
   read: boolean;
   user?: {
     name: string;
@@ -45,6 +46,61 @@ const Alerts = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+
+  // Mark notification as read
+  const markNotificationAsRead = async (notificationId: string) => {
+    try {
+      const adminNotificationId = notificationId.replace('admin_', '');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/notifications/${adminNotificationId}/read`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        // Update the notification in the local state
+        setNotifications(prev => prev.map(notification => 
+          notification.id === notificationId 
+            ? { ...notification, read: true }
+            : notification
+        ));
+        toast({ title: 'Success', description: 'Notification marked as read' });
+      }
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
+      toast({ title: 'Error', description: 'Failed to mark notification as read', variant: 'destructive' });
+    }
+  };
+
+  // Fetch admin notifications
+  const fetchAdminNotifications = async () => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/notifications`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const adminNotifications = await response.json();
+        return adminNotifications.map((notification: any) => ({
+          id: `admin_${notification._id}`,
+          type: notification.type === 'admin_announcement' ? 'admin_announcement' : 'system_alert',
+          title: notification.type === 'admin_announcement' ? 'Admin Announcement' : 'System Alert',
+          description: notification.message,
+          time: timeAgo(new Date(notification.createdAt)),
+          createdAt: notification.createdAt, // Keep original timestamp for sorting
+          read: notification.read
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch admin notifications:', error);
+    }
+    return [];
+  };
 
   // Fetch connection requests and matches
   const fetchConnectionData = async () => {
@@ -63,6 +119,8 @@ const Alerts = () => {
       const matchesResponse = await relationshipService.getMatches();
       console.log("Matches response:", matchesResponse);
       
+      let allNotifications: Notification[] = [];
+      
       if (matchesResponse && matchesResponse.matches) {
         const matchNotifications: Notification[] = matchesResponse.matches.map((match: any) => ({
           id: `match_${match._id}`,
@@ -70,6 +128,7 @@ const Alerts = () => {
           title: 'Connection Accepted!',
           description: `You and ${match.fname} ${match.lname} are now connected. You can start chatting!`,
           time: timeAgo(new Date(match.relationship?.createdAt || match.relationship?.updatedAt || Date.now())),
+          createdAt: match.relationship?.createdAt || match.relationship?.updatedAt || new Date().toISOString(),
           read: false,
           user: {
             name: `${match.fname} ${match.lname}`,
@@ -77,8 +136,17 @@ const Alerts = () => {
           }
         }));
         
-        setNotifications(matchNotifications);
+        allNotifications = [...allNotifications, ...matchNotifications];
       }
+      
+      // Fetch admin notifications
+      const adminNotifications = await fetchAdminNotifications();
+      allNotifications = [...allNotifications, ...adminNotifications];
+      
+      // Sort notifications by createdAt timestamp (newest first)
+      allNotifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
+      setNotifications(allNotifications);
       
     } catch (error) {
       console.error("Failed to fetch connection data:", error);
@@ -118,6 +186,7 @@ const Alerts = () => {
           title: 'Connection Accepted!',
           description: `You and ${acceptedUser.fname} ${acceptedUser.lname} are now connected. You can start chatting!`,
           time: 'Just now',
+          createdAt: new Date().toISOString(),
           read: false,
           user: {
             name: `${acceptedUser.fname} ${acceptedUser.lname}`,
@@ -167,7 +236,7 @@ const Alerts = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 pb-20">
+      <div className="min-h-screen bg-gray-50" style={{paddingBottom: '200px'}}>
         <div className="container py-6 flex justify-center items-center h-[calc(100vh-200px)]">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
@@ -177,7 +246,7 @@ const Alerts = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-gray-50" style={{paddingBottom: '200px'}}>
       <div className="container py-6">
         
         {/* Connection Requests Section */}
@@ -273,35 +342,54 @@ const Alerts = () => {
           {showNotifications && (
             <div className="space-y-4 mt-4">
               {notifications.length > 0 ? (
-                notifications.map((notification) => (
-                  <Alert
-                    key={notification.id}
-                    variant={notification.read ? "default" : "default"}
-                    className={notification.read ? "bg-background" : "bg-primary/5 border-primary/20"}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="flex items-start space-x-3">
-                        {notification.user?.photo && (
-                          <ProfileImage
-                            src={notification.user.photo}
-                            alt={notification.user.name}
-                            fallback={notification.user.name.split(' ').map(n => n[0]).join('')}
-                            size="sm"
-                          />
-                        )}
-                        <div>
-                          <AlertTitle className="font-semibold">{notification.title}</AlertTitle>
-                          <AlertDescription className="text-muted-foreground">
-                            {notification.description}
-                          </AlertDescription>
+                notifications.map((notification) => {
+                  const isAdminNotification = notification.type === 'admin_announcement' || notification.type === 'system_alert';
+                  const notificationStyle = isAdminNotification 
+                    ? "bg-blue-50 border-blue-200 hover:bg-blue-100" 
+                    : notification.read ? "bg-background" : "bg-primary/5 border-primary/20";
+                  
+                  return (
+                    <Alert
+                      key={notification.id}
+                      variant={notification.read ? "default" : "default"}
+                      className={`${notificationStyle} cursor-pointer transition-colors`}
+                      onClick={() => isAdminNotification && markNotificationAsRead(notification.id)}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-start space-x-3">
+                          {isAdminNotification ? (
+                            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                              {notification.type === 'admin_announcement' ? '📢' : '⚠️'}
+                            </div>
+                          ) : (
+                            notification.user?.photo && (
+                              <ProfileImage
+                                src={notification.user.photo}
+                                alt={notification.user.name}
+                                fallback={notification.user.name.split(' ').map(n => n[0]).join('')}
+                                size="sm"
+                              />
+                            )
+                          )}
+                          <div>
+                            <AlertTitle className={`font-semibold ${isAdminNotification ? 'text-blue-800' : ''}`}>
+                              {notification.title}
+                            </AlertTitle>
+                            <AlertDescription className={`${isAdminNotification ? 'text-blue-700' : 'text-muted-foreground'}`}>
+                              {notification.description}
+                            </AlertDescription>
+                            {isAdminNotification && !notification.read && (
+                              <div className="text-xs text-blue-600 mt-1 font-medium">Click to mark as read</div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-xs text-muted-foreground whitespace-nowrap ml-4">
+                          {notification.time}
                         </div>
                       </div>
-                      <div className="text-xs text-muted-foreground whitespace-nowrap ml-4">
-                        {notification.time}
-                      </div>
-                    </div>
-                  </Alert>
-                ))
+                    </Alert>
+                  );
+                })
               ) : (
                 <Card>
                   <CardContent className="flex flex-col items-center justify-center py-12">

@@ -18,7 +18,7 @@ exports.getNotifications = asyncHandler(async (req, res) => {
 // @route   POST /api/notifications/global
 // @access  Private/Admin
 exports.sendGlobalNotification = asyncHandler(async (req, res) => {
-  const { title, message, userIds } = req.body; // userIds is an array of user IDs
+  const { title, message, type, target, userIds } = req.body;
 
   if (!title || !message) {
     res.status(400);
@@ -29,6 +29,10 @@ exports.sendGlobalNotification = asyncHandler(async (req, res) => {
   if (userIds && userIds.length > 0) {
     // Send to specific users
     users = await User.find({ '_id': { $in: userIds } }, '_id');
+  } else if (target && target !== 'all') {
+    // Filter users by subscription plan
+    const planFilter = target === 'premium' ? 'premium' : 'freemium';
+    users = await User.find({ plan: planFilter }, '_id');
   } else {
     // Send to all users
     users = await User.find({}, '_id');
@@ -41,8 +45,8 @@ exports.sendGlobalNotification = asyncHandler(async (req, res) => {
 
   const notifications = users.map(user => ({
     user: user._id,
-    title,
-    message,
+    type: type || 'admin_announcement',
+    message: `${title}: ${message}`,
     read: false,
   }));
 

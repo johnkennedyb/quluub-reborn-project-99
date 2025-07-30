@@ -62,7 +62,10 @@ exports.applyReferralCode = async (req, res) => {
     currentUser.referralStatus = 'Verified';
     await currentUser.save();
     
-    // Check if the referrer has earned a premium reward
+    // Increment referrer's stats
+    referrer.referralStats.completedReferrals = (referrer.referralStats.completedReferrals || 0) + 1;
+
+    // Check if the referrer has earned a premium reward (for every 5 referrals)
     if (referrer.referralStats.completedReferrals > 0 && referrer.referralStats.completedReferrals % 5 === 0) {
       referrer.plan = 'premium';
       
@@ -71,8 +74,14 @@ exports.applyReferralCode = async (req, res) => {
         ? referrer.premiumExpirationDate 
         : now;
         
+      // Add one month to the expiration date
       currentExpiration.setMonth(currentExpiration.getMonth() + 1);
       referrer.premiumExpirationDate = currentExpiration;
+
+      // Track total earnings in months
+      referrer.referralStats.totalEarnings = (referrer.referralStats.totalEarnings || 0) + 1;
+
+      console.log(`User ${referrer.username} earned 1 month of premium via referral. Total referrals: ${referrer.referralStats.completedReferrals}`);
     }
 
     await referrer.save();

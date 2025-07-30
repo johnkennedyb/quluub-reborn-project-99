@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ZoomVideo from '@zoom/videosdk';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +30,7 @@ export const ZoomVideoCall: React.FC<ZoomVideoCallProps> = ({ participantId, par
   const mediaStreamRef = useRef<any>(null);
   const localPlayerRef = useRef<HTMLVideoElement>(null);
   const remotePlayerRef = useRef<HTMLVideoElement>(null);
+  const localCameraStreamRef = useRef<MediaStream | null>(null);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -37,113 +38,347 @@ export const ZoomVideoCall: React.FC<ZoomVideoCallProps> = ({ participantId, par
     return `${mins}:${secs}`;
   };
 
-  const handleCallEnd = useCallback(async () => {
-    console.log('📞 Ending call...');
+  // Reusable timer cleanup function
+  const clearTimer = useCallback(() => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
+      console.log('🛑 Timer cleared');
     }
+  }, []);
+
+  // Reusable video attachment function
+  const attachVideoStream = useCallback(async ({
+    element,
+    userId,
+    label,
+  }: {
+    element: HTMLVideoElement | null;
+    userId: number;
+    label: string;
+  }) => {
+    if (!element || !mediaStreamRef.current) {
+      console.warn(`⚠️ ${label} video attachment failed - missing refs:`, {
+        element: !!element,
+        mediaStreamRef: !!mediaStreamRef.current
+      });
+      return;
+    }
+
+    try {
+      console.log(`📹 Attaching ${label.toLowerCase()} video...`, {
+        element,
+        userId,
+        mediaStream: mediaStreamRef.current
+      });
+      
+      // Clear any existing content
+      element.srcObject = null;
+      
+      // Ensure video element is ready and visible
+      element.style.display = 'block';
+      element.style.visibility = 'visible';
+      element.autoplay = true;
+      element.playsInline = true;
+      
+      // Attach the Zoom video stream
+      await mediaStreamRef.current.attachVideo(element, userId);
+      console.log(`✅ ${label} video attached successfully!`);
+      
+      // Force play if needed
+      try {
+        await element.play();
+      } catch (playErr) {
+        console.log(`📹 ${label} video autoplay handled by browser`);
+      }
+      
+      // Verify video is working
+      setTimeout(() => {
+        if (element) {
+          console.log(`📹 ${label} video element state:`, {
+            videoWidth: element.videoWidth,
+            videoHeight: element.videoHeight,
+            readyState: element.readyState,
+            paused: element.paused,
+            srcObject: !!element.srcObject
+          });
+          
+          // If video dimensions are 0, try to refresh
+          if (element.videoWidth === 0 || element.videoHeight === 0) {
+            console.log(`🔄 ${label} video has no dimensions, attempting refresh...`);
+            element.load();
+          }
+        }
+      }, 2000);
+      
+    } catch (err) {
+      console.error(`❌ Error attaching ${label.toLowerCase()} video:`, err);
+      
+      // Retry with delay
+      setTimeout(async () => {
+        try {
+          console.log(`🔄 Retrying ${label.toLowerCase()} video attachment...`);
+          await mediaStreamRef.current.attachVideo(element, userId);
+          console.log(`✅ ${label} video attached on retry!`);
+          
+          // Force play on retry
+          try {
+            await element.play();
+          } catch (playErr) {
+            console.log(`📹 ${label} video retry autoplay handled`);
+          }
+        } catch (retryErr) {
+          console.error(`❌ ${label} video retry failed:`, retryErr);
+        }
+      }, 3000);
+    }
+  }, []);
+
+  const handleCallEnd = useCallback(async () => {
+    console.log('📞 Ending call...');
+    
+    // Clear timer first
+    clearTimer();
+    
+    // Cleanup Zoom resources
     if (zoomClientRef.current) {
       try {
+        console.log('🧹 Cleaning up Zoom resources...');
+        
+        // Stop media streams
+        if (mediaStreamRef.current) {
+          try {
+            await mediaStreamRef.current.stopVideo();
+            await mediaStreamRef.current.stopAudio();
+            console.log('📹 Media streams stopped');
+          } catch (error) {
+            console.error('Error stopping media streams:', error);
+          }
+        }
+        
+        // Leave Zoom session
         await zoomClientRef.current.leave();
+        console.log('✅ Left Zoom session successfully');
+        
+        // Remove event listeners
+        zoomClientRef.current.off('user-added');
+        
       } catch (error) {
-        console.error("Error during call cleanup:", error);
+        console.error('Error during call cleanup:', error);
+      } finally {
+        zoomClientRef.current = null;
+        mediaStreamRef.current = null;
       }
-      zoomClientRef.current = null;
-      mediaStreamRef.current = null;
     }
+    
+    // Cleanup direct camera stream
+    if (localCameraStreamRef.current) {
+      try {
+        console.log('📹 Stopping direct camera stream...');
+        localCameraStreamRef.current.getTracks().forEach(track => {
+          track.stop();
+          console.log('✅ Camera track stopped:', track.kind);
+        });
+        localCameraStreamRef.current = null;
+        
+        // Clear video elements
+        if (localPlayerRef.current) {
+          localPlayerRef.current.srcObject = null;
+        }
+        if (remotePlayerRef.current) {
+          remotePlayerRef.current.srcObject = null;
+        }
+      } catch (error) {
+        console.error('Error stopping camera stream:', error);
+      }
+    }
+    
+    // Update UI state
     setCallActive(false);
+    setTimeRemaining(300); // Reset timer for next call
+    
+    // Notify parent component
     if (onCallEnd) {
       onCallEnd();
     }
-    toast({ title: "Call Ended", description: `Your call with ${participantName} has ended.` });
+    
+    toast({ 
+      title: '📞 Call Ended', 
+      description: `Your call with ${participantName} has ended.`,
+      duration: 3000
+    });
   }, [onCallEnd, participantName, toast]);
 
   useEffect(() => {
-    // Timer effect
-    if (callActive) {
+    // Timer effect - only start timer when call is active and timer hasn't started yet
+    if (callActive && !timerRef.current) {
+      console.log('🕐 Starting 5-minute countdown timer...');
       timerRef.current = setInterval(() => {
         setTimeRemaining(prevTime => {
           if (prevTime <= 1) {
+            console.log('⏰ Timer expired, ending call...');
             handleCallEnd();
             return 0;
+          }
+          if (prevTime <= 30 && prevTime % 10 === 0) {
+            console.log(`⚠️ ${prevTime} seconds remaining`);
           }
           return prevTime - 1;
         });
       }, 1000);
+    } else if (!callActive && timerRef.current) {
+      console.log('🛑 Clearing timer - call ended');
+      clearTimer();
     }
+    
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
+      clearTimer();
     };
   }, [callActive, handleCallEnd]);
+
+  // Video attachment is now handled directly in startCall function
+  // This useEffect is no longer needed as timing was causing issues
   
-  // Cleanup on unmount
+  // Cleanup on unmount - only cleanup resources, don't call handleCallEnd
   useEffect(() => {
     return () => {
+      // Only cleanup resources without triggering the full handleCallEnd flow
+      clearTimer();
       if (zoomClientRef.current) {
-        handleCallEnd();
+        try {
+          zoomClientRef.current.leave();
+        } catch (error) {
+          console.error('Error during unmount cleanup:', error);
+        }
       }
     };
-  }, [handleCallEnd]);
+  }, [clearTimer]); // Include clearTimer in dependencies
+
+  // Function to initialize camera permissions (no direct video attachment)
+  const initializeCameraPermissions = async () => {
+    try {
+      console.log('🎥 Checking camera permissions...');
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: 'user'
+        }, 
+        audio: true 
+      });
+      
+      // Stop the stream immediately - we just needed to check permissions
+      stream.getTracks().forEach(track => track.stop());
+      console.log('✅ Camera permissions verified');
+      
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to access camera:', error);
+      toast({
+        title: 'Camera Error',
+        description: 'Failed to access camera. Please check permissions.',
+        variant: 'destructive'
+      });
+      throw error;
+    }
+  };
 
   const startCall = async () => {
     setIsLoading(true);
+    
     try {
-      const sessionKey = `quluub-call-${[user?._id, participantId].sort().join('-')}`;
+      // Check camera permissions first
+      await initializeCameraPermissions();
       
-      console.log(`🔑 Requesting Video SDK JWT for session: ${sessionKey}`);
-      const { data } = await apiClient.post('/zoom/get-sdk-token', { sessionKey });
-      const { sdkJWT } = data;
-
-      if (!sdkJWT) {
-        throw new Error('Missing SDK JWT from server.');
-      }
-
+      console.log('🎥 Initializing Zoom Video SDK...');
       const client = ZoomVideo.createClient();
       zoomClientRef.current = client;
 
-      await client.init('en-US', 'Global', { patchJsMedia: true });
+      await client.init('en-US', 'Global');
 
-      client.on('peer-video-state-change', async (payload: any) => {
-        const { action, userId } = payload;
-        if (remotePlayerRef.current && mediaStreamRef.current) {
-          if (action === 'Start') {
-            await mediaStreamRef.current.renderVideo(remotePlayerRef.current, userId, 1280, 720, 0, 0, 3);
-          } else if (action === 'Stop') {
-            await mediaStreamRef.current.stopRenderVideo(remotePlayerRef.current, userId);
+      console.log('📞 Requesting video session from backend...');
+      const { data } = await apiClient.post('/zoom/create-meeting', {
+        participantId,
+        topic: `Quluub Call with ${participantName}`,
+      });
+
+      const { sdkJWT, sessionName, userName } = data;
+      if (!sdkJWT || !sessionName) {
+        throw new Error('Missing SDK credentials from backend.');
+      }
+
+      await client.join(sessionName, sdkJWT, userName);
+      console.log('✅ Joined Zoom session successfully.');
+
+      mediaStreamRef.current = client.getMediaStream();
+
+      // Start video stream
+      try {
+        await mediaStreamRef.current.startVideo();
+        console.log('📹 Video stream started');
+      } catch (err) {
+        console.error('❌ Failed to start video stream:', err);
+      }
+
+      setCallActive(true);
+      
+      // Wait for UI to render then attach video streams
+      setTimeout(async () => {
+        try {
+          const currentUser = client.getCurrentUserInfo();
+          console.log('👤 Current user info:', currentUser);
+          
+          // Clear any existing video content
+          if (localPlayerRef.current) {
+            localPlayerRef.current.srcObject = null;
+          }
+          
+          // Attach local video stream
+          await attachVideoStream({
+            element: localPlayerRef.current,
+            userId: currentUser.userId,
+            label: 'Local'
+          });
+        } catch (err) {
+          console.error('❌ Error attaching local video:', err);
+        }
+      }, 1000);
+      
+      console.log('📞 Call is now active, timer starting...');
+      toast({ title: '📞 Call Started', description: `Call with ${participantName} is live.` });
+
+      // Handle remote users joining
+      client.on('user-added', async (payload) => {
+        console.log('👤 User added:', payload);
+        
+        for (const user of payload) {
+          const currentUser = client.getCurrentUserInfo();
+          if (user.userId !== currentUser.userId) {
+            setTimeout(async () => {
+              await attachVideoStream({
+                element: remotePlayerRef.current,
+                userId: user.userId,
+                label: 'Remote'
+              });
+            }, 500);
+            break; // Attach first remote user
           }
         }
       });
-
+      
+      // Handle remote user leaving
       client.on('user-removed', () => {
-        handleCallEnd();
+        console.log('👤 Remote user left the call');
+        toast({ title: '👋 User Left', description: 'The other participant has left the call.' });
       });
-      
-      client.on('connection-change', (payload: any) => {
-        if (payload.state === 'Disconnected') {
-          handleCallEnd();
-        }
-      });
-
-      await client.join(sessionKey, sdkJWT, user?.fname || 'Quluub User');
-      const stream = client.getMediaStream();
-      mediaStreamRef.current = stream;
-
-      if (localPlayerRef.current) {
-        await stream.startVideo({ videoElement: localPlayerRef.current });
-      }
-      await stream.startAudio();
-      
-      setVideoEnabled(true);
-      setAudioEnabled(true);
-      setCallActive(true);
-      toast({ title: "Call Started", description: `Your call with ${participantName} has begun.` });
 
     } catch (error) {
       console.error('💥 Failed to start call:', error);
-      toast({ title: 'Error', description: 'Could not start the video call. Please try again.', variant: 'destructive' });
+      toast({ 
+        title: 'Error Starting Call',
+        description: error instanceof Error ? error.message : 'An unknown error occurred.',
+        variant: 'destructive' 
+      });
       await handleCallEnd();
     } finally {
       setIsLoading(false);
@@ -152,152 +387,111 @@ export const ZoomVideoCall: React.FC<ZoomVideoCallProps> = ({ participantId, par
 
   const toggleVideo = async () => {
     if (mediaStreamRef.current) {
-      try {
-        if (videoEnabled) {
-          await mediaStreamRef.current.stopVideo();
-        } else {
-          if (localPlayerRef.current) {
-            await mediaStreamRef.current.startVideo({ videoElement: localPlayerRef.current });
-          }
-        }
-        setVideoEnabled(!videoEnabled);
-      } catch (err) {
-        console.error('Error toggling video', err);
+      if (videoEnabled) {
+        await mediaStreamRef.current.stopVideo();
+        toast({ title: 'Video Off' });
+      } else {
+        await mediaStreamRef.current.startVideo();
+        toast({ title: 'Video On' });
       }
+      setVideoEnabled(!videoEnabled);
     }
   };
 
   const toggleAudio = async () => {
     if (mediaStreamRef.current) {
-      try {
-        if (audioEnabled) {
-          await mediaStreamRef.current.muteAudio();
-        } else {
-          await mediaStreamRef.current.unmuteAudio();
-        }
-        setAudioEnabled(!audioEnabled);
-      } catch (err) {
-        console.error('Error toggling audio', err);
+      if (audioEnabled) {
+        await mediaStreamRef.current.muteAudio();
+        toast({ title: 'Audio Muted' });
+      } else {
+        await mediaStreamRef.current.unmuteAudio();
+        toast({ title: 'Audio Unmuted' });
       }
+      setAudioEnabled(!audioEnabled);
     }
   };
 
   return (
     <>
-      {!callActive ? (
-        <Card className="w-full max-w-md mx-auto my-8 bg-gray-800 text-white border-gray-700">
-          <CardHeader>
-            <CardTitle className="flex flex-col items-center text-center">
-              <Crown className="w-8 h-8 text-yellow-500 mb-2" />
-              <span className="text-2xl">Premium Video Call</span>
-              <Badge variant="outline" className="mt-2 border-green-500 text-green-500">
-                Wali Supervised
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col items-center text-center gap-4">
-            <img
-              src={`https://ui-avatars.com/api/?name=${participantName.replace(/\s/g, '+')}&background=random&size=96&color=fff`}
-              alt={participantName}
-              className="w-24 h-24 rounded-full border-4 border-blue-500 shadow-lg"
-            />
-            <p>You are about to start a call with <span className="font-bold">{participantName}</span>.</p>
-            
-            <div className="text-xs text-muted-foreground bg-gray-700 p-3 rounded-lg">
-              <p className="font-bold mb-2">Please remember:</p>
-              <ul className="list-disc list-inside text-left">
-                <li>• 5-minute duration limit</li>
-                <li>• Automatic cloud recording</li>
-                <li>• Wali supervision notification</li>
-                <li>• Islamic compliance monitoring</li>
-              </ul>
-            </div>
-            
-            <Button 
-              onClick={startCall}
-              disabled={isLoading}
-              className="w-full bg-green-600 hover:bg-green-700"
-              size="lg"
-            >
-              {isLoading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                  Creating Call...
-                </> 
-              ) : (
-                <>
-                  <Phone className="w-4 h-4 mr-2" />
-                  Start Video Call
-                </>
-              )}
-            </Button>
-            
-            <p className="text-xs text-center text-muted-foreground">
-              This call will be recorded and sent to the Wali for Islamic supervision
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <Dialog open={callActive} onOpenChange={(isOpen) => !isOpen && handleCallEnd()}>
-          <DialogContent className="bg-gray-900 text-white p-0 border-0 max-w-4xl w-full h-[90vh] flex flex-col">
-            <DialogHeader className="p-4 flex-shrink-0">
-              <DialogTitle className="flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <Crown className="w-5 h-5 text-yellow-500" />
-                  <span className="font-semibold">Video Call with {participantName}</span>
-                  <Badge variant="outline" className="border-green-500 text-green-500">
-                    Premium Feature
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 text-yellow-400">
-                    <Clock className="w-4 h-4" />
-                    <span className="font-mono text-lg">
-                      {formatTime(timeRemaining)}
-                    </span>
-                  </div>
-                  {timeRemaining <= 60 && (
-                    <Badge variant="destructive" className="animate-pulse">
-                      ⚠️ 1 Minute Remaining
-                    </Badge>
-                  )}
-                </div>
-              </DialogTitle>
+      {callActive ? (
+        <Dialog open={callActive} onOpenChange={(open) => {
+          if (!open) {
+            handleCallEnd();
+          }
+        }}>
+          <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0 bg-black">
+            <DialogHeader className="p-4 text-white">
+              <DialogTitle>Call with {participantName}</DialogTitle>
+              <DialogDescription>Video call with {participantName} is active.</DialogDescription>
             </DialogHeader>
-
-            <div className="flex-1 bg-gray-800 min-h-0 relative">
-              <video ref={remotePlayerRef} id="remote-player" className="w-full h-full object-contain" autoPlay playsInline></video>
-              <video ref={localPlayerRef} id="local-player" className="absolute bottom-4 right-4 border-2 border-gray-600 rounded-md w-32 h-24" autoPlay playsInline muted></video>
+            <div className="flex-grow relative bg-black">
+              {/* Main video area (remote participant) */}
+              <video 
+                ref={remotePlayerRef} 
+                className="w-full h-full object-cover" 
+                playsInline 
+                autoPlay 
+                muted={false}
+                style={{ 
+                  backgroundColor: '#1a1a1a',
+                  display: 'block',
+                  visibility: 'visible'
+                }}
+              />
+              
+              {/* Local video (picture-in-picture) - responsive sizing */}
+              <video 
+                ref={localPlayerRef} 
+                className="absolute bottom-2 right-2 w-24 h-18 sm:bottom-4 sm:right-4 sm:w-36 sm:h-28 md:w-48 md:h-36 object-cover border-2 border-white rounded-md shadow-lg" 
+                playsInline 
+                autoPlay 
+                muted={true}
+                style={{ 
+                  backgroundColor: '#2a2a2a',
+                  display: 'block',
+                  visibility: 'visible',
+                  zIndex: 10
+                }}
+              />
+              
+              {/* Video status indicators */}
+              <div className="absolute top-4 left-4 flex gap-2">
+                <div className="bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
+                  {videoEnabled ? ' Video On' : ' Video Off'}
+                </div>
+                <div className="bg-black bg-opacity-50 text-white px-2 py-1 rounded text-sm">
+                  {audioEnabled ? '🔊 Audio On' : '🔇 Audio Off'}
+                </div>
+              </div>
+              
+              {/* Participant info */}
+              <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white px-3 py-2 rounded">
+                <span className="text-sm font-medium">{participantName}</span>
+              </div>
             </div>
-
-            <DialogFooter className="bg-gray-900 p-4 flex justify-center gap-4 flex-shrink-0">
-              <Button
-                onClick={toggleVideo}
-                variant={videoEnabled ? "default" : "destructive"}
-                size="lg"
-                className="rounded-full w-12 h-12"
-              >
-                {videoEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+            <DialogFooter className="bg-gray-900 p-4 flex justify-center items-center gap-4">
+              <div className="text-white font-mono text-lg">
+                <Clock className="inline-block mr-2" />
+                {formatTime(timeRemaining)}
+              </div>
+              <Button onClick={toggleVideo} variant={videoEnabled ? 'secondary' : 'destructive'} size="icon">
+                {videoEnabled ? <Video /> : <VideoOff />}
               </Button>
-              <Button
-                onClick={toggleAudio}
-                variant={audioEnabled ? "default" : "destructive"}
-                size="lg"
-                className="rounded-full w-12 h-12"
-              >
-                {audioEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+              <Button onClick={toggleAudio} variant={audioEnabled ? 'secondary' : 'destructive'} size="icon">
+                {audioEnabled ? <Mic /> : <MicOff />}
               </Button>
-              <Button
-                onClick={handleCallEnd}
-                variant="destructive"
-                size="lg"
-                className="rounded-full w-12 h-12"
-              >
-                <PhoneOff className="w-5 h-5" />
+              <Button onClick={handleCallEnd} variant="destructive" size="icon">
+                <PhoneOff />
               </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
+      ) : (
+        <div className="flex justify-center items-center h-full">
+          <Button onClick={startCall} disabled={isLoading} size="lg">
+            {isLoading ? 'Starting Call...' : `Start Video Call with ${participantName}`}
+          </Button>
+        </div>
       )}
     </>
   );
