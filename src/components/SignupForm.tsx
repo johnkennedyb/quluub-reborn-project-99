@@ -23,16 +23,41 @@ import {
 import { format, differenceInYears } from "date-fns";
 import { ChevronLeft, ChevronRight, Eye, EyeOff } from "lucide-react";
 
-// Task #2: Major Nigerian cities list
-const majorNigerianCities = [
-  "Lagos", "Abuja", "Kano", "Ibadan", "Port Harcourt", "Benin City",
-  "Kaduna", "Onitsha", "Warri", "Aba", "Jos", "Ilorin", "Enugu",
-  "Abeokuta", "Sokoto", "Maiduguri", "Zaria", "Owerri", "Uyo",
-  "Calabar", "Akure", "Bauchi", "Katsina", "Gombe", "Yola",
-  "Osogbo", "Lokoja", "Lafia", "Makurdi", "Minna", "Asaba",
-  "Awka", "Abakaliki", "Umuahia", "Ado-Ekiti", "Birnin Kebbi",
-  "Dutse", "Jalingo", "Damaturu", "Yenagoa", "Ogun"
-];
+// Major cities by country - simplified location structure
+const majorCitiesByCountry: { [key: string]: string[] } = {
+  "Nigeria": [
+    "Lagos", "Abuja", "Kano", "Ibadan", "Port Harcourt", "Benin City",
+    "Kaduna", "Onitsha", "Warri", "Aba", "Jos", "Ilorin", "Enugu",
+    "Abeokuta", "Sokoto", "Maiduguri", "Zaria", "Owerri", "Uyo",
+    "Calabar", "Akure", "Bauchi", "Katsina", "Gombe", "Yola",
+    "Osogbo", "Lokoja", "Lafia", "Makurdi", "Minna", "Asaba",
+    "Awka", "Abakaliki", "Umuahia", "Ado-Ekiti", "Birnin Kebbi",
+    "Dutse", "Jalingo", "Damaturu", "Yenagoa", "Ogun"
+  ],
+  "United Kingdom": [
+    "London", "Birmingham", "Manchester", "Leeds", "Liverpool", "Sheffield",
+    "Bristol", "Glasgow", "Leicester", "Edinburgh", "Belfast", "Cardiff",
+    "Coventry", "Bradford", "Nottingham", "Hull", "Newcastle", "Stoke-on-Trent",
+    "Southampton", "Derby", "Portsmouth", "Brighton", "Plymouth", "Northampton",
+    "Reading", "Luton", "Wolverhampton", "Bolton", "Bournemouth", "Norwich"
+  ],
+  "United States": [
+    "New York", "Los Angeles", "Chicago", "Houston", "Phoenix", "Philadelphia",
+    "San Antonio", "San Diego", "Dallas", "San Jose", "Austin", "Jacksonville",
+    "Fort Worth", "Columbus", "Charlotte", "San Francisco", "Indianapolis", "Seattle",
+    "Denver", "Washington DC", "Boston", "El Paso", "Nashville", "Detroit", "Oklahoma City"
+  ],
+  "Canada": [
+    "Toronto", "Montreal", "Vancouver", "Calgary", "Edmonton", "Ottawa",
+    "Winnipeg", "Quebec City", "Hamilton", "Kitchener", "London", "Victoria",
+    "Halifax", "Oshawa", "Windsor", "Saskatoon", "Regina", "Sherbrooke"
+  ],
+  "Australia": [
+    "Sydney", "Melbourne", "Brisbane", "Perth", "Adelaide", "Gold Coast",
+    "Newcastle", "Canberra", "Sunshine Coast", "Wollongong", "Hobart", "Geelong",
+    "Townsville", "Cairns", "Darwin", "Toowoomba", "Ballarat", "Bendigo"
+  ]
+};
 
 interface SignupFormProps {
   onSignup: (data: any) => void;
@@ -47,7 +72,6 @@ interface RegistrationData {
   dateOfBirth: Date | null;
   ethnicity: string[];
   countryOfResidence: string;
-  stateOfResidence: string;
   cityOfResidence: string;
   summary: string;
   username: string;
@@ -74,12 +98,10 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
   const [showPassword, setShowPassword] = useState(false);
   const [suggestedUsername, setSuggestedUsername] = useState("");
   const [countries, setCountries] = useState<Location[]>([]);
-  const [states, setStates] = useState<Location[]>([]);
-  const [cities, setCities] = useState<Location[]>([]);
+  const [availableCities, setAvailableCities] = useState<string[]>([]);
   const [isDataLoading, setIsDataLoading] = useState(true);
 
   const [selectedCountry, setSelectedCountry] = useState<Location | null>(null);
-  const [selectedState, setSelectedState] = useState<Location | null>(null);
 
   const [formData, setFormData] = useState<RegistrationData>({
     email: "",
@@ -89,7 +111,6 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
     dateOfBirth: null,
     ethnicity: [],
     countryOfResidence: "",
-    stateOfResidence: "",
     cityOfResidence: "",
     summary: "",
     username: "",
@@ -101,6 +122,38 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
       ...prev,
       password: e.target.value
     }));
+  };
+
+  const generateSecurePassword = () => {
+    const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const numbers = '0123456789';
+    const symbols = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+    
+    const allChars = lowercase + uppercase + numbers + symbols;
+    let password = '';
+    
+    // Ensure at least one character from each category
+    password += lowercase[Math.floor(Math.random() * lowercase.length)];
+    password += uppercase[Math.floor(Math.random() * uppercase.length)];
+    password += numbers[Math.floor(Math.random() * numbers.length)];
+    password += symbols[Math.floor(Math.random() * symbols.length)];
+    
+    // Fill the rest randomly (12 characters total)
+    for (let i = 4; i < 12; i++) {
+      password += allChars[Math.floor(Math.random() * allChars.length)];
+    }
+    
+    // Shuffle the password
+    password = password.split('').sort(() => Math.random() - 0.5).join('');
+    
+    setFormData(prev => ({
+      ...prev,
+      password: password
+    }));
+    
+    // Show password when generated
+    setShowPassword(true);
   };
 
 
@@ -126,28 +179,15 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
   }, []);
 
   useEffect(() => {
-    if (selectedCountry?.isoCode) {
-      const countryStates = getStatesOfCountry(selectedCountry.isoCode);
-      setStates(countryStates);
-      setCities([]);
-      setSelectedState(null);
-      handleSelectChange("stateOfResidence", "");
+    if (selectedCountry?.name) {
+      // Get major cities for the selected country
+      const cities = majorCitiesByCountry[selectedCountry.name] || [];
+      setAvailableCities(cities);
       handleSelectChange("cityOfResidence", "");
     } else {
-      setStates([]);
-      setCities([]);
+      setAvailableCities([]);
     }
   }, [selectedCountry]);
-
-  useEffect(() => {
-    if (selectedCountry?.isoCode && selectedState?.isoCode) {
-      const stateCities = getCitiesOfState(selectedCountry.isoCode, selectedState.isoCode);
-      setCities(stateCities);
-      handleSelectChange("cityOfResidence", "");
-    } else {
-      setCities([]);
-    }
-  }, [selectedState]);
 
 
 
@@ -443,7 +483,7 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                     onChange={handlePasswordChange}
                     required
                     minLength={6}
-                    placeholder="Enter your password"
+                    placeholder="Enter your password or generate one"
                   />
                   <div className="absolute right-0 top-0 flex">
                     <Button
@@ -459,9 +499,20 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
                         <Eye className="h-4 w-4" />
                       )}
                     </Button>
-
                   </div>
                 </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={generateSecurePassword}
+                  className="w-full mt-2"
+                >
+                  🔐 Generate Secure Password
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Password must be at least 6 characters long
+                </p>
               </div>
 
               <div className="space-y-1 text-xs">
@@ -653,24 +704,17 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
               <UiSelect
                 value={formData.cityOfResidence}
                 onValueChange={(value) => handleSelectChange("cityOfResidence", value)}
+                disabled={!selectedCountry || availableCities.length === 0}
               >
                 <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select your city" />
+                  <SelectValue placeholder={selectedCountry ? "Select your city" : "Select country first"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {formData.countryOfResidence === "Nigeria" ? (
-                    majorNigerianCities.map((city) => (
-                      <SelectItem key={city} value={city}>
-                        {city}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    cities.map((city) => (
-                      <SelectItem key={city.name} value={city.name}>
-                        {city.name}
-                      </SelectItem>
-                    ))
-                  )}
+                  {availableCities.map((city) => (
+                    <SelectItem key={city} value={city}>
+                      {city}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </UiSelect>
             </div>

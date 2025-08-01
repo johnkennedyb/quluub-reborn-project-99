@@ -39,7 +39,7 @@ const Search = () => {
   const [inputs, setInputs] = useState({
     nationality: "",
     country: "",
-    ageRange: [22, 45],
+    ageRange: [18, 50], // Keep expanded range but fix the filtering logic
     heightRange: [52, 80],
     weightRange: [50, 90],
     build: "",
@@ -101,9 +101,14 @@ const Search = () => {
         params.genotype = inputs.genotype;
       }
       
-      // Only apply age range if user has changed from default (22-45)
+      // Add sorting parameter
+      if (inputs.sortBy) {
+        params.sortBy = inputs.sortBy;
+      }
+      
+      // Only apply age range if user has changed from default (18-50)
       if (inputs.ageRange && inputs.ageRange.length === 2) {
-        if (inputs.ageRange[0] !== 22 || inputs.ageRange[1] !== 45) {
+        if (inputs.ageRange[0] !== 18 || inputs.ageRange[1] !== 50) {
           params.minAge = inputs.ageRange[0];
           params.maxAge = inputs.ageRange[1];
         }
@@ -131,12 +136,29 @@ const Search = () => {
       const response = await userService.getBrowseUsers(params);
       console.log('📊 API Response:', response);
       
+      // Debug: Log the raw response structure
+      console.log('🔬 Response structure analysis:');
+      console.log('- Response type:', typeof response);
+      console.log('- Is array:', Array.isArray(response));
+      console.log('- Has data property:', !!response?.data);
+      console.log('- Has users property:', !!response?.users);
+      if (response?.data?.users) {
+        console.log('- Users in data.users:', response.data.users.length);
+        console.log('- First 3 users from data.users:', response.data.users.slice(0, 3).map(u => ({ name: `${u.fname} ${u.lname}`, username: u.username, status: u.status, created: u.createdAt })));
+      }
+      if (response?.users) {
+        console.log('- Users in users:', response.users.length);
+        console.log('- First 3 users from users:', response.users.slice(0, 3).map(u => ({ name: `${u.fname} ${u.lname}`, username: u.username, status: u.status, created: u.createdAt })));
+      }
+      
       if (response && response.data) {
         // Handle axios response format
         const data = response.data;
         if (data.users && Array.isArray(data.users)) {
-          console.log('✅ Found users:', data.users.length);
+          console.log('✅ Found users (data.users path):', data.users.length);
+          console.log('🎯 Setting results with users:', data.users.slice(0, 3).map(u => ({ name: `${u.fname} ${u.lname}`, username: u.username, status: u.status })));
           setResults(data.users);
+          console.log('🔄 Results state after setResults:', data.users.length, 'users');
           setTotalPages(data.pages || 1);
         } else {
           console.warn('⚠️ No users array in response data:', data);
@@ -145,12 +167,15 @@ const Search = () => {
         }
       } else if (response && response.users) {
         // Direct response format
-        console.log('✅ Found users (direct):', response.users.length);
+        console.log('✅ Found users (direct path):', response.users.length);
+        console.log('🎯 Setting results with users:', response.users.slice(0, 3).map(u => ({ name: `${u.fname} ${u.lname}`, username: u.username, status: u.status })));
         setResults(response.users);
+        console.log('🔄 Results state after setResults:', response.users.length, 'users');
         setTotalPages(response.pages || 1);
       } else if (Array.isArray(response)) {
         // Array response format
-        console.log('✅ Found users (array):', response.length);
+        console.log('✅ Found users (array path):', response.length);
+        console.log('🎯 Setting results with users:', response.slice(0, 3).map(u => ({ name: `${u.fname} ${u.lname}`, username: u.username, status: u.status })));
         setResults(response);
         setTotalPages(Math.ceil(response.length / 20));
       } else {
@@ -343,17 +368,8 @@ const Search = () => {
           {/* Filter sidebar */}
           <Card className="md:col-span-1 h-fit">
             <CardContent className="p-6">
-              <div className="flex justify-between items-center mb-4">
+              <div className="mb-4">
                 <h2 className="text-lg font-semibold">Search Filters</h2>
-                <Select value={inputs.sortBy} onValueChange={(value) => handleChange('sortBy', value)}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue placeholder="Sort by" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="newest">Newest</SelectItem>
-                    <SelectItem value="lastSeen">Last Seen</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
               
               <div className="space-y-6">
@@ -586,6 +602,20 @@ const Search = () => {
                   </div>
                   <Switch id="beard" checked={false} onCheckedChange={() => {}} disabled={currentUser?.gender !== 'female'} />
                 </div>
+                
+                <div>
+                  <label className="text-sm font-medium mb-2 block">Sort By</label>
+                  <Select value={inputs.sortBy} onValueChange={(value) => handleChange('sortBy', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Sort profiles" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="lastSeen">Last Seen</SelectItem>
+                      <SelectItem value="newest">Newest</SelectItem>
+                      <SelectItem value="oldest">Oldest</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
                 <Button 
                   onClick={searchUsers}
@@ -602,6 +632,14 @@ const Search = () => {
           <div className="md:col-span-3">
             <h1 className="text-2xl font-bold mb-6">Potential Spouses</h1>
             
+            {(() => {
+              console.log('🎨 RENDER DEBUG:');
+              console.log('- Loading:', loading);
+              console.log('- Results length:', results.length);
+              console.log('- Results array:', results.slice(0, 2).map(u => ({ name: `${u.fname} ${u.lname}`, username: u.username })));
+              return null;
+            })()}
+            
             {loading ? (
               <div className="flex justify-center items-center h-64">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -612,18 +650,32 @@ const Search = () => {
                   <p className="text-center text-red-500">Error loading users. Please try again.</p>
                 </CardContent>
               </Card>
-            ) : sortedUsers.length > 0 ? (
+            ) : results.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {(() => {
                   const items: JSX.Element[] = [];
                   let profileCount = 0;
                   
-                  sortedUsers.forEach((user, index) => {
+                  results.forEach((user, index) => {
                     const age = calculateAge(user.dob) || 0;
                     
-                    if (age < inputs.ageRange[0] || age > inputs.ageRange[1]) {
+                    console.log(`👥 Processing user ${index + 1}: ${user.fname} ${user.lname} (${user.username})`);
+                    console.log(`  - Age: ${age}, DOB: ${user.dob}`);
+                    console.log(`  - Age range filter: ${inputs.ageRange[0]} - ${inputs.ageRange[1]}`);
+                    console.log(`  - Passes age filter: ${age >= inputs.ageRange[0] && age <= inputs.ageRange[1]}`);
+                    
+                    // Allow users with invalid ages (0 or undefined DOB) to pass through
+                    // Only filter out users with valid ages that are outside the range
+                    if (age > 0 && (age < inputs.ageRange[0] || age > inputs.ageRange[1])) {
+                      console.log(`  ❌ FILTERED OUT: Age ${age} not in range ${inputs.ageRange[0]}-${inputs.ageRange[1]}`);
                       return;
                     }
+                    
+                    if (age === 0) {
+                      console.log(`  ⚠️ WARNING: Invalid age (0), but allowing user to pass through`);
+                    }
+                    
+                    console.log(`  ✅ PASSED FILTERS: Adding to display`);
                     
                     // Add profile card
                     items.push(

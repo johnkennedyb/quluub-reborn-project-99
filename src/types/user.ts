@@ -23,7 +23,10 @@ export interface User {
     completedReferrals: number;
   };
   videoCallCredits?: number;
-  waliDetails?: string;
+  waliDetails?: {
+    name?: string;
+    email?: string;
+  } | string;
   kunya?: string;
   nationality?: string;
   country?: string;

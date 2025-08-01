@@ -3,6 +3,19 @@ const User = require('../models/User');
 const crypto = require('crypto');
 const { sendValidationEmail, sendResetPasswordEmail } = require('../utils/emailService');
 
+// Temporary store for verification codes (in production, use Redis)
+const verificationCodes = new Map();
+
+// Clean up expired codes every 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [email, data] of verificationCodes.entries()) {
+    if (now > data.expiresAt) {
+      verificationCodes.delete(email);
+    }
+  }
+}, 10 * 60 * 1000);
+
 // @desc    Send email validation for existing users
 // @route   POST /api/email/send-validation
 // @access  Public
@@ -77,10 +90,12 @@ exports.sendVerificationCode = async (req, res) => {
     // Generate verification code (6 digits)
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     
-    // In a production environment, you would store this in a temporary store (like Redis)
-    // with a short expiration time (e.g., 10 minutes)
-    // For this example, we'll just return it in the response
-    // In a real app, you would send it via email
+    // Store verification code with 10-minute expiration
+    verificationCodes.set(email, {
+      code: verificationCode,
+      expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes
+      attempts: 0
+    });
     
     try {
       // Send verification email with a default name
@@ -132,17 +147,49 @@ exports.verifyEmailCode = async (req, res) => {
     
     console.log('Verifying code for:', email);
     
-    // In a production environment, you would verify the code against the temporary store
-    // For this example, we'll assume any 6-digit code is valid
-    const isValid = /^\d{6}$/.test(code);
-    
-    if (!isValid) {
-      return res.status(400).json({ message: 'Invalid verification code' });
+    // Check if code format is valid (6 digits)
+    if (!/^\d{6}$/.test(code)) {
+      return res.status(400).json({ message: 'Invalid verification code format' });
     }
     
-    // In a real app, you would also check if the code matches what was sent to the email
-    // and hasn't expired
+    // Get stored verification data
+    const storedData = verificationCodes.get(email);
     
+    if (!storedData) {
+      return res.status(400).json({ 
+        message: 'No verification code found for this email. Please request a new code.' 
+      });
+    }
+    
+    // Check if code has expired
+    if (Date.now() > storedData.expiresAt) {
+      verificationCodes.delete(email);
+      return res.status(400).json({ 
+        message: 'Verification code has expired. Please request a new code.' 
+      });
+    }
+    
+    // Check for too many attempts
+    if (storedData.attempts >= 5) {
+      verificationCodes.delete(email);
+      return res.status(400).json({ 
+        message: 'Too many failed attempts. Please request a new verification code.' 
+      });
+    }
+    
+    // Verify the actual code
+    if (storedData.code !== code) {
+      storedData.attempts += 1;
+      return res.status(400).json({ 
+        message: 'Invalid verification code. Please try again.',
+        attemptsRemaining: 5 - storedData.attempts
+      });
+    }
+    
+    // Code is valid - remove from store
+    verificationCodes.delete(email);
+    
+    console.log('Email verification successful for:', email);
     res.json({ 
       success: true,
       message: 'Email verified successfully',

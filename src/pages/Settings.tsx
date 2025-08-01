@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import Navbar from "@/components/Navbar";
-import { Check, CheckCircle, BadgeDollarSign, Eye, EyeOff, Mail, HelpCircle, Copy, Gift } from "lucide-react";
+import TopNavbar from "@/components/TopNavbar";
+import { Check, CheckCircle, BadgeDollarSign, Eye, EyeOff, Mail, HelpCircle, Copy, Gift, AlertTriangle, X } from "lucide-react";
 import { Lock } from "@/components/Icons";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -32,6 +33,8 @@ const Settings = () => {
   const [isLoadingPayment, setIsLoadingPayment] = useState(false);
   const [isUpgrading, setIsUpgrading] = useState(false);
   const [isCheckingPayment, setIsCheckingPayment] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showHideModal, setShowHideModal] = useState(false);
   const { toast } = useToast();
   // Automatically detect currency based on user's country
   const getUserCurrency = () => {
@@ -424,7 +427,12 @@ const Settings = () => {
     window.location.href = 'mailto:support@quluub.com';
   };
 
-  const handleHideProfile = async () => {
+  const handleHideProfile = () => {
+    setShowHideModal(true);
+  };
+
+  const confirmHideProfile = async () => {
+    setShowHideModal(false);
     try {
       const updatedUser = await userService.updateProfile(user?._id || '', { hidden: !user?.hidden });
       updateUser(updatedUser);
@@ -443,11 +451,12 @@ const Settings = () => {
     }
   };
 
-  const handleDeleteAccount = async () => {
-    if (!window.confirm("Are you sure you want to delete your account? This action cannot be undone.")) {
-      return;
-    }
+  const handleDeleteAccount = () => {
+    setShowDeleteModal(true);
+  };
 
+  const confirmDeleteAccount = async () => {
+    setShowDeleteModal(false);
     setIsDeletingAccount(true);
     try {
       await userService.deleteAccount();
@@ -803,7 +812,99 @@ const Settings = () => {
           </Card>
         </div>
       </div>
+      <TopNavbar />
       <Navbar />
+      
+      {/* Hide Profile Confirmation Modal */}
+      {showHideModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-shrink-0">
+                <Eye className="h-6 w-6 text-orange-500" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {user?.hidden ? 'Show Profile' : 'Hide Profile'}
+                </h3>
+              </div>
+              <button 
+                onClick={() => setShowHideModal(false)}
+                className="ml-auto text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="text-gray-600 mb-6">
+              {user?.hidden 
+                ? 'Are you sure you want to make your profile visible in search results? Other users will be able to find and view your profile.'
+                : 'Are you sure you want to hide your profile from search results? Other users will not be able to find your profile while browsing.'
+              }
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowHideModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={confirmHideProfile}
+                className="bg-orange-500 hover:bg-orange-600 text-white"
+              >
+                {user?.hidden ? 'Show Profile' : 'Hide Profile'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Delete Account Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex-shrink-0">
+                <AlertTriangle className="h-6 w-6 text-red-500" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Delete Account
+                </h3>
+              </div>
+              <button 
+                onClick={() => setShowDeleteModal(false)}
+                className="ml-auto text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete your account? This action cannot be undone. All your data, messages, and connections will be permanently removed.
+            </p>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-6">
+              <p className="text-red-800 text-sm font-medium">
+                ⚠️ This action is irreversible. Your account will be permanently deleted.
+              </p>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowDeleteModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={confirmDeleteAccount}
+                disabled={isDeletingAccount}
+                className="bg-red-500 hover:bg-red-600 text-white"
+              >
+                {isDeletingAccount ? 'Deleting...' : 'Delete Account'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

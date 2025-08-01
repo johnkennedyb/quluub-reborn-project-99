@@ -261,6 +261,8 @@ exports.getBrowseUsers = async (req, res) => {
     // Default filters - only exclude current user
     const filters = {
       _id: { $ne: req.user._id }, // Exclude current user
+      hidden: { $ne: true }, // Exclude hidden profiles
+      status: { $in: ['active', 'pending', 'NEW'] }, // Include active, pending, and new users, exclude banned/suspended
     };
     
     // Always filter by opposite gender
@@ -343,22 +345,109 @@ exports.getBrowseUsers = async (req, res) => {
       }
     }
     
-    console.log("Applying filters:", filters);
+    console.log("🔍 Applying filters:", JSON.stringify(filters, null, 2));
     
     // Allow pagination for large datasets
     const limit = req.query.limit ? parseInt(req.query.limit) : 30;
     const page = req.query.page ? parseInt(req.query.page) : 1;
     const skip = (page - 1) * limit;
+    
+    console.log(`📊 Pagination: page=${page}, limit=${limit}, skip=${skip}`);
+
+    // Determine sorting based on sortBy parameter
+    let sortCriteria = { lastSeen: -1, createdAt: -1 }; // Default: most recently active first, then newest
+    
+    if (req.query.sortBy) {
+      switch (req.query.sortBy) {
+        case 'newest':
+          sortCriteria = { createdAt: -1 }; // Newest accounts first
+          break;
+        case 'oldest':
+          sortCriteria = { createdAt: 1 }; // Oldest accounts first
+          break;
+        case 'lastSeen':
+        default:
+          // Sort by lastSeen first, then by createdAt for accounts without lastSeen
+          sortCriteria = { lastSeen: -1, createdAt: -1 };
+          break;
+      }
+    }
+    
+    console.log("📈 Applying sort criteria:", JSON.stringify(sortCriteria, null, 2));
 
     const count = await User.countDocuments(filters);
+    console.log(`📋 Total users matching filters: ${count}`);
     
-    const users = await User.find(filters)
-      .select('-password -resetPasswordToken -resetPasswordTokenExpiration -validationToken')
-      .sort({ lastSeen: -1 }) // Most recently active first
-      .limit(limit)
-      .skip(skip);
+    // Use aggregation pipeline to handle sorting with null lastSeen values properly
+    const users = await User.aggregate([
+      { $match: filters },
+      {
+        $addFields: {
+          // Create a computed field for sorting that handles null lastSeen
+          sortField: {
+            $cond: {
+              if: { $eq: ["$lastSeen", null] },
+              then: "$createdAt", // Use createdAt for users without lastSeen
+              else: "$lastSeen"   // Use lastSeen for users who have it
+            }
+          }
+        }
+      },
+      {
+        $sort: req.query.sortBy === 'oldest' 
+          ? { createdAt: 1 }
+          : req.query.sortBy === 'newest'
+          ? { createdAt: -1 }
+          : { sortField: -1, createdAt: -1 } // Default: sort by sortField desc, then createdAt desc
+      },
+      {
+        $project: {
+          password: 0,
+          resetPasswordToken: 0,
+          resetPasswordTokenExpiration: 0,
+          validationToken: 0,
+          sortField: 0 // Remove the computed field from results
+        }
+      },
+      { $skip: skip },
+      { $limit: limit }
+    ]);
     
-    console.log(`Found ${users.length} users matching the criteria on page ${page}`);
+    console.log(`✅ Found ${users.length} users matching the criteria on page ${page}`);
+    
+    // Debug: Log first few users to see what's being returned
+    if (users.length > 0) {
+      console.log('👥 Sample users returned:');
+      users.slice(0, 3).forEach((user, index) => {
+        console.log(`  ${index + 1}. ${user.fname} ${user.lname} (${user.username}) - Status: ${user.status}, Created: ${user.createdAt}, LastSeen: ${user.lastSeen}`);
+      });
+    } else {
+      console.log('❌ No users returned - investigating...');
+      
+      // Let's check if there are any users at all with basic filters
+      const basicCount = await User.countDocuments({
+        _id: { $ne: req.user._id },
+        gender: currentUser.gender === 'male' ? 'female' : 'male'
+      });
+      console.log(`🔍 Users with basic filters (opposite gender): ${basicCount}`);
+      
+      // Check users with different statuses
+      const statusCounts = await User.aggregate([
+        {
+          $match: {
+            _id: { $ne: req.user._id },
+            gender: currentUser.gender === 'male' ? 'female' : 'male'
+          }
+        },
+        {
+          $group: {
+            _id: '$status',
+            count: { $sum: 1 }
+          }
+        }
+      ]);
+      console.log('📊 User counts by status:', statusCounts);
+    }
     
     res.json({
       users,
@@ -390,6 +479,85 @@ exports.upgradePlan = async (req, res) => {
   } catch (error) {
     console.error('Upgrade plan error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Debug endpoint to investigate user data
+// @route   GET /api/users/debug-users
+// @access  Private
+exports.debugUsers = async (req, res) => {
+  try {
+    console.log('🔍 DEBUG: Investigating user data...');
+    
+    // Get total user count
+    const totalUsers = await User.countDocuments({});
+    console.log(`📊 Total users in database: ${totalUsers}`);
+    
+    // Get users by status
+    const statusCounts = await User.aggregate([
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+    console.log('📈 Users by status:', statusCounts);
+    
+    // Get users by gender
+    const genderCounts = await User.aggregate([
+      {
+        $group: {
+          _id: '$gender',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+    console.log('👥 Users by gender:', genderCounts);
+    
+    // Get recent users (last 7 days)
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const recentUsers = await User.find({
+      createdAt: { $gte: sevenDaysAgo }
+    }).select('fname lname username status createdAt gender hidden').sort({ createdAt: -1 }).limit(10);
+    
+    console.log('🆕 Recent users (last 7 days):');
+    recentUsers.forEach((user, index) => {
+      console.log(`  ${index + 1}. ${user.fname} ${user.lname} (${user.username}) - Status: ${user.status}, Gender: ${user.gender}, Hidden: ${user.hidden}, Created: ${user.createdAt}`);
+    });
+    
+    // Check what would match current search filters
+    const currentUser = await User.findById(req.user._id);
+    const searchFilters = {
+      _id: { $ne: req.user._id },
+      hidden: { $ne: true },
+      status: { $in: ['active', 'pending', 'NEW'] },
+      gender: currentUser.gender === 'male' ? 'female' : 'male'
+    };
+    
+    const matchingUsers = await User.find(searchFilters)
+      .select('fname lname username status createdAt gender hidden lastSeen')
+      .sort({ createdAt: -1 })
+      .limit(5);
+    
+    console.log('🎯 Users matching current search filters:');
+    matchingUsers.forEach((user, index) => {
+      console.log(`  ${index + 1}. ${user.fname} ${user.lname} (${user.username}) - Status: ${user.status}, Created: ${user.createdAt}, LastSeen: ${user.lastSeen}`);
+    });
+    
+    res.json({
+      totalUsers,
+      statusCounts,
+      genderCounts,
+      recentUsers: recentUsers.length,
+      matchingUsers: matchingUsers.length,
+      message: 'Debug data logged to console'
+    });
+    
+  } catch (error) {
+    console.error('❌ Debug endpoint error:', error);
+    res.status(500).json({ message: 'Debug error', error: error.message });
   }
 };
 

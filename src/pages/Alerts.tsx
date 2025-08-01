@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Navbar from "@/components/Navbar";
+import TopNavbar from "@/components/TopNavbar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import ProfileImage from "@/components/ProfileImage";
@@ -169,6 +170,30 @@ const Alerts = () => {
   }, []);
 
   const handleAcceptRequest = async (relationshipId: string, userId: string) => {
+    // Check if female user has Wali details filled out
+    if (user?.gender === 'female') {
+      let hasWaliDetails = false;
+      
+      if (user?.waliDetails) {
+        if (typeof user.waliDetails === 'object') {
+          // Object format: check name and email properties
+          hasWaliDetails = !!(user.waliDetails.name && user.waliDetails.email);
+        } else if (typeof user.waliDetails === 'string') {
+          // String format: check if it's not empty
+          hasWaliDetails = user.waliDetails.trim().length > 0;
+        }
+      }
+      
+      if (!hasWaliDetails) {
+        toast({
+          title: "Wali Details Required",
+          description: "Please complete your Wali (guardian) name and email in your profile before accepting connection requests.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    
     try {
       await relationshipService.respondToRequest(relationshipId, 'accept');
       
@@ -212,6 +237,30 @@ const Alerts = () => {
   };
 
   const handleDeclineRequest = async (relationshipId: string) => {
+    // Check if female user has Wali details filled out
+    if (user?.gender === 'female') {
+      let hasWaliDetails = false;
+      
+      if (user?.waliDetails) {
+        if (typeof user.waliDetails === 'object') {
+          // Object format: check name and email properties
+          hasWaliDetails = !!(user.waliDetails.name && user.waliDetails.email);
+        } else if (typeof user.waliDetails === 'string') {
+          // String format: check if it's not empty
+          hasWaliDetails = user.waliDetails.trim().length > 0;
+        }
+      }
+      
+      if (!hasWaliDetails) {
+        toast({
+          title: "Wali Details Required",
+          description: "Please complete your Wali (guardian) name and email in your profile before rejecting connection requests.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    
     try {
       await relationshipService.respondToRequest(relationshipId, 'reject');
       
@@ -247,7 +296,8 @@ const Alerts = () => {
 
   return (
     <div className="min-h-screen bg-gray-50" style={{paddingBottom: '200px'}}>
-      <div className="container py-6">
+      <TopNavbar />
+      <div className="container py-6" style={{paddingTop: '80px'}}>
         
         {/* Connection Requests Section */}
         <div className="mb-6">

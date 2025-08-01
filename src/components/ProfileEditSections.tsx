@@ -17,6 +17,42 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { parseJsonField } from "@/utils/dataUtils";
 
+// Major cities by country - simplified location structure
+const majorCitiesByCountry: { [key: string]: string[] } = {
+  "Nigeria": [
+    "Lagos", "Abuja", "Kano", "Ibadan", "Port Harcourt", "Benin City",
+    "Kaduna", "Onitsha", "Warri", "Aba", "Jos", "Ilorin", "Enugu",
+    "Abeokuta", "Sokoto", "Maiduguri", "Zaria", "Owerri", "Uyo",
+    "Calabar", "Akure", "Bauchi", "Katsina", "Gombe", "Yola",
+    "Osogbo", "Lokoja", "Lafia", "Makurdi", "Minna", "Asaba",
+    "Awka", "Abakaliki", "Umuahia", "Ado-Ekiti", "Birnin Kebbi",
+    "Dutse", "Jalingo", "Damaturu", "Yenagoa", "Ogun"
+  ],
+  "United Kingdom": [
+    "London", "Birmingham", "Manchester", "Leeds", "Liverpool", "Sheffield",
+    "Bristol", "Glasgow", "Leicester", "Edinburgh", "Belfast", "Cardiff",
+    "Coventry", "Bradford", "Nottingham", "Hull", "Newcastle", "Stoke-on-Trent",
+    "Southampton", "Derby", "Portsmouth", "Brighton", "Plymouth", "Northampton",
+    "Reading", "Luton", "Wolverhampton", "Bolton", "Bournemouth", "Norwich"
+  ],
+  "United States": [
+    "New York", "Los Angeles", "Chicago", "Houston", "Phoenix", "Philadelphia",
+    "San Antonio", "San Diego", "Dallas", "San Jose", "Austin", "Jacksonville",
+    "Fort Worth", "Columbus", "Charlotte", "San Francisco", "Indianapolis", "Seattle",
+    "Denver", "Washington DC", "Boston", "El Paso", "Nashville", "Detroit", "Oklahoma City"
+  ],
+  "Canada": [
+    "Toronto", "Montreal", "Vancouver", "Calgary", "Edmonton", "Ottawa",
+    "Winnipeg", "Quebec City", "Hamilton", "Kitchener", "London", "Victoria",
+    "Halifax", "Oshawa", "Windsor", "Saskatoon", "Regina", "Sherbrooke"
+  ],
+  "Australia": [
+    "Sydney", "Melbourne", "Brisbane", "Perth", "Adelaide", "Gold Coast",
+    "Newcastle", "Canberra", "Sunshine Coast", "Wollongong", "Hobart", "Geelong",
+    "Townsville", "Cairns", "Darwin", "Toowoomba", "Ballarat", "Bendigo"
+  ]
+};
+
 interface ProfileEditSectionsProps {
   user: User;
   onSave: (updatedUser: Partial<User>) => void;
@@ -110,8 +146,7 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
     workEducation: user.workEducation || "",
     nationality: user.nationality || "",
     country: user.country || "",
-    state: user.state || "",
-    region: user.region || "",
+    city: user.city || user.region || "", // Use city field, fallback to region for backward compatibility
     ethnicity: user.ethnicity || "",
     height: user.height || "",
     weight: user.weight || "",
@@ -140,11 +175,9 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
   const [selectedEthnicity, setSelectedEthnicity] = useState<string[]>(parseEthnicity());
 
   const [countries, setCountries] = useState<Location[]>([]);
-  const [states, setStates] = useState<Location[]>([]);
-  const [cities, setCities] = useState<Location[]>([]);
+  const [availableCities, setAvailableCities] = useState<string[]>([]);
 
   const [selectedCountry, setSelectedCountry] = useState<Location | null>(null);
-  const [selectedState, setSelectedState] = useState<Location | null>(null);
 
   const [open, setOpen] = useState(false);
 
@@ -165,27 +198,14 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
   }, [user.country]);
 
   useEffect(() => {
-    if (selectedCountry?.isoCode) {
-      const countryStates = getStatesOfCountry(selectedCountry.isoCode);
-      setStates(countryStates);
-      if (user.state) {
-        const state = countryStates.find(s => s.name === user.state) || null;
-        setSelectedState(state);
-      }
+    if (selectedCountry?.name) {
+      // Get major cities for the selected country
+      const cities = majorCitiesByCountry[selectedCountry.name] || [];
+      setAvailableCities(cities);
     } else {
-      setStates([]);
-      setCities([]);
+      setAvailableCities([]);
     }
-  }, [selectedCountry, user.state]);
-
-  useEffect(() => {
-    if (selectedCountry?.isoCode && selectedState?.isoCode) {
-      const stateCities = getCitiesOfState(selectedCountry.isoCode, selectedState.isoCode);
-      setCities(stateCities);
-    } else {
-      setCities([]);
-    }
-  }, [selectedState]);
+  }, [selectedCountry]);
 
   const sections = [
     "Basic Info",
@@ -267,8 +287,7 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
       setFormData(prev => ({
         ...prev,
         [field]: value,
-        ...(field === 'country' && { state: '', region: '' }),
-        ...(field === 'state' && { region: '' }),
+        ...(field === 'country' && { city: '' }), // Reset city when country changes
       }));
     }
   };
@@ -296,13 +315,13 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
       return;
     }
 
-    // Task #18: Ensure country of residence and state are not empty
+    // Task #18: Ensure country of residence and city are not empty
     if (!formData.country) {
       alert('Country of residence is required and cannot be empty.');
       return;
     }
-    if (!formData.state) {
-      alert('State/Province of residence is required and cannot be empty.');
+    if (!formData.city) {
+      alert('City of residence is required and cannot be empty.');
       return;
     }
 
@@ -519,39 +538,18 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
                 </Select>
               </div>
               <div>
-                <Label>State/Province of Residence</Label>
-                <Select
-                  value={formData.state}
-                  onValueChange={(value) => {
-                    const state = states.find(s => s.name === value) || null;
-                    setSelectedState(state);
-                    handleInputChange("state", value);
-                  }}
-                  disabled={!selectedCountry || states.length === 0}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select state/province" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {states.map((state) => (
-                      <SelectItem key={state.name} value={state.name}>{state.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
                 <Label>City of Residence</Label>
                 <Select
-                  value={formData.region} // Using 'region' field for city
-                  onValueChange={(value) => handleInputChange("region", value)}
-                  disabled={!selectedState || cities.length === 0}
+                  value={formData.city}
+                  onValueChange={(value) => handleInputChange("city", value)}
+                  disabled={!selectedCountry || availableCities.length === 0}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select city" />
+                    <SelectValue placeholder={selectedCountry ? "Select your city" : "Select country first"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {cities.map((city) => (
-                      <SelectItem key={city.name} value={city.name}>{city.name}</SelectItem>
+                    {availableCities.map((city) => (
+                      <SelectItem key={city} value={city}>{city}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
