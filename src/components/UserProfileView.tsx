@@ -456,7 +456,6 @@ const UserProfileView = ({ user, hasReceivedRequestFrom = false, requestId, isMa
             </CardHeader>
             <CardContent>
               <dl className="divide-y divide-gray-200">
-                <DetailItem label="Sect/Madhhab" value={user.sect} />
                 <DetailItem label="Revert/Convert" value={user.revert} />
                 <DetailItem label="Started Practicing" value={user.startedPracticing ? format(new Date(user.startedPracticing), 'PPP') : undefined} />
                 <DetailItem label="Pattern of Salaah" value={user.patternOfSalaah} />

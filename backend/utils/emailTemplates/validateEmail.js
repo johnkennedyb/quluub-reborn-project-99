@@ -12,27 +12,25 @@ const validateEmail = (recipientName, validationLink, verificationCode) => {
       line-height: 1.6;
       color: #374151;
     ">
-      <div style="text-align: center; margin-bottom: 30px;">
-        <h2 style="
-          color: #14b8a6;
-          font-size: 24px;
-          margin-bottom: 10px;
+      <div style="margin-bottom: 30px;">
+        <p style="
+          color: #374151;
+          font-size: 16px;
+          margin: 0 0 15px 0;
         ">
-          Assalamu Alaikum ${recipientName}!
-        </h2>
-        <p style="color: #6b7280; font-size: 16px; margin: 0;">
-          Welcome to the Quluub family
+          Dear ${recipientName},
+        </p>
+        <p style="
+          color: #374151;
+          font-size: 16px;
+          margin: 0 0 20px 0;
+        ">
+          Salaamun alaekum
         </p>
       </div>
       
-      <div style="
-        background: #f0fdfa;
-        border-left: 4px solid #14b8a6;
-        padding: 20px;
-        margin: 20px 0;
-        border-radius: 0 8px 8px 0;
-      ">
-        <p style="margin: 0; font-size: 16px; color: #0f766e;">
+      <div style="margin: 20px 0;">
+        <p style="margin: 0 0 20px 0; font-size: 16px; color: #374151;">
           Thank you for registering with Quluub! To complete your registration and start your journey to finding your perfect match, please use the verification code below:
         </p>
       </div>
@@ -47,9 +45,9 @@ const validateEmail = (recipientName, validationLink, verificationCode) => {
       ">
         <p style="
           color: white;
-          font-size: 14px;
-          margin: 0 0 10px 0;
-          opacity: 0.9;
+          font-size: 18px;
+          margin: 0 0 15px 0;
+          font-weight: 600;
         ">
           Your Verification Code
         </p>
@@ -70,7 +68,7 @@ const validateEmail = (recipientName, validationLink, verificationCode) => {
       </div>
       
       <div style="text-align: center; margin: 30px 0;">
-        <p style="color: #6b7280; font-size: 14px; margin-bottom: 15px;">
+        <p style="color: #374151; font-size: 16px; margin-bottom: 15px;">
           Or click the button below to verify your email:
         </p>
         <a href="${validationLink}" style="
@@ -105,9 +103,9 @@ const validateEmail = (recipientName, validationLink, verificationCode) => {
         </p>
       </div>
       
-      <div style="text-align: center; margin-top: 30px;">
-        <p style="color: #6b7280; font-size: 14px; margin: 0;">
-          Barakallahu feeki/feeka,<br>
+      <div style="margin-top: 30px;">
+        <p style="color: #374151; font-size: 16px; margin: 0;">
+          Barakallahu feekum,<br>
           <strong style="color: #14b8a6;">The Quluub Team</strong>
         </p>
       </div>

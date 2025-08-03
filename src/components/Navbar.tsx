@@ -62,18 +62,7 @@ const Navbar = () => {
                 className="flex flex-col items-center px-2 h-auto"
               >
                 <Link to="/profile">
-                  <div className="flex items-center justify-center mb-1">
-                    {isActive("/profile") ? (
-                      <User className="h-5 w-5 text-primary-foreground" />
-                    ) : (
-                      <ProfileImage
-                        src={user.profile_pic || ""}
-                        alt={user.username}
-                        fallback={user.fname?.charAt(0) || "U"}
-                        size="sm"
-                      />
-                    )}
-                  </div>
+                  <User className={`h-5 w-5 mb-1 ${isActive("/profile") ? "text-primary-foreground" : ""}`} />
                   <span className={`text-xs ${isActive("/profile") ? "text-primary-foreground" : ""}`}>Profile</span>
                 </Link>
               </Button>

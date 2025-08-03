@@ -63,7 +63,7 @@ const Auth = () => {
     >
       <Card className="w-full max-w-md bg-white/80  backdrop-blur-sm">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold text-green-700">Welcome to Quluub</CardTitle>
+          <CardTitle className="text-2xl font-bold text-primary">Welcome to Quluub</CardTitle>
           <CardDescription>Your Islamic marriage platform</CardDescription>
         </CardHeader>
         <CardContent>

@@ -521,7 +521,81 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
           </div>
         );
 
-      case 1: // Location and Ethnicity
+      case 1: // Deen
+        return (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label>Pattern of Salaah</Label>
+                <Select value={formData.patternOfSalaah} onValueChange={(value) => handleInputChange("patternOfSalaah", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select pattern" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Always">Always</SelectItem>
+                    <SelectItem value="Sometimes">Sometimes</SelectItem>
+                    <SelectItem value="Never">Never</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Revert to Islam</Label>
+                <Select value={formData.revert} onValueChange={(value) => handleInputChange("revert", value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select option" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Yes">Yes</SelectItem>
+                    <SelectItem value="No">No</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>Started Practicing On (easily backdatable)</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !formData.startedPracticing && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formData.startedPracticing ? (
+                      format(formData.startedPracticing, "PPP")
+                    ) : (
+                      <span>Pick a date</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={formData.startedPracticing}
+                    onSelect={(date) => handleInputChange("startedPracticing", date)}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div>
+              <Label>Scholars/Speakers you listen to</Label>
+              <Input value={formData.scholarsSpeakers} onChange={(e) => handleInputChange("scholarsSpeakers", e.target.value)} placeholder=""/>
+            </div>
+            <div>
+              <Label>Dressing/Covering</Label>
+              <Textarea value={formData.dressingCovering} onChange={(e) => handleInputChange("dressingCovering", e.target.value)} placeholder="Describe your usual dressing style."/>
+            </div>
+            <div>
+              <Label>What are you doing to improve your Islamic practice?</Label>
+              <Textarea value={formData.islamicPractice} onChange={(e) => handleInputChange("islamicPractice", e.target.value)} placeholder="e.g. Taking classes, reading books, etc."/>
+            </div>
+          </div>
+        );
+
+      case 2: // Location and Ethnicity
         return (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -593,7 +667,7 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
           </div>
         );
 
-      case 2: // Appearance and Co
+      case 3: // Appearance and Co
         return (
           <div className="space-y-6">
             <div>
@@ -709,7 +783,7 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
           </div>
         );
 
-      case 3: // Lifestyle and Traits
+      case 4: // Lifestyle and Traits
         return (
           <div className="space-y-6">
             <div>
@@ -745,7 +819,7 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
           </div>
         );
 
-      case 4: // Interests
+      case 5: // Interests
         return (
           <div className="space-y-6">
             <div>
@@ -771,78 +845,6 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
                 ))}
               </div>
             </div>
-
-            {/* Food and Travel */}
-            <div className="space-y-3">
-              <h3 className="font-medium text-base flex items-center gap-2">
-                🍽️ Food and Travel
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {foodTravelInterests.map((interest) => (
-                  <Badge
-                    key={interest}
-                    variant={selectedInterests.includes(interest) ? "default" : "secondary"}
-                    onClick={() => toggleInterest(interest)}
-                    className="cursor-pointer hover:scale-105 transition-transform"
-                  >
-                    {interest}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-
-            {/* Sports and Relaxation */}
-            <div className="space-y-3">
-              <h3 className="font-medium text-base flex items-center gap-2">
-                🏃‍♂️ Sports and Relaxation
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {sportsRelaxationInterests.map((interest) => (
-                  <Badge
-                    key={interest}
-                    variant={selectedInterests.includes(interest) ? "default" : "secondary"}
-                    onClick={() => toggleInterest(interest)}
-                    className="cursor-pointer hover:scale-105 transition-transform"
-                  >
-                    {interest}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-
-            {/* Selected Count */}
-            <div className="text-sm text-muted-foreground">
-              Selected: {selectedInterests.length} interest{selectedInterests.length !== 1 ? 's' : ''}
-            </div>
-          </div>
-        );
-
-      case 5: // Matching Details
-        return (
-          <div className="space-y-6">
-            <div>
-              <Label>Open to Matches From</Label>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {["Revert", "Widows/Widowers", "Divorcees", "Parents"].map((option) => (
-                  <Badge
-                    key={option}
-                    variant={formData.openToMatches.includes(option) ? "default" : "outline"}
-                    className="cursor-pointer"
-                    onClick={() => {
-                      let updated;
-                      if (formData.openToMatches.includes(option)) {
-                        updated = formData.openToMatches.split(", ").filter(o => o !== option).join(", ");
-                      } else {
-                        updated = formData.openToMatches ? `${formData.openToMatches}, ${option}` : option;
-                      }
-                      handleInputChange("openToMatches", updated);
-                    }}
-                  >
-                    {option}
-                  </Badge>
-                ))}
-              </div>
-            </div>
             <div>
               <Label>Dealbreakers</Label>
               <Textarea
@@ -862,7 +864,7 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
           </div>
         );
 
-      case 6: // Deen
+      case 6: // Matching Details
         return (
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -922,12 +924,8 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
               </Popover>
             </div>
             <div>
-              <Label>Sect/Methodology</Label>
-              <Input value={formData.sect} onChange={(e) => handleInputChange("sect", e.target.value)} placeholder="e.g. Sunni, Salafi, etc."/>
-            </div>
-            <div>
               <Label>Scholars/Speakers you listen to</Label>
-              <Input value={formData.scholarsSpeakers} onChange={(e) => handleInputChange("scholarsSpeakers", e.target.value)} placeholder="e.g. Mufti Menk, etc."/>
+              <Input value={formData.scholarsSpeakers} onChange={(e) => handleInputChange("scholarsSpeakers", e.target.value)} placeholder=""/>
             </div>
             <div>
               <Label>Dressing/Covering</Label>
@@ -956,7 +954,6 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
       {/* Mobile Navigation */}
       <div className="lg:hidden bg-white border-b">
         <div className="p-4">
-          <h2 className="text-xl font-bold text-primary mb-4">Quluub</h2>
           <div className="flex overflow-x-auto space-x-2 pb-2">
             {sidebarItems.map((item, index) => (
               <Button
@@ -977,7 +974,6 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
         {/* Desktop Sidebar */}
         <aside className="hidden lg:flex lg:w-64 bg-white p-6 border-r flex-col justify-between">
           <div>
-            <h2 className="text-2xl font-bold mb-8 text-primary">Quluub</h2>
             <nav className="space-y-2">
               {sidebarItems.map((item, index) => (
                 <Button

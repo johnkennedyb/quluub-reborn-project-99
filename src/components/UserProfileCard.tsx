@@ -78,7 +78,8 @@ export const UserProfileCard = ({ user, onView, onLike, onMessage }: UserProfile
           <p className="text-sm line-clamp-2 mb-2">{user.summary}</p>
         )}
         
-        {Array.isArray(traits) && traits.length > 0 && (
+        {/* Commented out profile summary tags as per user request */}
+        {/* {Array.isArray(traits) && traits.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
             {traits.slice(0, 3).map((trait, i) => (
               <Badge key={i} variant="outline" className="text-xs">
@@ -91,7 +92,7 @@ export const UserProfileCard = ({ user, onView, onLike, onMessage }: UserProfile
               </Badge>
             )}
           </div>
-        )}
+        )} */}
         
         <div className="flex justify-between mt-4 pt-2 border-t border-border">
           {onView && (

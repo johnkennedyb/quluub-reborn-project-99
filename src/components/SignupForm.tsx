@@ -914,8 +914,6 @@ const SignupForm = ({ onSignup, onSwitchToLogin }: SignupFormProps) => {
   return (
     <>
       <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold">Welcome to Quluub</h2>
-        <p className="text-muted-foreground">Your Islamic marriage platform</p>
         <div className="mt-4">
           Step {step} of {totalSteps}
         </div>

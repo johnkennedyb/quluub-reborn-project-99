@@ -250,7 +250,8 @@ const Search = () => {
       if (workParts.length > 0) tags.push(workParts[0]);
     }
     
-    if (user.patternOfSalaah) {
+    // Commented out profile summary tags as per user request
+    /* if (user.patternOfSalaah) {
       // Return to normal pattern names
       const patternMap: { [key: string]: string } = {
         'always': 'Always prays',
@@ -272,7 +273,7 @@ const Search = () => {
       } catch (e) {
         if (typeof user.traits === 'string') tags.push(user.traits);
       }
-    }
+    } */
     
     return tags.slice(0, 3);
   };

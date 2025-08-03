@@ -127,7 +127,8 @@ const MatchCard = ({
           )}
         </div>
 
-        {tags.length > 0 && (
+        {/* Commented out profile summary tags as per user request */}
+        {/* {tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mb-4">
             {tags.slice(0, 3).map((tag, index) => (
               <Badge key={index} variant="secondary" className="text-xs">
@@ -140,7 +141,7 @@ const MatchCard = ({
               </Badge>
             )}
           </div>
-        )}
+        )} */}
 
         <div className="flex gap-2">
           {onFavorite && (

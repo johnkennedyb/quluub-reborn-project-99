@@ -69,10 +69,12 @@ const Matches = () => {
     const tags: string[] = [];
     
     if (user.workEducation) tags.push(user.workEducation.split(' ')[0]);
-    if (user.patternOfSalaah) tags.push(user.patternOfSalaah);
-    if (user.nationality) tags.push(user.nationality);
+    // Commented out remaining profile summary tags as per user request
+    // if (user.patternOfSalaah) tags.push(user.patternOfSalaah);
+    // if (user.nationality) tags.push(user.nationality);
     
-    // Try to extract traits if they exist
+    // Commented out profile summary tags as per user request
+    /* // Try to extract traits if they exist
     if (user.traits) {
       try {
         const traitsArray = JSON.parse(user.traits);
@@ -80,10 +82,10 @@ const Matches = () => {
           tags.push(traitsArray[0]);
         }
       } catch (e) {
-        // If parsing fails, just use the string
+        // If parsing fails, treat as string
         if (typeof user.traits === 'string') tags.push(user.traits);
       }
-    }
+    } */
     
     return tags.filter(Boolean).slice(0, 3);
   };
