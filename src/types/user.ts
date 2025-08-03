@@ -34,6 +34,8 @@ export interface User {
   region?: string;
   build?: string;
   appearance?: string;
+  skinColor?: string;
+  facialAttractiveness?: string;
   hijab?: string;
   beard?: string;
   maritalStatus?: string;

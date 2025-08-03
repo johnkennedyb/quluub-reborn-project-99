@@ -44,6 +44,7 @@ const Search = () => {
     weightRange: [50, 90],
     build: "",
     appearance: "",
+    skinColor: "",
     maritalStatus: "",
     patternOfSalaah: "",
     genotype: "",
@@ -87,6 +88,10 @@ const Search = () => {
 
       if (inputs.appearance) {
         params.appearance = inputs.appearance;
+      }
+
+      if (inputs.skinColor) {
+        params.skinColor = inputs.skinColor;
       }
 
       if (inputs.maritalStatus) {
@@ -553,13 +558,13 @@ const Search = () => {
                 </div>
                 
                 <div>
-                  <label className="text-sm font-medium mb-2 block">Facial Appearance</label>
-                  <Select value={inputs.appearance} onValueChange={(value) => handleChange('appearance', value)}>
+                  <label className="text-sm font-medium mb-2 block">Skin Color</label>
+                  <Select value={inputs.skinColor} onValueChange={(value) => handleChange('skinColor', value)}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Any appearance" />
+                      <SelectValue placeholder="Any skin color" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="any">Any appearance</SelectItem>
+                      <SelectItem value="any">Any skin color</SelectItem>
                       <SelectItem value="Very Fair">Very Fair</SelectItem>
                       <SelectItem value="Fair">Fair</SelectItem>
                       <SelectItem value="Medium">Medium</SelectItem>
@@ -585,22 +590,6 @@ const Search = () => {
                       <SelectItem value="CC">CC</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <Label htmlFor="hijab" className="text-sm font-medium">Hijab</Label>
-                    <p className="text-xs text-muted-foreground">Show only sisters who wear hijab</p>
-                  </div>
-                  <Switch id="hijab" checked={false} onCheckedChange={() => {}} disabled={currentUser?.gender !== 'male'} />
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <Label htmlFor="beard" className="text-sm font-medium">Beard</Label>
-                    <p className="text-xs text-muted-foreground">Show only brothers with beard</p>
-                  </div>
-                  <Switch id="beard" checked={false} onCheckedChange={() => {}} disabled={currentUser?.gender !== 'female'} />
                 </div>
                 
                 <div>

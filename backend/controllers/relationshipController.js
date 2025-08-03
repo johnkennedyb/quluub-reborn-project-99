@@ -83,12 +83,20 @@ exports.respondToRequest = async (req, res) => {
       return res.status(400).json({ message: "Invalid status. Must be 'rejected' or 'matched'" });
     }
     
-    // Find relationship
-    const relationship = await Relationship.findOne({ id: relationshipId });
+    // Find relationship - try both custom id field and MongoDB _id
+    let relationship = await Relationship.findOne({ id: relationshipId });
+    
+    // If not found by custom id, try MongoDB _id
+    if (!relationship) {
+      relationship = await Relationship.findById(relationshipId);
+    }
     
     if (!relationship) {
+      console.log(`Relationship not found with id: ${relationshipId}`);
       return res.status(404).json({ message: "Relationship not found" });
     }
+    
+    console.log(`Found relationship:`, { id: relationship.id, _id: relationship._id, status: relationship.status });
     
     // Check if user is the one being followed (only they can respond)
     if (relationship.followed_user_id !== req.user._id.toString()) {
@@ -308,16 +316,19 @@ exports.getSentRequests = async (req, res) => {
     console.log(`Found ${sentRequests.length} sent requests`);
     
     // Transform the data to match expected format - return user objects directly
-    const transformedRequests = sentRequests.map(request => ({
-      ...request.followed_user_id._doc, // Spread the user data directly
-      relationship: {
-        id: request.id,
-        _id: request._id,
-        status: request.status,
-        createdAt: request.createdAt,
-        relationshipId: request.id
-      }
-    }));
+    // Filter out requests where the followed user no longer exists (deleted accounts)
+    const transformedRequests = sentRequests
+      .filter(request => request.followed_user_id !== null)
+      .map(request => ({
+        ...request.followed_user_id._doc, // Spread the user data directly
+        relationship: {
+          id: request.id,
+          _id: request._id,
+          status: request.status,
+          createdAt: request.createdAt,
+          relationshipId: request.id
+        }
+      }));
     
     res.json({ requests: transformedRequests });
   } catch (error) {

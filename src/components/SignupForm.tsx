@@ -26,36 +26,36 @@ import { ChevronLeft, ChevronRight, Eye, EyeOff } from "lucide-react";
 // Major cities by country - simplified location structure
 const majorCitiesByCountry: { [key: string]: string[] } = {
   "Nigeria": [
-    "Lagos", "Abuja", "Kano", "Ibadan", "Port Harcourt", "Benin City",
-    "Kaduna", "Onitsha", "Warri", "Aba", "Jos", "Ilorin", "Enugu",
-    "Abeokuta", "Sokoto", "Maiduguri", "Zaria", "Owerri", "Uyo",
-    "Calabar", "Akure", "Bauchi", "Katsina", "Gombe", "Yola",
-    "Osogbo", "Lokoja", "Lafia", "Makurdi", "Minna", "Asaba",
-    "Awka", "Abakaliki", "Umuahia", "Ado-Ekiti", "Birnin Kebbi",
-    "Dutse", "Jalingo", "Damaturu", "Yenagoa", "Ogun"
+    "Aba", "Abakaliki", "Abeokuta", "Abuja", "Ado-Ekiti", "Akure", "Asaba",
+    "Awka", "Bauchi", "Benin City", "Birnin Kebbi", "Calabar", "Damaturu",
+    "Dutse", "Enugu", "Gombe", "Ibadan", "Ilorin", "Jalingo", "Jos",
+    "Kaduna", "Kano", "Katsina", "Lafia", "Lagos", "Lokoja", "Maiduguri",
+    "Makurdi", "Minna", "Ogun", "Onitsha", "Osogbo", "Owerri", "Port Harcourt",
+    "Sokoto", "Umuahia", "Uyo", "Warri", "Yenagoa", "Yola", "Zaria"
   ],
   "United Kingdom": [
-    "London", "Birmingham", "Manchester", "Leeds", "Liverpool", "Sheffield",
-    "Bristol", "Glasgow", "Leicester", "Edinburgh", "Belfast", "Cardiff",
-    "Coventry", "Bradford", "Nottingham", "Hull", "Newcastle", "Stoke-on-Trent",
-    "Southampton", "Derby", "Portsmouth", "Brighton", "Plymouth", "Northampton",
-    "Reading", "Luton", "Wolverhampton", "Bolton", "Bournemouth", "Norwich"
+    "Belfast", "Birmingham", "Bolton", "Bournemouth", "Bradford", "Brighton",
+    "Bristol", "Cardiff", "Coventry", "Derby", "Edinburgh", "Glasgow",
+    "Hull", "Leeds", "Leicester", "Liverpool", "London", "Luton",
+    "Manchester", "Newcastle", "Northampton", "Norwich", "Nottingham", "Plymouth",
+    "Portsmouth", "Reading", "Sheffield", "Southampton", "Stoke-on-Trent", "Wolverhampton"
   ],
   "United States": [
-    "New York", "Los Angeles", "Chicago", "Houston", "Phoenix", "Philadelphia",
-    "San Antonio", "San Diego", "Dallas", "San Jose", "Austin", "Jacksonville",
-    "Fort Worth", "Columbus", "Charlotte", "San Francisco", "Indianapolis", "Seattle",
-    "Denver", "Washington DC", "Boston", "El Paso", "Nashville", "Detroit", "Oklahoma City"
+    "Austin", "Boston", "Charlotte", "Chicago", "Columbus", "Dallas",
+    "Denver", "Detroit", "El Paso", "Fort Worth", "Houston", "Indianapolis",
+    "Jacksonville", "Los Angeles", "Nashville", "New York", "Oklahoma City", "Philadelphia",
+    "Phoenix", "San Antonio", "San Diego", "San Francisco", "San Jose", "Seattle",
+    "Washington DC"
   ],
   "Canada": [
-    "Toronto", "Montreal", "Vancouver", "Calgary", "Edmonton", "Ottawa",
-    "Winnipeg", "Quebec City", "Hamilton", "Kitchener", "London", "Victoria",
-    "Halifax", "Oshawa", "Windsor", "Saskatoon", "Regina", "Sherbrooke"
+    "Calgary", "Edmonton", "Halifax", "Hamilton", "Kitchener", "London",
+    "Montreal", "Oshawa", "Ottawa", "Quebec City", "Regina", "Saskatoon",
+    "Sherbrooke", "Toronto", "Vancouver", "Victoria", "Windsor", "Winnipeg"
   ],
   "Australia": [
-    "Sydney", "Melbourne", "Brisbane", "Perth", "Adelaide", "Gold Coast",
-    "Newcastle", "Canberra", "Sunshine Coast", "Wollongong", "Hobart", "Geelong",
-    "Townsville", "Cairns", "Darwin", "Toowoomba", "Ballarat", "Bendigo"
+    "Adelaide", "Ballarat", "Bendigo", "Brisbane", "Cairns", "Canberra",
+    "Darwin", "Geelong", "Gold Coast", "Hobart", "Melbourne", "Newcastle",
+    "Perth", "Sunshine Coast", "Sydney", "Toowoomba", "Townsville", "Wollongong"
   ]
 };
 

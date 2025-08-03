@@ -148,27 +148,87 @@ const UserProfileView = ({ user, hasReceivedRequestFrom = false, requestId, isMa
     return age ? `${age} years old` : "Age not provided";
   };
 
+  const getProfileSummary = () => {
+    const age = calculateAge(user.dob);
+    const ethnicity = user.ethnicity || user.nationality;
+    const location = user.country;
+    
+    let summary = "";
+    
+    if (age) {
+      summary += `${age} year old`;
+    }
+    
+    if (ethnicity) {
+      summary += (summary ? " " : "") + ethnicity;
+    }
+    
+    if (location) {
+      summary += (summary ? " living in " : "") + location;
+    }
+    
+    return summary || "Profile information not available";
+  };
+
   const handleRequestResponse = async (action: 'accept' | 'reject') => {
-    if (!requestId) return;
+    console.log('=== MATCH REQUEST DEBUG ===');
+    console.log('requestId:', requestId);
+    console.log('requestId type:', typeof requestId);
+    console.log('hasReceivedRequestFrom:', hasReceivedRequestFrom);
+    console.log('relationshipId:', relationshipId);
+    console.log('user._id:', user._id);
+    console.log('========================');
     
-    // Task #28: Check if wali name and email are provided before accept/reject
-    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-    const waliDetails = currentUser.waliDetails ? JSON.parse(currentUser.waliDetails) : {};
-    
-    if (!waliDetails.name || !waliDetails.email) {
-      toast.error('Please complete your Wali name and email in your profile settings before accepting or rejecting requests.');
+    if (!requestId) {
+      console.error('No requestId provided!');
+      toast.error('No request ID found. Cannot process request.');
       return;
     }
     
+    // Task #28: Check if wali name and email are provided before accept/reject (only for female users)
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+    
+    if (currentUser.gender === 'female') {
+      let waliDetails: { name?: string; email?: string } = {};
+      
+      try {
+        // Handle both string and object formats for waliDetails
+        if (typeof currentUser.waliDetails === 'string') {
+          waliDetails = JSON.parse(currentUser.waliDetails);
+        } else if (typeof currentUser.waliDetails === 'object' && currentUser.waliDetails !== null) {
+          waliDetails = currentUser.waliDetails;
+        }
+      } catch (error) {
+        console.error('Error parsing wali details:', error);
+        waliDetails = {};
+      }
+      
+      if (!waliDetails.name || !waliDetails.email) {
+        toast.error('Please complete your Wali name and email in your profile settings before accepting or rejecting requests.');
+        return;
+      }
+    }
+    
     setIsProcessingRequest(true);
+    console.log(`Attempting to ${action} request with ID:`, requestId);
+    
     try {
-      await relationshipService.respondToRequest(requestId, action);
+      const response = await relationshipService.respondToRequest(requestId, action);
+      console.log(`Request ${action}ed successfully:`, response);
       toast.success(`Request ${action}ed successfully`);
       // Optionally refresh the page or update the UI
       window.location.reload();
     } catch (error: any) {
       console.error(`Error ${action}ing request:`, error);
-      toast.error(`Failed to ${action} request`);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        requestId
+      });
+      
+      const errorMessage = error.response?.data?.message || error.message || `Failed to ${action} request`;
+      toast.error(errorMessage);
     } finally {
       setIsProcessingRequest(false);
     }
@@ -189,7 +249,7 @@ const UserProfileView = ({ user, hasReceivedRequestFrom = false, requestId, isMa
               </Avatar>
               <h2 className="text-2xl font-bold">{user.fname} {user.lname}</h2>
               <p className="text-sm text-muted-foreground">@{user.username}</p>
-              <p className="text-sm text-muted-foreground mt-1">{user.state || 'Unknown'}, {user.country || 'Unknown'}</p>
+              <p className="text-sm text-muted-foreground mt-1">{getProfileSummary()}</p>
               {user.lastSeen && <p className="text-xs text-gray-400 mt-2">Last seen: {format(new Date(user.lastSeen), 'PPp')}</p>}
               <div className="mt-4 flex gap-2 flex-wrap justify-center sm:justify-start">
                 {/* Show different buttons based on relationship status */}
@@ -380,7 +440,9 @@ const UserProfileView = ({ user, hasReceivedRequestFrom = false, requestId, isMa
             <CardContent>
               <dl className="divide-y divide-gray-200">
                 <DetailItem label="Build" value={user.build} />
-                <DetailItem label="Facial Appearance" value={user.appearance} />
+                <DetailItem label="Appearance" value={user.appearance} />
+                <DetailItem label="Skin Color" value={user.skinColor} />
+                <DetailItem label="Facial Attractiveness" value={user.facialAttractiveness} />
                 {user.gender === 'female' && <DetailItem label="Hijab" value={user.hijab} />}
                 {user.gender === 'male' && <DetailItem label="Beard" value={user.beard} />}
                 <DetailItem label="Dressing / Covering" value={user.dressingCovering} />

@@ -20,36 +20,36 @@ import { parseJsonField } from "@/utils/dataUtils";
 // Major cities by country - simplified location structure
 const majorCitiesByCountry: { [key: string]: string[] } = {
   "Nigeria": [
-    "Lagos", "Abuja", "Kano", "Ibadan", "Port Harcourt", "Benin City",
-    "Kaduna", "Onitsha", "Warri", "Aba", "Jos", "Ilorin", "Enugu",
-    "Abeokuta", "Sokoto", "Maiduguri", "Zaria", "Owerri", "Uyo",
-    "Calabar", "Akure", "Bauchi", "Katsina", "Gombe", "Yola",
-    "Osogbo", "Lokoja", "Lafia", "Makurdi", "Minna", "Asaba",
-    "Awka", "Abakaliki", "Umuahia", "Ado-Ekiti", "Birnin Kebbi",
-    "Dutse", "Jalingo", "Damaturu", "Yenagoa", "Ogun"
+    "Aba", "Abakaliki", "Abeokuta", "Abuja", "Ado-Ekiti", "Akure", "Asaba",
+    "Awka", "Bauchi", "Benin City", "Birnin Kebbi", "Calabar", "Damaturu",
+    "Dutse", "Enugu", "Gombe", "Ibadan", "Ilorin", "Jalingo", "Jos",
+    "Kaduna", "Kano", "Katsina", "Lafia", "Lagos", "Lokoja", "Maiduguri",
+    "Makurdi", "Minna", "Ogun", "Onitsha", "Osogbo", "Owerri", "Port Harcourt",
+    "Sokoto", "Umuahia", "Uyo", "Warri", "Yenagoa", "Yola", "Zaria"
   ],
   "United Kingdom": [
-    "London", "Birmingham", "Manchester", "Leeds", "Liverpool", "Sheffield",
-    "Bristol", "Glasgow", "Leicester", "Edinburgh", "Belfast", "Cardiff",
-    "Coventry", "Bradford", "Nottingham", "Hull", "Newcastle", "Stoke-on-Trent",
-    "Southampton", "Derby", "Portsmouth", "Brighton", "Plymouth", "Northampton",
-    "Reading", "Luton", "Wolverhampton", "Bolton", "Bournemouth", "Norwich"
+    "Belfast", "Birmingham", "Bolton", "Bournemouth", "Bradford", "Brighton",
+    "Bristol", "Cardiff", "Coventry", "Derby", "Edinburgh", "Glasgow",
+    "Hull", "Leeds", "Leicester", "Liverpool", "London", "Luton",
+    "Manchester", "Newcastle", "Northampton", "Norwich", "Nottingham", "Plymouth",
+    "Portsmouth", "Reading", "Sheffield", "Southampton", "Stoke-on-Trent", "Wolverhampton"
   ],
   "United States": [
-    "New York", "Los Angeles", "Chicago", "Houston", "Phoenix", "Philadelphia",
-    "San Antonio", "San Diego", "Dallas", "San Jose", "Austin", "Jacksonville",
-    "Fort Worth", "Columbus", "Charlotte", "San Francisco", "Indianapolis", "Seattle",
-    "Denver", "Washington DC", "Boston", "El Paso", "Nashville", "Detroit", "Oklahoma City"
+    "Austin", "Boston", "Charlotte", "Chicago", "Columbus", "Dallas",
+    "Denver", "Detroit", "El Paso", "Fort Worth", "Houston", "Indianapolis",
+    "Jacksonville", "Los Angeles", "Nashville", "New York", "Oklahoma City", "Philadelphia",
+    "Phoenix", "San Antonio", "San Diego", "San Francisco", "San Jose", "Seattle",
+    "Washington DC"
   ],
   "Canada": [
-    "Toronto", "Montreal", "Vancouver", "Calgary", "Edmonton", "Ottawa",
-    "Winnipeg", "Quebec City", "Hamilton", "Kitchener", "London", "Victoria",
-    "Halifax", "Oshawa", "Windsor", "Saskatoon", "Regina", "Sherbrooke"
+    "Calgary", "Edmonton", "Halifax", "Hamilton", "Kitchener", "London",
+    "Montreal", "Oshawa", "Ottawa", "Quebec City", "Regina", "Saskatoon",
+    "Sherbrooke", "Toronto", "Vancouver", "Victoria", "Windsor", "Winnipeg"
   ],
   "Australia": [
-    "Sydney", "Melbourne", "Brisbane", "Perth", "Adelaide", "Gold Coast",
-    "Newcastle", "Canberra", "Sunshine Coast", "Wollongong", "Hobart", "Geelong",
-    "Townsville", "Cairns", "Darwin", "Toowoomba", "Ballarat", "Bendigo"
+    "Adelaide", "Ballarat", "Bendigo", "Brisbane", "Cairns", "Canberra",
+    "Darwin", "Geelong", "Gold Coast", "Hobart", "Melbourne", "Newcastle",
+    "Perth", "Sunshine Coast", "Sydney", "Toowoomba", "Townsville", "Wollongong"
   ]
 };
 
@@ -123,7 +123,13 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
 
   const parseWaliDetails = () => {
     try {
-      return parseJsonField(user.waliDetails) || { name: "", email: "", whatsapp: "", telegram: "", otherNumber: "" };
+      // Handle both string and object types for waliDetails
+      if (typeof user.waliDetails === 'string') {
+        return parseJsonField(user.waliDetails) || { name: "", email: "", whatsapp: "", telegram: "", otherNumber: "" };
+      } else if (typeof user.waliDetails === 'object' && user.waliDetails !== null) {
+        return user.waliDetails;
+      }
+      return { name: "", email: "", whatsapp: "", telegram: "", otherNumber: "" };
     } catch {
       return { name: "", email: "", whatsapp: "", telegram: "", otherNumber: "" };
     }
@@ -146,12 +152,14 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
     workEducation: user.workEducation || "",
     nationality: user.nationality || "",
     country: user.country || "",
-    city: user.city || user.region || "", // Use city field, fallback to region for backward compatibility
+    city: user.region || "", // Use region field for city data
     ethnicity: user.ethnicity || "",
     height: user.height || "",
     weight: user.weight || "",
     build: user.build || "",
     appearance: user.appearance || "",
+    skinColor: user.skinColor || "",
+    facialAttractiveness: user.facialAttractiveness || "",
     hijab: user.hijab || "No",
     beard: user.beard || "No",
     genotype: user.genotype || "",
@@ -209,23 +217,23 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
 
   const sections = [
     "Basic Info",
+    "Deen",
     "Location and Ethnicity",
     "Appearance and Co",
     "Lifestyle and Traits",
     "Interests",
     "Matching Details",
-    "Deen",
     ...(user.gender === 'female' ? ["Wali Details"] : []),
   ];
 
   const sidebarItems = [
     { icon: "👤", label: "Basic Info" },
+    { icon: "🕌", label: "Deen" },
     { icon: "🌍", label: "Location and Ethnicity" },
     { icon: "👗", label: "Appearance and Co" },
     { icon: "🎭", label: "Lifestyle and Traits" },
     { icon: "🎯", label: "Interests" },
     { icon: "💕", label: "Matching Details" },
-    { icon: "🕌", label: "Deen" },
     ...(user.gender === 'female' ? [{ icon: "👨‍👧", label: "Wali Details" }] : []),
   ];
 
@@ -631,17 +639,50 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
               </Select>
             </div>
             <div>
-              <Label>Facial Appearance</Label>
+              <Label>Appearance</Label>
               <Select value={formData.appearance} onValueChange={(value) => handleInputChange("appearance", value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select facial appearance" />
+                  <SelectValue placeholder="Select appearance" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Clean Shaven">Clean Shaven</SelectItem>
                   <SelectItem value="Beard">Beard</SelectItem>
                   <SelectItem value="Hijab">Hijab</SelectItem>
-                  <SelectItem value="Niqab">Niqab</SelectItem>
                   <SelectItem value="Jilbab">Jilbab</SelectItem>
+                  <SelectItem value="Niqab">Niqab</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Skin Color</Label>
+              <Select value={formData.skinColor} onValueChange={(value) => handleInputChange("skinColor", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select skin color" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Very Fair">Very Fair</SelectItem>
+                  <SelectItem value="Fair">Fair</SelectItem>
+                  <SelectItem value="Medium">Medium</SelectItem>
+                  <SelectItem value="Dark">Dark</SelectItem>
+                  <SelectItem value="Very Dark">Very Dark</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Facial Attractiveness</Label>
+              <Select value={formData.facialAttractiveness} onValueChange={(value) => handleInputChange("facialAttractiveness", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select facial attractiveness" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Standout">Standout</SelectItem>
+                  <SelectItem value="Very attractive">Very attractive</SelectItem>
+                  <SelectItem value="Attractive">Attractive</SelectItem>
+                  <SelectItem value="Fairly attractive">Fairly attractive</SelectItem>
+                  <SelectItem value="Above average">Above average</SelectItem>
+                  <SelectItem value="Average/Regular">Average/Regular</SelectItem>
+                  <SelectItem value="Fair/Okay">Fair/Okay</SelectItem>
+                  <SelectItem value="Plain">Plain</SelectItem>
                 </SelectContent>
               </Select>
             </div>

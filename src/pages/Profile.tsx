@@ -68,7 +68,7 @@ const Profile = () => {
         setRelationshipStatus({
           isMatched: false,
           hasReceivedRequestFrom: true,
-          requestId: receivedRequest._id || receivedRequest.relationship?.id
+          requestId: receivedRequest.relationship?.id || receivedRequest._id
         });
         return;
       }
