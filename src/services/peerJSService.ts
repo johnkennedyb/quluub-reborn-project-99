@@ -34,12 +34,17 @@ class PeerJSService {
       // Create unique peer ID
       const peerId = `${config.userId}_${Date.now()}`;
       
-      // Initialize PeerJS
+      // Initialize PeerJS with dynamic server configuration
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const baseUrl = apiUrl.replace('/api', ''); // Remove /api suffix
+      const isSecure = baseUrl.startsWith('https');
+      const url = new URL(baseUrl);
+      
       this.peer = new Peer(peerId, {
-        host: 'peerjs-server.herokuapp.com',
-        port: 443,
-        path: '/',
-        secure: true,
+        host: url.hostname,
+        port: isSecure ? 443 : (url.port ? parseInt(url.port) : 80),
+        path: '/peerjs',
+        secure: isSecure,
         config: {
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
