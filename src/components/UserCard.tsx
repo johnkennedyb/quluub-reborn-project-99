@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import moment from 'moment';
-import { MessageCircle, User as UserIcon } from 'lucide-react';
+import { MessageCircle, User as UserIcon, Heart } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { userService } from '@/lib/api-client';
 
 import { User } from '@/types/user';
 
@@ -20,10 +22,56 @@ interface UserCardProps {
   showChatButton?: boolean;
   conversationId?: string;
   showViewProfileButton?: boolean;
+  showFavoriteButton?: boolean;
+  isFavorited?: boolean;
+  onFavoriteToggle?: (userId: string) => void;
 }
 
-const UserCard: React.FC<UserCardProps> = ({ user, isSearch = false, showChatButton = false, conversationId, showViewProfileButton = false }) => {
+const UserCard: React.FC<UserCardProps> = ({ 
+  user, 
+  isSearch = false, 
+  showChatButton = false, 
+  conversationId, 
+  showViewProfileButton = false,
+  showFavoriteButton = false,
+  isFavorited = false,
+  onFavoriteToggle
+}) => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [isUpdatingFavorite, setIsUpdatingFavorite] = useState(false);
+
+  const handleFavoriteClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user._id || isUpdatingFavorite) return;
+
+    setIsUpdatingFavorite(true);
+    try {
+      if (isFavorited) {
+        await userService.removeFromFavorites(user._id);
+        toast({
+          title: "Removed from Favorites",
+          description: "User has been removed from your favorites.",
+        });
+      } else {
+        await userService.addToFavorites(user._id);
+        toast({
+          title: "Added to Favorites",
+          description: "User has been added to your favorites.",
+        });
+      }
+      onFavoriteToggle?.(user._id);
+    } catch (error) {
+      console.error("Failed to update favorites:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update favorites.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingFavorite(false);
+    }
+  };
 
   const handleChatClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -113,13 +161,13 @@ const UserCard: React.FC<UserCardProps> = ({ user, isSearch = false, showChatBut
             Last seen: {daysAgo(user.lastSeen || user.createdAt)}
         </div>
         
-        {(showChatButton || showViewProfileButton) && (
+        {(showChatButton || showViewProfileButton || showFavoriteButton) && (
           <div className="mt-4 pt-3 border-t">
-            <div className={`flex gap-2 ${showChatButton && showViewProfileButton ? 'flex-row' : 'flex-col'}`}>
+            <div className={`flex gap-2 ${(showChatButton && showViewProfileButton) || (showChatButton && showFavoriteButton) || (showViewProfileButton && showFavoriteButton) ? 'flex-row' : 'flex-col'}`}>
               {showChatButton && (
                 <Button 
                   onClick={handleChatClick}
-                  className={`flex items-center gap-2 bg-blue-600 hover:bg-blue-700 ${showViewProfileButton ? 'flex-1' : 'w-full'}`}
+                  className={`flex items-center gap-2 bg-blue-600 hover:bg-blue-700 ${(showViewProfileButton || showFavoriteButton) ? 'flex-1' : 'w-full'}`}
                   size="sm"
                 >
                   <MessageCircle className="w-4 h-4" />
@@ -130,11 +178,23 @@ const UserCard: React.FC<UserCardProps> = ({ user, isSearch = false, showChatBut
                 <Button 
                   onClick={handleViewProfileClick}
                   variant="outline"
-                  className={`flex items-center gap-2 ${showChatButton ? 'flex-1' : 'w-full'}`}
+                  className={`flex items-center gap-2 ${(showChatButton || showFavoriteButton) ? 'flex-1' : 'w-full'}`}
                   size="sm"
                 >
                   <UserIcon className="w-4 h-4" />
                   View Profile
+                </Button>
+              )}
+              {showFavoriteButton && (
+                <Button 
+                  onClick={handleFavoriteClick}
+                  variant={isFavorited ? "default" : "outline"}
+                  className={`flex items-center gap-2 ${isFavorited ? 'bg-red-500 hover:bg-red-600 text-white' : 'border-red-500 text-red-500 hover:bg-red-50'} ${(showChatButton || showViewProfileButton) ? 'flex-1' : 'w-full'}`}
+                  size="sm"
+                  disabled={isUpdatingFavorite}
+                >
+                  <Heart className={`w-4 h-4 ${isFavorited ? 'fill-current' : ''}`} />
+                  {isFavorited ? 'Favorited' : 'Favorite'}
                 </Button>
               )}
             </div>

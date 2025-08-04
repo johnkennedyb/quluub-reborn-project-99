@@ -60,7 +60,7 @@ const DashboardTabs: React.FC<DashboardTabsProps> = ({
       <Card>
         <CardContent className="p-0">
           <Tabs key={activeTab} value={activeTab} onValueChange={handleTabChange}>
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="matches">
                 Matches ({matchesArray?.length || 0})
               </TabsTrigger>
@@ -69,6 +69,9 @@ const DashboardTabs: React.FC<DashboardTabsProps> = ({
               </TabsTrigger>
               <TabsTrigger value="sent">
                 Sent Requests ({sentRequestArray?.length || 0})
+              </TabsTrigger>
+              <TabsTrigger value="favourites">
+                Favourites ({favoritesArray?.length || 0})
               </TabsTrigger>
             </TabsList>
             
@@ -109,6 +112,24 @@ const DashboardTabs: React.FC<DashboardTabsProps> = ({
                   ))
                 ) : (
                   <EmptyState message="No pending sent requests yet" />
+                )}
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="favourites" className="mt-0">
+              <div className="max-h-[63.25vh] overflow-y-auto p-4 space-y-4">
+                {favoritesArray?.length > 0 ? (
+                  favoritesArray.map((user) => (
+                    <UserCard 
+                      key={user._id || user.username} 
+                      user={user} 
+                      showChatButton={true}
+                      showViewProfileButton={true}
+                      showFavoriteButton={true}
+                    />
+                  ))
+                ) : (
+                  <EmptyState message="No favourites added yet" />
                 )}
               </div>
             </TabsContent>
@@ -168,6 +189,29 @@ const DashboardTabs: React.FC<DashboardTabsProps> = ({
                 ))
               ) : (
                 <EmptyState message="No pending sent requests yet" />
+              )}
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+        
+        <AccordionItem value="favourites">
+          <AccordionTrigger>
+            Favourites ({favoritesArray?.length || 0})
+          </AccordionTrigger>
+          <AccordionContent>
+            <div className="max-h-64 overflow-y-auto space-y-4 p-2">
+              {favoritesArray?.length > 0 ? (
+                favoritesArray.map((user) => (
+                  <UserCard 
+                    key={user._id || user.username} 
+                    user={user} 
+                    showChatButton={true}
+                    showViewProfileButton={true}
+                    showFavoriteButton={true}
+                  />
+                ))
+              ) : (
+                <EmptyState message="No favourites added yet" />
               )}
             </div>
           </AccordionContent>
