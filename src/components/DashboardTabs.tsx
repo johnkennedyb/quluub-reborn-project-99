@@ -123,7 +123,6 @@ const DashboardTabs: React.FC<DashboardTabsProps> = ({
                     <UserCard 
                       key={user._id || user.username} 
                       user={user} 
-                      showChatButton={true}
                       showViewProfileButton={true}
                       showFavoriteButton={true}
                     />
@@ -205,7 +204,6 @@ const DashboardTabs: React.FC<DashboardTabsProps> = ({
                   <UserCard 
                     key={user._id || user.username} 
                     user={user} 
-                    showChatButton={true}
                     showViewProfileButton={true}
                     showFavoriteButton={true}
                   />
