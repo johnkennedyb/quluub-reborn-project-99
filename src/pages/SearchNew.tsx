@@ -40,7 +40,7 @@ const Search = () => {
     nationality: "",
     country: "",
     ageRange: [22, 45],
-    heightRange: [52, 80],
+    heightRange: [48, 96],
     weightRange: [50, 90],
     build: "",
     appearance: "",

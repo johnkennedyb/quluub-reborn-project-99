@@ -45,6 +45,13 @@ const Messages = () => {
   const [invitationOpen, setInvitationOpen] = useState(false);
   const [invitationData, setInvitationData] = useState<{callerName: string; callerId: string; sessionId?: string; callId?: string; message?: string;} | null>(null);
   const [incomingCall, setIncomingCall] = useState<any>(null);
+  const [monthlyCallUsage, setMonthlyCallUsage] = useState<{
+    remainingSeconds: number;
+    formattedRemainingTime: string;
+    hasTimeRemaining: boolean;
+    totalUsedSeconds: number;
+    formattedUsedTime: string;
+  } | null>(null);
 
   // Video call refs and state
   const localVideoRef = useRef<HTMLDivElement>(null);
@@ -278,6 +285,13 @@ const Messages = () => {
     }
   }, [conversationId, targetUserId]);
 
+  // Fetch monthly usage when recipient is set
+  useEffect(() => {
+    if (recipientId && user) {
+      fetchMonthlyUsage();
+    }
+  }, [recipientId, user]);
+
   // Function to create or find conversation with a specific user
   const createOrFindConversation = async (userId: string) => {
     try {
@@ -392,6 +406,20 @@ const Messages = () => {
     }
   }, [user, messages]);
 
+  // Fetch monthly video call usage for this match
+  const fetchMonthlyUsage = async () => {
+    if (!recipientId || !user) return;
+    
+    try {
+      const response = await apiClient.get(`/monthly-usage/video-call/${recipientId}`);
+      if (response.data.success) {
+        setMonthlyCallUsage(response.data.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch monthly usage:', error);
+    }
+  };
+
   const handleStartVideoCall = async () => {
     if (!recipientId || !user) return;
 
@@ -401,6 +429,17 @@ const Messages = () => {
             description: "Video calls are available for Premium users only. Please upgrade your plan.",
             variant: "destructive",
             duration: 5000
+        });
+        return;
+    }
+
+    // Check monthly video call limit
+    if (monthlyCallUsage && !monthlyCallUsage.hasTimeRemaining) {
+        toast({
+            title: "⏰ Monthly Limit Reached",
+            description: `You have used all 5 minutes of video call time with this match for this month. Used: ${monthlyCallUsage.formattedUsedTime}/5:00`,
+            variant: "destructive",
+            duration: 7000
         });
         return;
     }
@@ -427,7 +466,8 @@ const Messages = () => {
     // Send a message with a clickable video call link to the chat log
     try {
         const videoCallLinkMessage = `🎥 **Video Call Invitation**\n\n📞 ${user.fname} ${user.lname} is inviting you to a video call\n\n🔗 **Join Link:** [Click here to join the video call](/video-call?sessionId=${sessionId}&callerId=${user._id}&callerName=${encodeURIComponent(user.fname + ' ' + user.lname)})\n\n_This is a premium feature. Islamic supervision is active._`;
-        await chatService.sendMessage(conversationId, videoCallLinkMessage, 'video_call_invitation', invitationPayload);
+        // Fix: Pass recipientId instead of conversationId - backend expects userId parameter
+        await chatService.sendMessage(recipientId, videoCallLinkMessage, 'video_call_invitation', invitationPayload);
     } catch (error) {
         console.error("Failed to send video call message to chat", error);
     }
@@ -531,52 +571,78 @@ const Messages = () => {
     <div className="flex h-screen bg-gray-100">
       <div className="flex-1 flex flex-col bg-white">
         {/* Header */}
-        <div className="p-4 border-b bg-white flex items-center justify-between shadow-sm">
+        <div className="p-2 sm:p-4 border-b bg-white flex items-center justify-between shadow-sm">
           <div className="flex items-center">
             <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
               <ArrowLeft className="h-5 w-5 text-gray-700" />
             </Button>
-            <h2 className="ml-4 text-lg font-medium text-gray-800">Chat</h2>
+            <h2 className="ml-2 sm:ml-4 text-base sm:text-lg font-medium text-gray-800">Chat</h2>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2">
             {/* View Profile Button */}
             {recipientId && (
               <Button
                 onClick={() => navigate(`/profile/${recipientId}`)}
                 variant="outline"
                 size="sm"
-                className="border-gray-300 hover:bg-gray-50"
+                className="border-gray-300 hover:bg-gray-50 hidden sm:flex"
               >
                 <User className="w-4 h-4 mr-2" />
                 View Profile
               </Button>
             )}
             
-            {/* Video Call Button - Premium Feature */}
+            {/* Mobile View Profile Button */}
             {recipientId && (
               <Button
-                onClick={handleStartVideoCall}
-                className={isPremiumUser(user) ? "bg-blue-600 hover:bg-blue-700 text-white" : "border-yellow-300 text-yellow-700 hover:bg-yellow-50"}
-                variant={isPremiumUser(user) ? "default" : "outline"}
+                onClick={() => navigate(`/profile/${recipientId}`)}
+                variant="outline"
                 size="sm"
+                className="border-gray-300 hover:bg-gray-50 sm:hidden p-2"
               >
-                <Video className="h-4 w-4 mr-2" />
-                Video Call
-                <Crown className="h-3 w-3 ml-1" />
+                <User className="w-4 h-4" />
               </Button>
+            )}
+            
+            {/* Video Call Button - Premium Feature */}
+            {recipientId && (
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={handleStartVideoCall}
+                  className={isPremiumUser(user) ? "bg-blue-600 hover:bg-blue-700 text-white" : "border-yellow-300 text-yellow-700 hover:bg-yellow-50"}
+                  variant={isPremiumUser(user) ? "default" : "outline"}
+                  size="sm"
+                  disabled={monthlyCallUsage && !monthlyCallUsage.hasTimeRemaining}
+                >
+                  <Video className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Video Call</span>
+                  <Crown className="h-3 w-3 ml-1" />
+                </Button>
+                {/* Monthly usage indicator - beside button */}
+                {monthlyCallUsage && (
+                  <div className="text-xs text-gray-500 hidden sm:block">
+                    <span className={monthlyCallUsage.hasTimeRemaining ? "text-green-600" : "text-red-500"}>
+                      {monthlyCallUsage.formattedRemainingTime} left
+                    </span>
+                    <span className="text-gray-400 ml-1">
+                      ({monthlyCallUsage.formattedUsedTime}/5:00)
+                    </span>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
 
         {/* Video Containers - Show when video call is active */}
         {showVideoCallInterface && (
-          <div className="p-4 bg-gray-900 border-b">
-            <div className="flex flex-wrap gap-4 justify-center">
+          <div className="p-2 sm:p-4 bg-gray-900 border-b">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-4 justify-center">
               {/* Local Video Preview */}
               <div className="relative">
                 <div
                   ref={localVideoRef}
-                  className="w-64 h-48 bg-black rounded-lg overflow-hidden border-2 border-blue-500"
+                  className="w-full sm:w-64 h-32 sm:h-48 bg-black rounded-lg overflow-hidden border-2 border-blue-500"
                 />
                 <div className="absolute bottom-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
                   You ({user?.fname})
@@ -598,10 +664,10 @@ const Messages = () => {
 
               {/* Waiting for participant */}
               {remoteUserIds.length === 0 && (
-                <div className="w-64 h-48 bg-gray-800 rounded-lg border-2 border-dashed border-gray-600 flex items-center justify-center">
+                <div className="w-full sm:w-64 h-32 sm:h-48 bg-gray-800 rounded-lg border-2 border-dashed border-gray-600 flex items-center justify-center">
                   <div className="text-center text-gray-400">
-                    <Clock className="w-8 h-8 mx-auto mb-2" />
-                    <p className="text-sm font-medium truncate">{recipientName || "Waiting..."}</p>
+                    <Clock className="w-6 sm:w-8 h-6 sm:h-8 mx-auto mb-2" />
+                    <p className="text-xs sm:text-sm font-medium truncate">{recipientName || "Waiting..."}</p>
                   </div>
                 </div>
               )}
@@ -610,7 +676,7 @@ const Messages = () => {
         )}
 
         {/* Chat Window */}
-        <div id="message-container" className="flex-1 p-4 space-y-4 bg-gray-50 overflow-y-auto">
+        <div id="message-container" className="flex-1 p-2 sm:p-4 space-y-2 sm:space-y-4 bg-gray-50 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center h-full">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
@@ -632,7 +698,7 @@ const Messages = () => {
                 }`}
               >
                 <div
-                  className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                  className={`max-w-[280px] sm:max-w-xs lg:max-w-md px-3 sm:px-4 py-2 rounded-lg ${
                     msg.senderId === user?._id
                       ? "bg-blue-500 text-white"
                       : "bg-white text-gray-800 border"
@@ -667,10 +733,10 @@ const Messages = () => {
         </div>
 
         {/* Message Input */}
-        <div className="p-4 border-t bg-white">
+        <div className="p-2 sm:p-4 border-t bg-white">
           {/* Task #29: Message counter display */}
-          <div className="flex justify-between items-center mb-2 text-xs text-gray-500">
-            <span>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2 text-xs text-gray-500 gap-1 sm:gap-0">
+            <span className="truncate">
               Messages: {messagesUsed}/{messageLimit} 
               {messageLimit - messagesUsed <= 3 && messageLimit - messagesUsed > 0 && (
                 <span className="text-orange-500 ml-1">({messageLimit - messagesUsed} left)</span>
@@ -689,13 +755,14 @@ const Messages = () => {
               onChange={(e) => setMessageText(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="Type your message..."
-              className="flex-1"
+              className="flex-1 text-sm sm:text-base"
               disabled={isSending || messagesUsed >= messageLimit}
             />
             <Button 
               onClick={sendMessage} 
               disabled={!messageText.trim() || isSending}
-              className="bg-blue-500 hover:bg-blue-600"
+              className="bg-blue-500 hover:bg-blue-600 px-3 sm:px-4"
+              size="sm"
             >
               {isSending ? (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>

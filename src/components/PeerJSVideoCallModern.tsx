@@ -93,16 +93,35 @@ export const PeerJSVideoCallModern: React.FC<PeerJSVideoCallModernProps> = ({
       });
       
       localStreamRef.current = stream;
+      console.log('📹 Local stream created:', stream);
+      console.log('📹 Local stream tracks:', stream.getTracks());
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
+        console.log('📹 Local video element srcObject set');
+        // Force local video to play
+        localVideoRef.current.play().catch(e => console.log('Local video play error:', e));
+      } else {
+        console.error('❌ Local video ref is null');
       }
 
-      // Create peer instance
-      const peerId = `${user?._id}_${sessionId}`;
-      const peer = new Peer(peerId, {
-        host: 'localhost',
-        port: 5000,
-        path: '/peerjs'
+      // Determine caller/callee based on user IDs to avoid conflicts
+      const isCaller = user?._id && participantId && user._id < participantId;
+      const myPeerId = isCaller ? `caller_${sessionId}` : `callee_${sessionId}`;
+      const remotePeerId = isCaller ? `callee_${sessionId}` : `caller_${sessionId}`;
+      
+      console.log('👤 Role:', isCaller ? 'Caller' : 'Callee');
+      console.log('🆔 My Peer ID:', myPeerId);
+      console.log('🎯 Remote Peer ID:', remotePeerId);
+
+      // Create peer instance with unique ID
+      const peer = new Peer(myPeerId, {
+        host: 'http://preview--quluub-reborn-project-99.lovable.app/',
+        port: 433,
+
+        // host: 'localhost',
+        // port: 5000,
+        path: '/peerjs',
+        debug: 2
       });
 
       peerRef.current = peer;
@@ -130,11 +149,17 @@ export const PeerJSVideoCallModern: React.FC<PeerJSVideoCallModernProps> = ({
 
       peer.on('error', (error) => {
         console.error('❌ PeerJS error:', error);
+        setConnectionStatus('disconnected');
         toast({
           title: "Connection Error",
-          description: "Failed to establish video call connection",
+          description: `Failed to establish video call: ${error.message || error.type}`,
           variant: "destructive"
         });
+      });
+
+      peer.on('disconnected', () => {
+        console.log('🔌 PeerJS disconnected, attempting to reconnect...');
+        peer.reconnect();
       });
 
       // Handle incoming calls
@@ -144,32 +169,97 @@ export const PeerJSVideoCallModern: React.FC<PeerJSVideoCallModernProps> = ({
         callRef.current = call;
         
         call.on('stream', (remoteStream) => {
-          console.log('📺 Received remote stream');
+          console.log('📺 Received remote stream from incoming call:', remoteStream);
+          console.log('📺 Remote stream tracks:', remoteStream.getTracks());
           if (remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = remoteStream;
+            console.log('📺 Remote video element srcObject set');
+            // Force video to play
+            remoteVideoRef.current.play().catch(e => console.log('Remote video play error:', e));
+          } else {
+            console.error('❌ Remote video ref is null');
           }
           setConnectionStatus('connected');
         });
+
+        call.on('error', (error) => {
+          console.error('❌ Call error:', error);
+          setConnectionStatus('disconnected');
+        });
       });
 
-      // Make outgoing call
-      const remotePeerId = `${participantId}_${sessionId}`;
-      console.log('📞 Attempting to call remote peer:', remotePeerId);
-      
-      setTimeout(() => {
-        const call = peer.call(remotePeerId, stream);
-        if (call) {
-          callRef.current = call;
+      // Only caller initiates the call to avoid race conditions
+      if (isCaller) {
+        console.log('📞 Caller: Attempting to call remote peer:', remotePeerId);
+        
+        // Retry logic for outgoing calls with improved timing
+        let retryCount = 0;
+        const maxRetries = 8; // Increased retries
+        const initialDelay = 4000; // Increased initial delay to 4 seconds
+        const retryDelay = 2000;
+        
+        const attemptCall = () => {
+          const delay = retryCount === 0 ? initialDelay : retryDelay + (retryCount * 1500); // Longer exponential backoff
+          console.log(`🔄 Attempting call in ${delay}ms (attempt ${retryCount + 1}/${maxRetries + 1})`);
           
-          call.on('stream', (remoteStream) => {
-            console.log('📺 Received remote stream from outgoing call');
-            if (remoteVideoRef.current) {
-              remoteVideoRef.current.srcObject = remoteStream;
+          setTimeout(() => {
+            if (peerRef.current && peerRef.current.open) {
+              console.log('📞 Making call to:', remotePeerId);
+              const call = peerRef.current.call(remotePeerId, stream);
+              if (call) {
+                callRef.current = call;
+                
+                call.on('stream', (remoteStream) => {
+                  console.log('📺 ✅ SUCCESS: Received remote stream from outgoing call:', remoteStream);
+                  console.log('📺 Remote stream tracks:', remoteStream.getTracks());
+                  if (remoteVideoRef.current) {
+                    remoteVideoRef.current.srcObject = remoteStream;
+                    console.log('📺 Remote video element srcObject set for outgoing call');
+                    // Force video to play
+                    remoteVideoRef.current.play().catch(e => console.log('Remote video play error:', e));
+                  } else {
+                    console.error('❌ Remote video ref is null for outgoing call');
+                  }
+                  setConnectionStatus('connected');
+                });
+
+                call.on('error', (error) => {
+                  console.error(`❌ Outgoing call error (attempt ${retryCount + 1}):`, error);
+                  if (retryCount < maxRetries) {
+                    retryCount++;
+                    console.log(`🔄 Will retry call (${retryCount}/${maxRetries}) - waiting for callee peer...`);
+                    attemptCall();
+                  } else {
+                    console.error('❌ All retry attempts failed - callee may not be available');
+                    setConnectionStatus('disconnected');
+                    toast({
+                      title: "Call Failed",
+                      description: "Could not connect to the other participant. They may have left or have connection issues.",
+                      variant: "destructive"
+                    });
+                  }
+                });
+              } else {
+                console.error('❌ Failed to create call object');
+                if (retryCount < maxRetries) {
+                  retryCount++;
+                  attemptCall();
+                }
+              }
+            } else {
+              console.error('❌ Peer not ready or not open');
+              if (retryCount < maxRetries) {
+                retryCount++;
+                attemptCall();
+              }
             }
-            setConnectionStatus('connected');
-          });
-        }
-      }, 2000);
+          }, delay);
+        };
+        
+        attemptCall();
+      } else {
+        console.log('📞 Callee: Waiting for incoming call...');
+      }
 
     } catch (error) {
       console.error('❌ Failed to initialize call:', error);
@@ -334,7 +424,12 @@ export const PeerJSVideoCallModern: React.FC<PeerJSVideoCallModernProps> = ({
           ref={remoteVideoRef}
           autoPlay
           playsInline
+          muted={false}
+          controls={false}
           className="w-full h-full object-cover bg-gray-800"
+          onLoadedMetadata={() => console.log('📺 Remote video metadata loaded')}
+          onPlay={() => console.log('📺 Remote video started playing')}
+          onError={(e) => console.error('❌ Remote video error:', e)}
         />
         
         {/* Remote Video Placeholder */}
@@ -359,7 +454,11 @@ export const PeerJSVideoCallModern: React.FC<PeerJSVideoCallModernProps> = ({
             autoPlay
             playsInline
             muted
+            controls={false}
             className="w-full h-full object-cover"
+            onLoadedMetadata={() => console.log('📹 Local video metadata loaded')}
+            onPlay={() => console.log('📹 Local video started playing')}
+            onError={(e) => console.error('❌ Local video error:', e)}
           />
           {!videoEnabled && (
             <div className="absolute inset-0 bg-gray-800 flex items-center justify-center">

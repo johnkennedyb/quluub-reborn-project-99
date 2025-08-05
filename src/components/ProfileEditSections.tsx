@@ -400,10 +400,14 @@ const ProfileEditSections = ({ user, onSave, onCancel }: ProfileEditSectionsProp
 
   const generateHeightOptions = () => {
     const heights = [];
-    for (let ft = 4; ft <= 7; ft++) {
+    for (let ft = 4; ft <= 8; ft++) {
       for (let inch = 0; inch < 12; inch++) {
-        if (ft === 7 && inch > 11) break; // Stop after 7ft 11in
-        heights.push(`${ft}ft ${inch}in`);
+        if (ft === 8 && inch > 0) break; // Stop after 8ft
+        if (inch === 0) {
+          heights.push(`${ft}ft`);
+        } else {
+          heights.push(`${ft}ft ${inch}in`);
+        }
       }
     }
     return heights;

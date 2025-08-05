@@ -20,6 +20,7 @@ const waliRoutes = require('./routes/waliRoutes');
 const feedRoutes = require('./routes/feedRoutes');
 const profileTestRoutes = require('./routes/profileTestRoutes');
 const videoCallTestRoutes = require('./routes/videoCallTestRoutes');
+const monthlyUsageRoutes = require('./routes/monthlyUsageRoutes');
 const cors = require('cors');
 const User = require('./models/User');
 
@@ -405,9 +406,10 @@ app.use('/api/whereby', wherebyRoutes);
 app.use('/api/zoom', require('./routes/zoomRoutes'));
 app.use('/api/zoom', videoCallTestRoutes);
 app.use('/api/video-calls', require('./routes/videoRecordingRoutes'));
-app.use('/wali', waliRoutes);
+app.use('/api/wali', waliRoutes);
 app.use('/api/feed', feedRoutes);
 app.use('/api/test', profileTestRoutes);
+app.use('/api/monthly-usage', monthlyUsageRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const MonthlyCallUsage = require('../models/MonthlyCallUsage');
 const { sendEmail } = require('../utils/emailService');
 
 // @desc    Send video call notification to Wali
@@ -9,10 +10,32 @@ exports.sendVideoCallNotificationToWali = async (req, res) => {
     const { recipientId, recipientInfo, status, duration, timestamp } = req.body;
     const userId = req.user._id;
 
-    // Get user's Wali details
-    const user = await User.findById(userId).select('waliDetails fname lname username');
+    // Get user's details including plan
+    const user = await User.findById(userId).select('waliDetails fname lname username plan');
     if (!user || !user.waliDetails || !user.waliDetails.email) {
       return res.status(400).json({ message: 'Wali details not found' });
+    }
+
+    // Only premium users can initiate video calls (status === 'started')
+    // Free users can join calls initiated by premium users
+    if (status === 'started' && (!user.plan || (user.plan !== 'premium' && user.plan !== 'pro'))) {
+      return res.status(403).json({ 
+        message: 'Only premium users can initiate video calls. Free users can join calls initiated by premium users.',
+        code: 'PREMIUM_REQUIRED_FOR_INITIATION'
+      });
+    }
+
+    // Check monthly video call time limit for this match pair (5 minutes per month)
+    if (status === 'started') {
+      const timeCheck = await MonthlyCallUsage.getRemainingTime(userId, recipientId);
+      if (!timeCheck.hasTimeRemaining) {
+        return res.status(403).json({
+          message: 'Monthly video call limit reached. You have used all 5 minutes for this month with this match.',
+          code: 'MONTHLY_LIMIT_REACHED',
+          totalUsedSeconds: timeCheck.totalUsedSeconds,
+          monthlyLimitSeconds: timeCheck.monthlyLimitSeconds
+        });
+      }
     }
 
     // Get recipient details
@@ -64,6 +87,22 @@ exports.sendVideoCallNotificationToWali = async (req, res) => {
       subject: subject,
       html: emailContent,
     });
+
+    // Track video call usage if call ended
+    if (status === 'ended' && duration > 0) {
+      try {
+        await MonthlyCallUsage.addCallDuration(
+          userId, 
+          recipientId, 
+          duration, 
+          null, // callId - can be added if available
+          userId // initiatedBy
+        );
+        console.log(`📊 Monthly call usage updated: ${duration} seconds added for users ${userId} and ${recipientId}`);
+      } catch (error) {
+        console.error('Error updating monthly call usage:', error);
+      }
+    }
 
     // Log the video call notification
     console.log(`Video call ${status} notification sent to Wali:`, {

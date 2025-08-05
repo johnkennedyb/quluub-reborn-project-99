@@ -141,12 +141,14 @@ export const VideoCallInterface: React.FC<VideoCallInterfaceProps> = ({
       
       setCurrentInvitation(invitationData);
       
-      // For outgoing calls, we're already connected
-      // For incoming calls, we need to set the state to incoming first
+      // For outgoing calls, start PeerJS connection as caller
+      // For incoming calls, start PeerJS connection as callee
       if (incomingCall.isOutgoing) {
+        console.log('📞 CALLER: Starting outgoing call - will create caller PeerJS connection');
         setCallState('connected');
       } else {
-        setCallState('incoming');
+        console.log('📞 CALLEE: Accepting incoming call - will create callee PeerJS connection');
+        setCallState('connected'); // Changed from 'incoming' to 'connected' to start PeerJS immediately
       }
       
       setPeerJSSessionData({ 
@@ -195,18 +197,24 @@ export const VideoCallInterface: React.FC<VideoCallInterfaceProps> = ({
         console.log('🎯 RECIPIENT: Call ID:', data.callId);
         
         setCurrentInvitation(data);
-        setCallState('incoming');
-        setPeerJSSessionData({ sessionId: data.sessionId, callId: data.callId });
+        
+        // Auto-accept and start PeerJS connection for recipient
+        console.log('🎯 RECIPIENT: Auto-accepting call and starting PeerJS connection');
+        setCallState('connected');
+        setPeerJSSessionData({ 
+          sessionId: data.sessionId, 
+          callId: data.callId 
+        });
         setShowPeerJSCall(true);
         
         console.log('🎯 RECIPIENT: Showing toast notification');
         toast({
           title: '📞 Incoming Video Call',
-          description: `${data.callerName} is calling you`,
+          description: `${data.callerName} is calling you - Connecting...`,
           duration: 5000,
         });
         
-        console.log('🎯 RECIPIENT: Call setup complete, waiting for user action');
+        console.log('🎯 RECIPIENT: Call setup complete, PeerJS will auto-start');
       } else {
         console.log('🎯 RECIPIENT: ❌ Video call invitation not for this user');
       }
@@ -238,16 +246,20 @@ export const VideoCallInterface: React.FC<VideoCallInterfaceProps> = ({
           sessionId: invitationData.sessionId, 
           callId: invitationData.callId 
         });
+        
+        // Auto-accept and start PeerJS connection for recipient
+        console.log('🎯 RECIPIENT: Auto-accepting call and starting PeerJS connection');
+        setCallState('connected');
         setShowPeerJSCall(true);
         
         console.log('🎯 RECIPIENT: Showing toast and setting up call interface');
         toast({
           title: '📞 Incoming Video Call',
-          description: `${invitationData.callerName} is calling you`,
+          description: `${invitationData.callerName} is calling you - Connecting...`,
           duration: 5000,
         });
         
-        console.log('🎯 RECIPIENT: Call setup complete via new_message');
+        console.log('🎯 RECIPIENT: Call setup complete via new_message - PeerJS will auto-start');
       } else if (message.messageType === 'video_call_invitation') {
         console.log('🎯 RECIPIENT: Video call invitation not for this user (via new_message)');
         console.log('🎯 RECIPIENT: Message recipient:', message.recipientId, 'Current user:', user?._id);

@@ -2,6 +2,7 @@
 const asyncHandler = require('express-async-handler');
 const { v4: uuidv4 } = require('uuid');
 const Call = require('../models/Call');
+const MonthlyCallUsage = require('../models/MonthlyCallUsage');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
 const Chat = require('../models/Chat');
@@ -28,10 +29,24 @@ exports.initiateCall = asyncHandler(async (req, res) => {
     throw new Error('Recipient not found');
   }
 
-  const caller = await User.findById(callerId);
+  const caller = await User.findById(callerId).select('fname lname username plan');
   if (!caller) {
     res.status(404);
     throw new Error('Caller not found');
+  }
+
+  // Only premium users can initiate video calls
+  // Free users can join calls initiated by premium users
+  if (!caller.plan || (caller.plan !== 'premium' && caller.plan !== 'pro')) {
+    res.status(403);
+    throw new Error('Only premium users can initiate video calls. Free users can join calls initiated by premium users.');
+  }
+
+  // Check monthly video call time limit for this match pair (5 minutes per month)
+  const timeCheck = await MonthlyCallUsage.getRemainingTime(callerId, recipientId);
+  if (!timeCheck.hasTimeRemaining) {
+    res.status(403);
+    throw new Error(`Monthly video call limit reached. You have used all 5 minutes for this month with this match. Remaining: 0:00`);
   }
 
   // Check for existing active call between these users

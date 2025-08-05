@@ -495,7 +495,28 @@ class WebRTCService {
   }
 }
 
-export const webrtcService = new WebRTCService();
+// TEMPORARILY DISABLED - Conflicting with PeerJS video calls
+// This service was causing immediate call termination
+// export const webrtcService = new WebRTCService();
+// export default webrtcService;
+
+// Minimal stub to prevent import errors
+export const webrtcService = {
+  endCall: () => console.log('WebRTC service disabled'),
+  initializeCall: () => console.log('WebRTC service disabled'),
+  // Add other methods as needed
+};
+
 export default webrtcService;
 
+// Export types for compatibility
+export interface CallData {
+  id: string;
+  participants: string[];
+  status: string;
+}
 
+export interface WebRTCCallbacks {
+  onCallEnd?: () => void;
+  onCallStart?: () => void;
+}

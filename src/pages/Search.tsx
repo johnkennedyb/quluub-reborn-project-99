@@ -40,7 +40,7 @@ const Search = () => {
     nationality: "",
     country: "",
     ageRange: [18, 50], // Keep expanded range but fix the filtering logic
-    heightRange: [52, 80],
+    heightRange: [48, 96],
     weightRange: [50, 90],
     build: "",
     appearance: "",
@@ -122,7 +122,7 @@ const Search = () => {
       // Add height range parameters (only if not default range)
       if (inputs.heightRange && inputs.heightRange.length === 2) {
         // Only apply height filter if user has changed from default
-        if (inputs.heightRange[0] !== 52 || inputs.heightRange[1] !== 80) {
+        if (inputs.heightRange[0] !== 48 || inputs.heightRange[1] !== 96) {
           params.minHeight = inputs.heightRange[0];
           params.maxHeight = inputs.heightRange[1];
         }
@@ -401,15 +401,15 @@ const Search = () => {
                   <div className="mb-2">
                     <Slider 
                       value={inputs.heightRange} 
-                      min={120} 
-                      max={215} 
+                      min={48} 
+                      max={96} 
                       step={1}
                       onValueChange={(value) => handleChange('heightRange', value)}
                     />
                   </div>
                   <div className="flex justify-between text-sm text-muted-foreground">
-                    <span>{Math.floor(inputs.heightRange[0]/30.48)}'{Math.round((inputs.heightRange[0]/2.54)%12)}"</span>
-                    <span>{Math.floor(inputs.heightRange[1]/30.48)}'{Math.round((inputs.heightRange[1]/2.54)%12)}"</span>
+                    <span>{Math.floor(inputs.heightRange[0]/12)}ft {inputs.heightRange[0]%12 === 0 ? '' : inputs.heightRange[0]%12 + 'in'}</span>
+                    <span>{Math.floor(inputs.heightRange[1]/12)}ft {inputs.heightRange[1]%12 === 0 ? '' : inputs.heightRange[1]%12 + 'in'}</span>
                   </div>
                 </div>
                 

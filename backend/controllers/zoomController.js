@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Call = require('../models/Call');
+const MonthlyCallUsage = require('../models/MonthlyCallUsage');
 const nodemailer = require('nodemailer');
 
 // Zoom Video SDK configuration
@@ -167,6 +168,18 @@ exports.createMeeting = async (req, res) => {
       return res.status(403).json({ 
         message: 'Video calls are for Premium users only. Please upgrade your plan.',
         requiresUpgrade: true 
+      });
+    }
+
+    // Check monthly video call time limit for this match pair (5 minutes per month)
+    const timeCheck = await MonthlyCallUsage.getRemainingTime(userId, participantId);
+    if (!timeCheck.hasTimeRemaining) {
+      return res.status(403).json({
+        message: 'Monthly video call limit reached. You have used all 5 minutes for this month with this match.',
+        code: 'MONTHLY_LIMIT_REACHED',
+        totalUsedSeconds: timeCheck.totalUsedSeconds,
+        monthlyLimitSeconds: timeCheck.monthlyLimitSeconds,
+        remainingTime: '0:00'
       });
     }
 
