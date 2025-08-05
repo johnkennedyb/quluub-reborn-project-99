@@ -116,7 +116,7 @@ export const PeerJSVideoCallModern: React.FC<PeerJSVideoCallModernProps> = ({
       // Create peer instance with unique ID
       const peer = new Peer(myPeerId, {
         host: 'quluub-reborn-project-33-8lca.onrender.com',
-        port: 433,
+        port: 443,
 
         // host: 'localhost',
         // port: 5000,
