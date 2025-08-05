@@ -150,12 +150,29 @@ const UserCard: React.FC<UserCardProps> = ({
           {summary.length > maxLength ? `${summary.substring(0, maxLength)}...` : summary || '✨ This user hasn\'t shared their story yet. Send them a message to learn more!'}
         </p>
 
-        <div className="flex items-center text-xs text-muted-foreground gap-2">
+        <div className="flex items-center text-xs text-muted-foreground gap-2 flex-wrap">
           <span>{getAge(user.dob)}</span>
           {user.nationality && <span>{capitalizeFirstLetter(user.nationality)}</span>}
           {getFlag(user.nationality)}
           {user.country && <span>| Lives in: {capitalizeFirstLetter(user.country)}</span>}
         </div>
+        
+        {/* Ethnicity display with yellow background */}
+        {user.ethnicity && Array.isArray(user.ethnicity) && user.ethnicity.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {user.ethnicity.map((eth: string, index: number) => (
+              eth && eth.trim() ? (
+                <Badge 
+                  key={index} 
+                  className="text-xs bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-200"
+                  variant="outline"
+                >
+                  {capitalizeFirstLetter(eth.trim())}
+                </Badge>
+              ) : null
+            ))}
+          </div>
+        )}
 
         <div className="text-xs text-muted-foreground mt-2 italic">
             Last seen: {daysAgo(user.lastSeen || user.createdAt)}

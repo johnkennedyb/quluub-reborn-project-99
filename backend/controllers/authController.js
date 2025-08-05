@@ -113,14 +113,13 @@ const signup = async (req, res) => {
     });
 
     if (user) {
-      // Send validation and welcome emails
+      // Send welcome email only (email already verified during pre-signup)
       try {
-        const verificationToken = crypto.randomBytes(32).toString('hex');
-        user.emailVerificationToken = crypto.createHash('sha256').update(verificationToken).digest('hex');
-        user.emailVerificationExpires = Date.now() + 3600000; // 1 hour
+        // Mark email as verified since user completed pre-signup verification
+        user.emailVerified = true;
         await user.save();
 
-        sendValidationEmail(user.email, user.fname, verificationToken);
+        // Only send welcome email - no verification needed
         sendWelcomeEmail(user.email, user.fname);
 
         // If the user is female and provided a parent's email, notify the Wali
